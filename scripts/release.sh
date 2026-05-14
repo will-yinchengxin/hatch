@@ -4,6 +4,9 @@
 # Example: ./scripts/release.sh 0.2.0
 set -euo pipefail
 
+# Always run from project root regardless of where the script is called from
+cd "$(dirname "$0")/.."
+
 VERSION="${1:-0.1.0}"
 WAILS="${GOPATH:-$HOME/go}/bin/wails"
 DMG_OUT="build/bin/Hatch-${VERSION}-arm64.dmg"
