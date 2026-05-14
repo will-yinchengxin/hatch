@@ -138,8 +138,41 @@ wails build            → Built in 5.559s ✓
 
 ---
 
-## Day 6 — 打包 + DMG（待执行）
+## Day 6 — 打包 + DMG ✅
 
-- [ ] `wails build -platform darwin/arm64 -clean`
-- [ ] `codesign --force --deep --sign - build/bin/Hatch.app`
-- [ ] `create-dmg Hatch.dmg build/bin/Hatch.app`
+**日期**: 2026-05-14
+
+| 步骤 | 状态 | 说明 |
+|------|------|------|
+| `wails.json` 补全元信息 | ✅ | productName=Hatch / version=0.1.0 / copyright |
+| `wails build -platform darwin/arm64 -clean` | ✅ | 4.98s，产物 `build/bin/Hatch.app`（arm64，adhoc 自签名）|
+| `codesign --force --deep --sign -` | ✅ | `codesign --verify --deep --strict` 通过 |
+| `create-dmg` 安装 | ✅ | `brew install create-dmg` v1.2.3 |
+| DMG 打包 | ✅ | `Hatch-0.1.0-arm64.dmg` **3.4 MB**，含 Applications 快捷方式 |
+| `scripts/release.sh` | ✅ | 一键 build → sign → DMG，支持版本号参数 |
+
+**首次运行绕过 Gatekeeper**（本地自签名无 Apple 开发者账号）：
+```bash
+xattr -cr /Applications/Hatch.app   # 一次性执行后正常双击
+# 或：右键 Hatch.app → 打开 → 打开
+```
+
+**完整发布流程**（下次迭代）：
+```bash
+./scripts/release.sh 0.2.0
+```
+
+---
+
+## 全部 6 天执行完毕 🎉
+
+| Day | 内容 | 状态 |
+|-----|------|------|
+| 1 | 环境 + Wails vanilla 骨架 | ✅ |
+| 2 | config / zshrc manager / store | ✅ |
+| 3 | scanner / parser / language detection | ✅ |
+| 4 | executor oneshot + service + event stream | ✅ |
+| 5 | 前端 Alpine.js + 完整 app.go API | ✅ |
+| 6 | wails build -clean + codesign + DMG | ✅ |
+
+**测试汇总**: zshrc 7/7 · scanner 11/11 · executor 9/9 — 全部通过

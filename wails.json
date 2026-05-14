@@ -1,11 +1,17 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "hatch",
-  "outputfilename": "hatch",
+  "name": "Hatch",
+  "outputfilename": "Hatch",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "info": {
+    "productName": "Hatch",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright © 2026 will yin",
+    "comments": "Script management dashboard for macOS"
+  },
   "author": {
     "name": "will yin",
     "email": "826895143@qq.com"
