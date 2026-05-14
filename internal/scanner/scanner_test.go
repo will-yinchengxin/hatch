@@ -198,6 +198,64 @@ func TestScanDir_DefaultsForPlainScript(t *testing.T) {
 	}
 }
 
+func TestDetectServicePattern_CaseStatement(t *testing.T) {
+	dir := t.TempDir()
+	writeScript(t, dir, "redis.sh", `#!/bin/bash
+case "$1" in
+  start)
+    echo "starting"
+    ;;
+  stop)
+    echo "stopping"
+    ;;
+  restart)
+    echo "restarting"
+    ;;
+  status)
+    echo "status"
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|status}"
+    exit 1
+esac
+`)
+	scripts, err := ScanDir(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scripts) != 1 {
+		t.Fatalf("expected 1 script, got %d", len(scripts))
+	}
+	s := scripts[0]
+	if s.Type != config.TypeService {
+		t.Errorf("expected service type, got %q", s.Type)
+	}
+	if !containsStr(s.Commands, "start") || !containsStr(s.Commands, "stop") {
+		t.Errorf("expected start/stop in commands, got %v", s.Commands)
+	}
+}
+
+func TestDetectServicePattern_UsageHint(t *testing.T) {
+	dir := t.TempDir()
+	writeScript(t, dir, "svc.sh", `#!/bin/bash
+usage() { echo "Usage: $0 {start|stop|reload}"; exit 1; }
+[ $# -eq 0 ] && usage
+`)
+	scripts, _ := ScanDir(dir, nil)
+	if len(scripts) == 1 && scripts[0].Type != config.TypeService {
+		t.Errorf("usage hint should trigger service detection, got type %q", scripts[0].Type)
+	}
+}
+
+func TestDetectServicePattern_PlainScript(t *testing.T) {
+	dir := t.TempDir()
+	writeScript(t, dir, "backup.sh", "#!/bin/bash\ntar czf backup.tar.gz /data\n")
+	scripts, _ := ScanDir(dir, nil)
+	if len(scripts) == 1 && scripts[0].Type != config.TypeOneshot {
+		t.Errorf("plain script should be oneshot, got %q", scripts[0].Type)
+	}
+}
+
 func TestScanDir_ServiceAutoFillsPidFile(t *testing.T) {
 	dir := t.TempDir()
 	writeScript(t, dir, "daemon.sh", "#!/bin/bash\n# @hatch.type: service\n")

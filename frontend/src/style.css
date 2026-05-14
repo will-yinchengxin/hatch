@@ -387,3 +387,169 @@ code {
 }
 
 [x-cloak] { display: none !important; }
+
+/* ── Directory cards (home view) ──────────────────────────────────────── */
+.dir-card-list { display: flex; flex-direction: column; gap: 10px; }
+
+.dir-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dir-card:hover { border-color: var(--primary); background: var(--surface-3); }
+
+.dir-card-icon { font-size: 24px; flex-shrink: 0; }
+
+.dir-card-body { flex: 1; min-width: 0; }
+
+.dir-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.dir-card-title strong { font-size: 15px; }
+
+.dir-card-path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 5px;
+}
+
+.dir-card-meta { display: flex; gap: 10px; font-size: 12px; }
+.script-count { color: var(--text); }
+.script-type-summary { color: var(--text-muted); }
+
+.dir-card-arrow { color: var(--text-muted); font-size: 18px; flex-shrink: 0; }
+
+.badge-export {
+  background: #1a2a3a;
+  color: #60a5fa;
+  border-color: #2a4a6a;
+  font-family: var(--font-mono);
+}
+
+/* ── Breadcrumb ───────────────────────────────────────────────────────── */
+.back-btn { font-size: 13px; padding: 4px 10px; }
+
+.breadcrumb { display: flex; flex-direction: column; gap: 1px; }
+.dir-name { font-size: 14px; font-weight: 600; }
+.dir-path { font-family: var(--font-mono); font-size: 11px; }
+
+/* ── Command tags ─────────────────────────────────────────────────────── */
+.cmd-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.cmd-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  background: #1a2a2a;
+  color: #67e8f9;
+  border: 1px solid #2a4a4a;
+}
+
+/* ── Directory settings rows ──────────────────────────────────────────── */
+.dir-setting-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+
+.dir-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.dir-setting-info { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.dir-setting-path { max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dir-setting-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.btn-quick-export {
+  font-size: 12px;
+  padding: 3px 10px;
+  background: #1a2a3a;
+  border-color: #2a4a6a;
+  color: #60a5fa;
+}
+.btn-quick-export:hover { background: #1e3347; border-color: var(--primary); }
+.btn-clear-export { font-size: 12px; padding: 3px 10px; }
+
+/* ── Quick export modal ───────────────────────────────────────────────── */
+.quick-export-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.modal-inner {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  min-width: 420px;
+  max-width: 90vw;
+}
+.modal-inner p { margin: 0 0 14px; }
+.modal-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.modal-row .eq { font-size: 14px; }
+.preview-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-3);
+  padding: 3px 7px;
+  border-radius: 3px;
+}
+.modal-actions { display: flex; gap: 8px; }
+
+/* ── zshrc preview ────────────────────────────────────────────────────── */
+.zshrc-preview {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.preview-label {
+  padding: 5px 10px;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.preview-pre {
+  margin: 0;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: #0d111a;
+  color: #86efac;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.export-row-header { margin-bottom: 2px; font-size: 11px; }
+.export-empty { font-size: 12px; padding: 4px 0; }

@@ -87,6 +87,67 @@ func parseHatchAnnotations(path string) (config.ScriptMeta, bool) {
 	return meta, found
 }
 
+// detectServicePattern scans the first 200 lines for start/stop/restart/reload
+// patterns common in init-style and daemon control scripts (shell & python).
+// Returns (true, commands) when at least start+stop are found.
+func detectServicePattern(path string) (bool, []string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, nil
+	}
+	defer f.Close()
+
+	var sb strings.Builder
+	sc := bufio.NewScanner(f)
+	lineCount := 0
+	for sc.Scan() && lineCount < 200 {
+		lineCount++
+		sb.WriteString(strings.ToLower(sc.Text()))
+		sb.WriteByte('\n')
+	}
+	text := sb.String()
+
+	known := []string{"start", "stop", "restart", "reload", "status"}
+	var found []string
+	for _, cmd := range known {
+		if matchesServiceCmd(text, cmd) {
+			found = append(found, cmd)
+		}
+	}
+
+	if containsStr(found, "start") && containsStr(found, "stop") {
+		return true, found
+	}
+	return false, nil
+}
+
+// matchesServiceCmd returns true when cmd appears as a standalone service verb
+// in text (case statement arm, quoted comparison, usage hint, etc.).
+func matchesServiceCmd(text, cmd string) bool {
+	for _, pattern := range []string{
+		cmd + ")",        // case arm:   start)
+		`"` + cmd + `"`, // quoted:     "start"
+		`'` + cmd + `'`, // quoted:     'start'
+		"|" + cmd + "|", // usage hint: {start|stop}
+		"|" + cmd + "}",
+		"{" + cmd + "|",
+	} {
+		if strings.Contains(text, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsStr(ss []string, s string) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 // probeHelp runs `script --help` with a 2-second timeout and returns stdout+stderr.
 func probeHelp(path string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

@@ -144,6 +144,54 @@ func (a *App) RemoveDirectory(path string) error {
 	return a.cfg.Save()
 }
 
+// UpdateDirectoryExport sets (or clears) the export name for an existing directory
+// and syncs ~/.zshrc immediately.
+func (a *App) UpdateDirectoryExport(dirPath, exportName string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	found := false
+	for i, d := range a.cfg.Directories {
+		if d.Path != dirPath {
+			continue
+		}
+		found = true
+		// Remove old export entry if name changed
+		if d.ExportName != "" && d.ExportName != exportName {
+			var kept []config.ExportVar
+			for _, e := range a.cfg.Exports {
+				if e.Name != d.ExportName {
+					kept = append(kept, e)
+				}
+			}
+			a.cfg.Exports = kept
+		}
+		a.cfg.Directories[i].ExportName = exportName
+		break
+	}
+	if !found {
+		return fmt.Errorf("directory not found: %s", dirPath)
+	}
+
+	if exportName != "" {
+		updated := false
+		for i, e := range a.cfg.Exports {
+			if e.Name == exportName {
+				a.cfg.Exports[i].Value = dirPath
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			a.cfg.Exports = append(a.cfg.Exports, config.ExportVar{Name: exportName, Value: dirPath})
+		}
+		if err := a.syncZshrc(); err != nil {
+			return err
+		}
+	}
+	return a.cfg.Save()
+}
+
 // ─── Script scanning ─────────────────────────────────────────────────────────
 
 // ScanAll rescans every configured script directory and returns the full list.
@@ -183,6 +231,37 @@ func (a *App) ScanAll() ([]config.ScriptMeta, error) {
 		_ = a.store.Replace(all)
 	}
 	return all, nil
+}
+
+// GetScriptsByDir scans a single directory and returns its scripts.
+func (a *App) GetScriptsByDir(dirPath string) ([]config.ScriptMeta, error) {
+	a.mu.RLock()
+	overrides := a.cfg.OverrideMeta
+	a.mu.RUnlock()
+
+	scripts, err := scanner.ScanDir(dirPath, overrides)
+	if err != nil {
+		return nil, err
+	}
+
+	a.mu.Lock()
+	for _, s := range scripts {
+		if s.Type == config.TypeService {
+			if _, ok := a.services[s.Path]; !ok {
+				a.services[s.Path] = executor.NewServiceManager(
+					s.Path, s.PidFile, executor.NewEmitter(a.ctx),
+				)
+			}
+		}
+	}
+	a.mu.Unlock()
+
+	if a.store != nil {
+		for _, s := range scripts {
+			_ = a.store.UpdateMeta(s)
+		}
+	}
+	return scripts, nil
 }
 
 // ─── Script execution ────────────────────────────────────────────────────────

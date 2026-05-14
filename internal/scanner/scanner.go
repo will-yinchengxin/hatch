@@ -77,9 +77,18 @@ func buildMeta(path, name string, info os.FileInfo) config.ScriptMeta {
 		meta.Type = config.TypeOneshot
 	}
 
+	// Tier 2a: auto-detect service pattern when no annotations declared a type.
+	if !hasAnnotations && meta.Type == config.TypeOneshot {
+		if isService, cmds := detectServicePattern(path); isService {
+			meta.Type = config.TypeService
+			if len(meta.Commands) == 0 {
+				meta.Commands = cmds
+			}
+		}
+	}
+
 	if !hasAnnotations && meta.Desc == "" {
 		if help := probeHelp(path); help != "" {
-			// Use first non-empty line of --help output as description
 			for _, line := range strings.Split(help, "\n") {
 				if line = strings.TrimSpace(line); line != "" {
 					if len(line) > 120 {

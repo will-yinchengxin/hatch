@@ -18,6 +18,10 @@ export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }
 
+export function GetScriptsByDir(arg1) {
+  return window['go']['main']['App']['GetScriptsByDir'](arg1);
+}
+
 export function RemoveDirectory(arg1) {
   return window['go']['main']['App']['RemoveDirectory'](arg1);
 }
@@ -36,4 +40,8 @@ export function ScanAll() {
 
 export function ServiceAction(arg1, arg2, arg3) {
   return window['go']['main']['App']['ServiceAction'](arg1, arg2, arg3);
+}
+
+export function UpdateDirectoryExport(arg1, arg2) {
+  return window['go']['main']['App']['UpdateDirectoryExport'](arg1, arg2);
 }

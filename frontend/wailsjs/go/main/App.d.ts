@@ -11,6 +11,8 @@ export function GetAllServiceStatuses():Promise<Record<string, string>>;
 
 export function GetConfig():Promise<config.Config>;
 
+export function GetScriptsByDir(arg1:string):Promise<Array<config.ScriptMeta>>;
+
 export function RemoveDirectory(arg1:string):Promise<void>;
 
 export function RunScript(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
@@ -20,3 +22,5 @@ export function SaveExports(arg1:Array<config.ExportVar>):Promise<void>;
 export function ScanAll():Promise<Array<config.ScriptMeta>>;
 
 export function ServiceAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
+
+export function UpdateDirectoryExport(arg1:string,arg2:string):Promise<void>;
