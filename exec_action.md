@@ -89,11 +89,22 @@ go test ./internal/... → zshrc: PASS (7/7), scanner: PASS (11/11)
 
 ---
 
-## Day 4 — 执行器 + 实时输出流（待执行）
+## Day 4 — 执行器 + 实时输出流 ✅
 
-- [ ] `internal/executor/oneshot.go` — `/bin/zsh -l -c` 执行 + 输出捕获
-- [ ] `internal/executor/service.go` — start/stop/restart + PID 文件管理
-- [ ] `internal/executor/stream.go` — Wails EventsEmit 推送实时日志
+**日期**: 2026-05-14
+
+| 步骤 | 状态 | 说明 |
+|------|------|------|
+| `internal/executor/stream.go` | ✅ | `Emitter` 封装 Wails `EventsEmit`；三类事件 `executor:log` / `executor:done` / `executor:status`，结构体类型安全 |
+| `internal/executor/oneshot.go` | ✅ | `RunOneshot` → `/bin/zsh -l -c`（login shell，zshrc 生效）；stdout/stderr 并发扫描实时推送；内外两层设计（`runOneshotInternal` 接受回调，无 Wails context 依赖，可单元测试）|
+| `internal/executor/service.go` | ✅ | `ServiceManager`：Start / Stop（SIGTERM）/ Restart / Status；PID 文件读写；`kill -0` 存活探测；stale PID 自动清理；独立进程组（`Setpgid`）防止父进程 SIGINT 传播 |
+| `internal/executor/cmd.go` | ✅ | `newBackgroundCmd` 共享帮助函数，`Setpgid: true` |
+| `internal/executor/executor_test.go` | ✅ | 9 个测试全部通过：shellQuote、echo、exit code、stderr、事件发射、start/stop、双重启动报错、stale PID 清理、restart 换 PID |
+
+```
+go test ./internal/... → executor: PASS (9/9), scanner: PASS (11/11), zshrc: PASS (7/7)
+go build ./...         → OK
+```
 
 ---
 
