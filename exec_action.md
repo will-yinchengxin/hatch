@@ -68,11 +68,24 @@ go build ./internal/...        → OK
 
 ---
 
-## Day 3 — 扫描器 + 注释块解析（待执行）
+## Day 3 — 扫描器 + 注释块解析 ✅
 
-- [ ] `internal/scanner/metadata.go` — ScriptMeta / ScriptType 数据结构
-- [ ] `internal/scanner/scanner.go` — 目录扫描（可执行文件过滤）
-- [ ] `internal/scanner/parser.go` — `@hatch.*` 注释解析 + `--help` 探测降级
+**日期**: 2026-05-14
+
+| 步骤 | 状态 | 说明 |
+|------|------|------|
+| `internal/scanner/parser.go` | ✅ | `@hatch.*` 注释解析（支持 `#` / `//` / `--` 前缀）；shebang 语言检测（处理 `env` 间接调用）；`--help` 2s 超时探测降级 |
+| `internal/scanner/scanner.go` | ✅ | 目录扫描，跳过隐藏文件和非脚本扩展；三层降级（注释块 → `--help` → 默认）；Override 合并；service 类型自动填充 PidFile |
+| `internal/scanner/scanner_test.go` | ✅ | 11 个测试全部通过 |
+
+**三层降级逻辑**
+1. 文件头 `@hatch.*` 注释 → 完整元信息
+2. `--help` 探测（2s 超时）→ 填充 Desc
+3. 默认值 → `type: oneshot`，`language` 由 shebang/扩展名推断，`name` 去掉扩展名
+
+```
+go test ./internal/... → zshrc: PASS (7/7), scanner: PASS (11/11)
+```
 
 ---
 
