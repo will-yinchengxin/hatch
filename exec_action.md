@@ -50,12 +50,21 @@ wails build  → Built 'hatch.app' in 17.346s (自签名完成)
 
 ---
 
-## Day 2 — zshrc 管理器 + 配置存储（待执行）
+## Day 2 — zshrc 管理器 + 配置存储 ✅
 
-- [ ] `internal/config/config.go` — Config / Directory / ExportVar 结构体 + JSON 读写
-- [ ] `internal/zshrc/manager.go` — Hatch managed block 读写（幂等覆盖）
-- [ ] `internal/zshrc/manager_test.go` — 单元测试（文件写入 / 幂等 / 不破坏块外内容）
-- [ ] `internal/store/store.go` — 脚本列表持久化
+**日期**: 2026-05-14
+
+| 步骤 | 状态 | 说明 |
+|------|------|------|
+| `internal/config/config.go` | ✅ | Config / Directory / ExportVar / ScriptMeta 结构体，JSON Load/Save，存储路径 `~/Library/Application Support/Hatch/config.json` |
+| `internal/zshrc/manager.go` | ✅ | Hatch managed block 读写；幂等覆盖（整块替换）；key 排序保证每次输出一致；块外内容零修改 |
+| `internal/zshrc/manager_test.go` | ✅ | 7 个测试全部通过：创建块、幂等、更新、读取、空块返回 nil、删除、保留块后内容 |
+| `internal/store/store.go` | ✅ | 脚本列表持久化，存储路径 `~/Library/Application Support/Hatch/scripts.json`；Replace / UpdateMeta / All，并发安全（RWMutex） |
+
+```
+go test ./internal/zshrc/... -v → PASS (7/7)
+go build ./internal/...        → OK
+```
 
 ---
 
