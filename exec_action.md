@@ -108,12 +108,33 @@ go build ./...         → OK
 
 ---
 
-## Day 5 — 前端界面（待执行）
+## Day 5 — 前端界面 ✅
 
-- [ ] 替换 Pico.css + Alpine.js（直接 `<script>` 引入，无构建工具）
-- [ ] 脚本列表 + 分页 + 搜索
-- [ ] oneshot 运行按钮 + 参数输入框
-- [ ] service 状态指示灯 + start/stop/restart 控制
+**日期**: 2026-05-14
+
+| 步骤 | 状态 | 说明 |
+|------|------|------|
+| `app.go` 全量 API | ✅ | 9 个绑定方法：GetConfig / ScanAll / AddDirectory / RemoveDirectory / RunScript / ServiceAction / GetAllServiceStatuses / SaveExports / CheckZshrc |
+| `internal/store` 增强 | ✅ | NewWithPath / NewEmpty 备用构造；corrupt JSON → 静默重置 |
+| Alpine.js + Pico.css | ✅ | `npm install alpinejs @picocss/pico`，Vite 打包 |
+| `frontend/index.html` | ✅ | 完整 Alpine 声明式 UI；header / scripts tab / settings tab |
+| `frontend/src/main.js` | ✅ | 所有 Wails 绑定导入；Alpine 组件注册；EventsOn 事件监听 |
+| `frontend/src/style.css` | ✅ | 深色主题；脚本卡片；徽章（语言/类型）；状态指示灯动画；内联日志面板 |
+| `wails build` | ✅ | darwin/arm64 编译 + 自签名，5.5s |
+
+**前端功能覆盖**
+- 脚本列表：搜索（名称/描述/语言/标签）+ 分页（15条/页）
+- oneshot：参数输入框 + ▶ 运行按钮 + 运行中 aria-busy 状态
+- service：● 状态指示灯（绿色脉冲/灰色）+ start/stop/restart 按钮（根据状态启用/禁用）
+- 日志面板：内联折叠，stdout 白色 / stderr 红色，500 行限制，自动滚底
+- 设置页：目录管理（增删 + 导出名）、环境变量编辑、zshrc 状态显示
+- 事件驱动：`executor:log` / `executor:done` / `executor:status` 实时更新
+- 服务状态轮询：每 3s `GetAllServiceStatuses`
+
+```
+go test ./internal/... → 全部通过
+wails build            → Built in 5.559s ✓
+```
 
 ---
 

@@ -28,12 +28,18 @@ func defaultPath() (string, error) {
 	return filepath.Join(dir, "Hatch", "scripts.json"), nil
 }
 
-// New loads (or initialises) the store from disk.
+// New loads (or initialises) the store from the default path.
+// Falls back to a temp path if the OS config dir is unavailable.
 func New() (*Store, error) {
 	path, err := defaultPath()
 	if err != nil {
-		return nil, err
+		path = filepath.Join(os.TempDir(), "hatch", "scripts.json")
 	}
+	return NewWithPath(path)
+}
+
+// NewWithPath creates a store backed by the given file path.
+func NewWithPath(path string) (*Store, error) {
 	s := &Store{path: path}
 	if err := s.load(); err != nil {
 		return nil, err
@@ -49,10 +55,17 @@ func (s *Store) load() error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(data, &s.data)
+	// Corrupt JSON → start fresh rather than crash.
+	if err := json.Unmarshal(data, &s.data); err != nil {
+		s.data = storeData{}
+	}
+	return nil
 }
 
 func (s *Store) save() error {
+	if s.path == "" {
+		return nil
+	}
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
