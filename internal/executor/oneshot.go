@@ -48,6 +48,9 @@ func runOneshotInternal(
 ) (*OneshotResult, error) {
 	cmdArgs := buildZshArgs(scriptPath, args)
 	cmd := exec.Command("/bin/zsh", cmdArgs...)
+	if logFn != nil {
+		logFn("[hatch] command: "+buildScriptCommandForLog(scriptPath, args), "stdout")
+	}
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -106,13 +109,24 @@ func runOneshotInternal(
 	}, nil
 }
 
-// buildZshArgs constructs the argv for: /bin/zsh -l -c 'scriptPath arg1 arg2…'
+// buildZshArgs constructs the argv for a login zsh command that explicitly
+// sources ~/.zshrc before executing the script. Wails apps launched from Finder
+// do not inherit an interactive terminal environment, and zsh -l -c does not
+// read ~/.zshrc by itself.
 func buildZshArgs(scriptPath string, args []string) []string {
-	cmd := shellQuote(scriptPath)
+	cmd := `if [[ -r "${ZDOTDIR:-$HOME}/.zshrc" ]]; then source "${ZDOTDIR:-$HOME}/.zshrc"; fi; exec ` + shellQuote(scriptPath)
 	for _, a := range args {
 		cmd += " " + shellQuote(a)
 	}
 	return []string{"-l", "-c", cmd}
+}
+
+func buildScriptCommandForLog(scriptPath string, args []string) string {
+	cmd := shellQuote(scriptPath)
+	for _, a := range args {
+		cmd += " " + shellQuote(a)
+	}
+	return cmd
 }
 
 // shellQuote wraps s in single quotes, escaping any embedded single quotes.

@@ -4,281 +4,391 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hatch</title>
-  <link rel="stylesheet" href="/src/style.css" />
+  <link rel="icon" type="image/png" href="/src/assets/images/logo.png" />
 </head>
 <body x-data="hatchApp()" x-init="init()">
 
   <!-- ── Header ─────────────────────────────────────────────────────── -->
   <header class="app-header">
-    <div class="header-left">
-      <!-- Back button when inside a directory -->
-      <button x-show="selectedDir" @click="exitDir()" class="back-btn">← 目录</button>
-      <span class="logo" x-show="!selectedDir">🐣 Hatch</span>
+    <div class="header-brand">
+      <button x-show="selectedDir" @click="exitDir()" class="btn-back">← 返回</button>
+      <span class="logo" x-show="!selectedDir">
+        <img src="/src/assets/images/logo.png" alt="Hatch" class="logo-img" />
+        <span class="logo-text">Hatch</span>
+      </span>
       <template x-if="selectedDir">
         <div class="breadcrumb">
           <span class="dir-name" x-text="selectedDir?.exportName || baseName(selectedDir?.path)"></span>
-          <span class="dir-path muted" x-text="selectedDir?.path"></span>
+          <span class="dir-path" x-text="selectedDir?.path"></span>
         </div>
       </template>
     </div>
-    <div class="header-center" x-show="selectedDir || tab === 'scripts'">
+
+    <nav class="tab-nav" x-show="!selectedDir">
+      <button class="tab" :class="tab==='scripts'  ? 'active' : ''" @click="tab='scripts'">📜 脚本</button>
+      <button class="tab" :class="tab==='settings' ? 'active' : ''" @click="tab='settings'">⚙ 设置</button>
+      <button class="tab" :class="tab==='ai' ? 'active' : ''" @click="tab='ai'">✦ AI</button>
+    </nav>
+
+    <div class="header-right">
       <input
+        x-show="selectedDir"
         type="search"
         x-model="query"
         @input="page = 1"
-        placeholder="搜索脚本名称 / 描述 / 语言…"
+        placeholder="搜索脚本…"
         class="search-input"
-        x-show="selectedDir"
       />
-    </div>
-    <div class="header-right">
-      <button class="icon-btn" @click="selectedDir ? scanDir(selectedDir) : scanAll()" title="重新扫描" :aria-busy="loading">↻</button>
       <button
-        class="icon-btn"
-        :class="tab === 'settings' ? 'active' : ''"
-        @click="tab = tab === 'settings' ? 'scripts' : 'settings'; selectedDir = null"
-        title="设置"
-      >⚙</button>
+        class="btn-refresh"
+        @click="selectedDir ? scanDir(selectedDir) : (tab==='scripts' ? scanAll() : null)"
+        :aria-busy="loading"
+        x-show="tab==='scripts'"
+        title="重新扫描"
+      >↻ 刷新</button>
+      <label class="autolaunch-toggle" :class="{active: autoLaunchEnabled}" title="开机自启动 (点击切换)">
+        <input type="checkbox" x-model="autoLaunchEnabled" @change="toggleAutoLaunch()" :disabled="autoLaunchSaving" />
+        <span x-text="autoLaunchEnabled ? '⏻ 自启 ✓' : '⏻ 自启'"></span>
+      </label>
     </div>
   </header>
 
-  <!-- ── Error banner ───────────────────────────────────────────────── -->
-  <div class="error-banner" x-show="error" x-transition>
-    <span x-text="error"></span>
-    <button class="icon-btn" @click="error = ''">✕</button>
+  <!-- ── Error toast ────────────────────────────────────────────────── -->
+  <div class="error-toast" x-show="error" x-transition.opacity.duration.200ms>
+    <span class="error-toast-msg" x-text="error"></span>
+    <button class="icon-btn" @click="error=''; clearTimeout(errorTimer)">✕</button>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       SCRIPTS TAB — Directory list (no dir selected)
+       SCRIPTS — Directory list
   ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab === 'scripts' && !selectedDir">
+  <main x-show="tab==='scripts' && !selectedDir">
+    <section class="page-hero">
+      <div>
+        <p class="eyebrow">Script Dashboard</p>
+        <h1>脚本工作台</h1>
+        <p class="page-subtitle">按目录管理一次性脚本和常驻服务，运行、查看日志和维护环境变量都在这里完成。</p>
+      </div>
+      <div class="hero-stats" x-show="scriptDirs.length>0">
+        <div class="stat-pill">
+          <span x-text="scriptDirs.length"></span>
+          <small>脚本目录</small>
+        </div>
+        <div class="stat-pill">
+          <span x-text="totalScriptCount"></span>
+          <small>脚本</small>
+        </div>
+        <div class="stat-pill">
+          <span x-text="serviceScriptCount"></span>
+          <small>服务</small>
+        </div>
+      </div>
+    </section>
 
     <div class="loading-wrap" x-show="loading">
-      <progress></progress><p class="muted">扫描目录…</p>
+      <progress></progress><p class="muted" style="margin-top:10px">扫描目录…</p>
     </div>
 
-    <!-- No directories configured -->
-    <div class="empty-state" x-show="!loading && scriptDirs.length === 0">
+    <div class="empty-state" x-show="!loading && scriptDirs.length===0">
       <p>还没有配置脚本目录。</p>
-      <button @click="tab = 'settings'">⚙ 去设置</button>
+      <button @click="tab='settings'">⚙ 去设置</button>
     </div>
 
-    <!-- Directory cards -->
-    <div class="dir-card-list" x-show="!loading && scriptDirs.length > 0">
+    <div class="dir-card-list" x-show="!loading && scriptDirs.length>0">
       <template x-for="d in scriptDirs" :key="d.path">
-        <div class="dir-card" @click="enterDir(d)">
+        <div class="dir-card" @click="enterDir(d)" role="button" tabindex="0" @keyup.enter="enterDir(d)">
           <div class="dir-card-icon">📁</div>
           <div class="dir-card-body">
             <div class="dir-card-title">
               <strong x-text="d.exportName || baseName(d.path)"></strong>
-              <span class="badge badge-export" x-show="d.exportName" x-text="'$' + d.exportName"></span>
+              <span class="badge badge-export" x-show="d.exportName" x-text="'$'+d.exportName"></span>
             </div>
-            <div class="dir-card-path muted" x-text="d.path"></div>
+            <div class="dir-card-path" x-text="d.path"></div>
             <div class="dir-card-meta">
-              <span class="script-count" x-text="(dirScriptCount[d.path] || 0) + ' 个脚本'"></span>
-              <span class="script-type-summary" x-text="dirTypeSummary(d.path)"></span>
+              <span x-text="(dirScriptCount[d.path]||0)+' 个脚本'"></span>
+              <span x-text="dirTypeSummary(d.path)"></span>
             </div>
           </div>
-          <div class="dir-card-arrow">→</div>
+          <div class="dir-enter-btn">进入 →</div>
         </div>
       </template>
     </div>
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       SCRIPTS TAB — Script list (inside a directory)
+       SCRIPTS — Script list (inside a directory)
   ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab === 'scripts' && selectedDir">
+  <main x-show="tab==='scripts' && selectedDir">
+    <section class="directory-toolbar">
+      <div>
+        <p class="eyebrow">Directory</p>
+        <h1 x-text="selectedDir?.exportName || baseName(selectedDir?.path)"></h1>
+        <p class="page-subtitle" x-text="selectedDir?.path"></p>
+      </div>
+      <div class="toolbar-summary">
+        <span x-text="filteredScripts.length + ' / ' + currentScripts.length + ' 个脚本'"></span>
+        <span x-text="currentScripts.filter(s=>s.type==='service').length + ' service'"></span>
+      </div>
+    </section>
 
     <div class="loading-wrap" x-show="loading">
-      <progress></progress><p class="muted">扫描脚本…</p>
+      <progress></progress><p class="muted" style="margin-top:10px">扫描脚本…</p>
     </div>
-
-    <div class="empty-state" x-show="!loading && currentScripts.length === 0">
+    <div class="empty-state" x-show="!loading && currentScripts.length===0">
       <p>此目录下没有找到脚本。</p>
     </div>
-
-    <div class="empty-state" x-show="!loading && currentScripts.length > 0 && filteredScripts.length === 0">
-      <p>没有匹配 "<span x-text="query"></span>" 的脚本。</p>
+    <div class="empty-state" x-show="!loading && currentScripts.length>0 && filteredScripts.length===0">
+      <p>没有匹配「<span x-text="query"></span>」的脚本。</p>
     </div>
 
     <div class="script-list">
       <template x-for="s in pagedScripts" :key="s.path">
-        <article class="script-card">
+        <article class="script-card" :data-type="s.type">
 
           <div class="card-header">
             <div class="card-title">
               <span x-text="langIcon(s.language)" class="lang-icon"></span>
               <strong x-text="s.name"></strong>
-              <span class="badge" :class="'lang-' + s.language" x-text="s.language"></span>
-              <span class="badge" :class="'type-' + s.type" x-text="s.type"></span>
+              <span class="badge" :class="'lang-'+s.language" x-text="s.language"></span>
+              <span class="badge" :class="'type-'+s.type" x-text="s.type"></span>
             </div>
-            <button
-              class="log-toggle"
-              x-show="logLines(s.path).length > 0"
-              @click="logTarget = logTarget === s.path ? null : s.path"
-              :class="logTarget === s.path ? 'active' : ''"
-              title="查看日志"
-            >📋</button>
+            <div class="card-actions">
+              <button
+                class="btn-edit"
+                @click.stop="fillScriptWithAI(s)"
+                :aria-busy="aiBusyScript===s.path"
+                title="使用 AI 分析脚本并填充编辑表单"
+              >✦ 智能填写</button>
+              <button class="btn-edit" @click.stop="openEdit(s)" title="编辑元信息">✏ 编辑</button>
+              <button
+                class="log-toggle"
+                @click="logTarget = logTarget===s.path ? null : s.path"
+                :class="logTarget===s.path ? 'active' : ''"
+                x-show="runningSet[s.path] || logLines(s.path).length > 0"
+              >
+                <span x-show="runningSet[s.path]">⏳</span>
+                <span x-show="!runningSet[s.path] && scriptExitCodes[s.path] === 0">✓</span>
+                <span x-show="!runningSet[s.path] && scriptExitCodes[s.path] !== undefined && scriptExitCodes[s.path] !== 0">✗</span>
+                <span x-show="!runningSet[s.path] && scriptExitCodes[s.path] === undefined">📋</span>
+                日志
+              </button>
+            </div>
           </div>
 
-          <p class="card-desc" x-text="s.desc || '暂无描述'" :class="!s.desc ? 'muted' : ''"></p>
+          <p class="card-desc" x-text="s.desc||'暂无描述'" :class="!s.desc?'muted':''"></p>
 
-          <!-- Commands tags (service) -->
-          <div class="cmd-tags" x-show="s.commands && s.commands.length > 0">
-            <template x-for="cmd in s.commands" :key="cmd">
-              <span class="cmd-tag" x-text="cmd"></span>
+          <div class="cmd-tags meta-tags" x-show="s.tags && s.tags.length>0">
+            <template x-for="t in s.tags" :key="t">
+              <span class="cmd-tag tag-chip" x-text="t"></span>
+            </template>
+          </div>
+
+          <!-- Detected service sub-commands -->
+          <div class="cmd-tags" x-show="s.commands && s.commands.length>0">
+            <template x-for="c in s.commands" :key="c">
+              <span class="cmd-tag" x-text="c"></span>
+            </template>
+          </div>
+
+          <!-- Preset quick-run buttons -->
+          <div class="preset-row" x-show="normalizedPresets(s).length > 0">
+            <template x-for="p in normalizedPresets(s)" :key="p.name + ':' + p.args">
+              <button
+                class="preset-btn"
+                @click.stop="runPreset(s, p)"
+                :disabled="isPresetDisabled(s, p)"
+                :class="presetClass(p)"
+                :title="'参数: ' + p.args"
+                x-text="presetButtonLabel(p)"
+              ></button>
             </template>
           </div>
 
           <!-- Oneshot controls -->
-          <div class="card-footer" x-show="s.type === 'oneshot'">
-            <input
-              type="text"
-              x-model="scriptArgs[s.path]"
-              placeholder="运行参数（可选，空格分隔）"
-              class="args-input"
-              @keyup.enter="runScript(s)"
-            />
+          <div class="card-footer" x-show="s.type==='oneshot'">
+            <template x-if="!Array.isArray(s.args) || s.args.length > 0 || s.args === null">
+              <input
+                type="text"
+                x-model="scriptArgs[s.path]"
+                placeholder="运行参数（可选）"
+                class="args-input"
+                @keyup.enter="runScript(s)"
+              />
+            </template>
             <button
               @click="runScript(s)"
-              :disabled="runningSet[s.path]"
-              :aria-busy="runningSet[s.path]"
+              :disabled="!!runningSet[s.path]"
+              :aria-busy="runningSet[s.path] ? true : null"
               class="run-btn"
             >▶ 运行</button>
           </div>
 
           <!-- Service controls -->
-          <div class="card-footer service-footer" x-show="s.type === 'service'">
+          <div class="card-footer service-footer" x-show="s.type==='service'">
             <div class="status-info">
-              <span class="status-dot" :class="statuses[s.path] === 'running' ? 'dot-running' : 'dot-stopped'"></span>
-              <span class="status-label" x-text="statuses[s.path] || 'stopped'"></span>
+              <span class="status-dot" :class="statuses[s.path]==='running'?'dot-running':'dot-stopped'"></span>
+              <span class="status-label" x-text="statuses[s.path]==='running'?'运行中':'已停止'"></span>
             </div>
             <div class="service-actions">
-              <template x-if="!s.commands || s.commands.length === 0">
-                <span>
-                  <button @click="serviceAction(s, 'start')" :disabled="statuses[s.path]==='running'" class="btn-start">▶ start</button>
-                  <button @click="serviceAction(s, 'stop')"  :disabled="statuses[s.path]!=='running'" class="btn-stop">■ stop</button>
-                  <button @click="serviceAction(s, 'restart')" class="btn-restart">↺</button>
-                </span>
-              </template>
-              <template x-if="s.commands && s.commands.length > 0">
+              <template x-if="s.commands && s.commands.length>0">
                 <span>
                   <template x-for="cmd in s.commands" :key="cmd">
                     <button
                       @click="serviceAction(s, cmd)"
-                      :disabled="cmd==='start' && statuses[s.path]==='running' || cmd==='stop' && statuses[s.path]!=='running'"
-                      :class="cmd==='start' ? 'btn-start' : cmd==='stop' ? 'btn-stop' : 'btn-restart'"
+                      :disabled="(cmd==='start'&&statuses[s.path]==='running')||(cmd==='stop'&&statuses[s.path]!=='running')"
+                      :class="cmd==='start'?'btn-start':cmd==='stop'?'btn-stop':'btn-restart'"
                       x-text="cmdLabel(cmd)"
                     ></button>
                   </template>
                 </span>
               </template>
+              <template x-if="!s.commands || s.commands.length===0">
+                <span>
+                  <button @click="serviceAction(s,'start')"   :disabled="statuses[s.path]==='running'" class="btn-start">▶ start</button>
+                  <button @click="serviceAction(s,'stop')"    :disabled="statuses[s.path]!=='running'" class="btn-stop">■ stop</button>
+                  <button @click="serviceAction(s,'restart')" class="btn-restart">↺</button>
+                </span>
+              </template>
             </div>
           </div>
 
-          <!-- Inline log panel -->
-          <div class="log-panel" x-show="logTarget === s.path && logLines(s.path).length > 0" x-transition>
+          <!-- Inline log panel (auto-shown when running or has output) -->
+          <div class="log-panel" x-show="logTarget===s.path" x-transition>
             <div class="log-toolbar">
-              <span class="muted" x-text="logLines(s.path).length + ' 行'"></span>
-              <button class="icon-btn" @click="clearLog(s.path)">🗑</button>
+              <div class="log-status">
+                <span x-show="runningSet[s.path]" class="log-status-running">● 运行中</span>
+                <template x-if="!runningSet[s.path] && scriptExitCodes[s.path] !== undefined">
+                  <span>
+                    <span x-show="scriptExitCodes[s.path] === 0" class="log-status-ok">✓ exit 0</span>
+                    <span x-show="scriptExitCodes[s.path] !== 0" class="log-status-err" x-text="'✗ exit ' + scriptExitCodes[s.path]"></span>
+                  </span>
+                </template>
+                <span
+                  x-show="!runningSet[s.path] && scriptExitCodes[s.path] === undefined"
+                  class="log-status-default"
+                  x-text="logLines(s.path).length + ' 行'"
+                ></span>
+              </div>
+              <button class="icon-btn" @click="clearLog(s.path)" title="清空日志">🗑</button>
             </div>
-            <pre class="log-pre" :id="'log-' + btoa(s.path)"><template
-              x-for="(l, i) in logLines(s.path)" :key="i"
-            ><span :class="l.stream === 'stderr' ? 'log-stderr' : 'log-stdout'" x-text="l.line + '\n'"></span></template></pre>
+            <pre class="log-pre" :id="'log-'+safeId(s.path)">
+              <template x-if="logLines(s.path).length === 0 && runningSet[s.path]">
+                <span class="log-empty">等待输出…</span>
+              </template>
+              <template x-for="(l,i) in logLines(s.path)" :key="i">
+                <span :class="l.stream==='stderr'?'log-stderr':'log-stdout'" x-text="l.line+'\n'"></span>
+              </template>
+            </pre>
           </div>
 
         </article>
       </template>
     </div>
 
-    <!-- Pagination -->
-    <nav class="pagination" x-show="totalPages > 1">
-      <button @click="page--" :disabled="page <= 1">←</button>
+    <nav class="pagination" x-show="totalPages>1">
+      <button @click="page--" :disabled="page<=1">←</button>
       <span x-text="`${page} / ${totalPages}`"></span>
-      <button @click="page++" :disabled="page >= totalPages">→</button>
+      <button @click="page++" :disabled="page>=totalPages">→</button>
     </nav>
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       SETTINGS TAB
+       SETTINGS
   ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab === 'settings'">
-    <h2 class="settings-title">⚙ 设置</h2>
+  <main x-show="tab==='settings'">
+    <section class="page-hero settings-hero">
+      <div>
+        <p class="eyebrow">Preferences</p>
+        <h1>设置</h1>
+        <p class="page-subtitle">维护脚本目录、shell 导出变量和 zshrc 备注。</p>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-pill">
+          <span x-text="directoryCount"></span>
+          <small>目录</small>
+        </div>
+        <div class="stat-pill">
+          <span x-text="exportCount"></span>
+          <small>变量</small>
+        </div>
+      </div>
+    </section>
 
-    <!-- ── Shell 状态 ── -->
+    <!-- Shell status -->
     <section class="settings-section">
       <h3>Shell 状态</h3>
       <div class="zshrc-info" x-show="zshrcInfo">
         <div class="info-row">
           <span class="info-label">当前 Shell</span>
-          <code x-text="zshrcInfo?.shell || '-'"></code>
-          <span class="badge" :class="zshrcInfo?.isZsh ? 'badge-ok' : 'badge-warn'"
-            x-text="zshrcInfo?.isZsh ? '✓ zsh' : '⚠ 非 zsh'"></span>
+          <code x-text="zshrcInfo?.shell||'-'"></code>
+          <span class="badge" :class="zshrcInfo?.isZsh?'badge-ok':'badge-warn'"
+            x-text="zshrcInfo?.isZsh?'✓ zsh':'⚠ 非 zsh'"></span>
         </div>
         <div class="info-row">
           <span class="info-label">zshrc 路径</span>
-          <code x-text="zshrcInfo?.zshrcPath || '-'"></code>
+          <code x-text="zshrcInfo?.zshrcPath||'-'"></code>
         </div>
-        <div class="info-row" x-show="(zshrcInfo?.hatchLines || []).length > 0">
+        <div class="info-row" x-show="(zshrcInfo?.hatchLines||[]).length>0">
           <span class="info-label">Managed block</span>
-          <code x-text="zshrcInfo?.hatchLines?.length + ' 行'"></code>
+          <code x-text="(zshrcInfo?.hatchLines?.length||0)+' 行'"></code>
         </div>
       </div>
     </section>
 
-    <!-- ── 目录管理 ── -->
+    <!-- Directories -->
     <section class="settings-section">
       <h3>📁 目录管理</h3>
-
-      <div class="dir-setting-list" x-show="(cfg.directories || []).length > 0">
-        <template x-for="d in (cfg.directories || [])" :key="d.path">
+      <div class="dir-setting-list" x-show="(cfg.directories||[]).length>0">
+        <template x-for="d in (cfg.directories||[])" :key="d.path">
           <div class="dir-setting-row">
             <div class="dir-setting-info">
               <code x-text="d.path" class="dir-setting-path"></code>
-              <span class="badge badge-export" x-show="d.exportName" x-text="'$' + d.exportName"></span>
-              <span class="muted" x-show="!d.isScriptDir" style="font-size:11px">仅路径导出</span>
+              <span class="badge badge-export" x-show="d.exportName" x-text="'$'+d.exportName"></span>
+              <span class="muted text-xs" x-show="!d.isScriptDir">仅路径导出</span>
             </div>
             <div class="dir-setting-actions">
-              <!-- Quick export button when no export name set -->
               <template x-if="!d.exportName">
-                <button class="btn-quick-export" @click="quickExport(d)" title="设置为环境变量">
-                  📤 导出为环境变量
-                </button>
+                <button class="btn-quick-export" @click="quickExport(d)">📤 导出路径</button>
               </template>
               <template x-if="d.exportName">
-                <button class="btn-clear-export secondary" @click="clearExport(d)" title="取消导出">
-                  ✕ 取消导出
-                </button>
+                <button class="secondary text-sm" @click="clearExport(d)">✕ 取消导出</button>
               </template>
-              <button class="icon-btn danger" @click="removeDirectory(d.path)" title="删除目录">✕</button>
+              <button class="icon-btn danger" @click="removeDirectory(d.path)">✕</button>
             </div>
           </div>
         </template>
       </div>
-      <div class="muted" x-show="(cfg.directories || []).length === 0" style="margin-bottom:12px">还没有添加目录。</div>
+      <div class="muted text-sm" x-show="(cfg.directories||[]).length===0" style="margin-bottom:12px">还没有添加目录。</div>
 
       <!-- Quick export modal -->
-      <div class="quick-export-modal" x-show="quickExportDir" x-transition>
-        <div class="modal-inner">
-          <p>为 <code x-text="quickExportDir?.path"></code> 设置导出名：</p>
+      <div class="overlay" x-show="quickExportDir" x-transition @click.self="quickExportDir=null">
+        <div class="modal">
+          <h4>📤 导出为环境变量</h4>
+          <p class="muted text-sm">
+            将目录路径写入 <code>~/.zshrc</code>，新终端中可用 <code>$变量名</code> 引用。
+          </p>
           <div class="modal-row">
-            <span class="eq">export</span>
-            <input type="text" x-model="quickExportName" placeholder="如 MyTools" class="var-name" @keyup.enter="confirmQuickExport()" autofocus />
-            <span class="eq">=</span>
+            <span class="mono-label">export</span>
+            <input type="text" x-model="quickExportName" placeholder="MY_TOOLS" class="var-name"
+              @keyup.enter="confirmQuickExport()" x-ref="exportNameInput" />
+            <span class="mono-label">=</span>
             <code x-text="quickExportDir?.path" class="preview-val"></code>
           </div>
+          <div class="zshrc-preview quick-export-preview" x-show="quickExportName">
+            <div class="preview-label">将写入 Hatch managed block</div>
+            <pre class="preview-pre" x-text="quickExportPreview()"></pre>
+          </div>
           <div class="modal-actions">
-            <button @click="confirmQuickExport()" :disabled="!quickExportName">✓ 确认</button>
-            <button class="secondary" @click="quickExportDir = null; quickExportName = ''">取消</button>
+            <button @click="confirmQuickExport()" :disabled="!quickExportName">✓ 写入 zshrc</button>
+            <button class="secondary" @click="quickExportDir=null;quickExportName=''">取消</button>
           </div>
         </div>
       </div>
 
-      <!-- Add directory form -->
+      <!-- Add dir form -->
       <div class="add-dir-form">
-        <input type="text" x-model="newDir.path" placeholder="/path/to/dir" class="path-input" @keyup.enter="addDirectory()" />
-        <input type="text" x-model="newDir.exportName" placeholder="导出名（可选，如 MyTools）" class="export-name-input" />
+        <input type="text" x-model="newDir.path" placeholder="/path/to/scripts" class="path-input" @keyup.enter="addDirectory()" />
+        <input type="text" x-model="newDir.exportName" placeholder="导出变量名（可选）" class="export-name-input" />
         <label class="checkbox-label">
           <input type="checkbox" x-model="newDir.isScriptDir" />脚本目录
         </label>
@@ -286,41 +396,344 @@
       </div>
     </section>
 
-    <!-- ── 环境变量 ── -->
+    <!-- Env vars -->
     <section class="settings-section">
       <h3>🔑 环境变量</h3>
-      <p class="muted hint">以下变量将写入 <code>~/.zshrc</code> 的 Hatch managed block，<strong>保存后</strong>在新终端窗口生效。</p>
+      <p class="hint">写入 <code>~/.zshrc</code> Hatch managed block，保存后新终端生效。</p>
 
-      <!-- Live preview of what gets written -->
-      <div class="zshrc-preview" x-show="(cfg.exports || []).some(e => e.name)">
+      <div class="zshrc-preview" x-show="(cfg.exports||[]).some(e=>e.name)">
         <div class="preview-label">写入 ~/.zshrc 预览：</div>
-        <pre class="preview-pre"># &gt;&gt;&gt; Hatch managed block &gt;&gt;&gt;
-<template x-for="e in (cfg.exports || []).filter(e => e.name)" :key="e.name"><span x-text="'export ' + e.name + '=&quot;' + e.value + '&quot;\n'"></span></template># &lt;&lt;&lt; Hatch managed block &lt;&lt;&lt;</pre>
+        <pre class="preview-pre" x-text="exportsPreview()"></pre>
       </div>
 
       <div class="export-list">
-        <div class="export-row export-row-header muted">
-          <span class="var-name">变量名</span><span class="eq"></span><span class="var-value">值（路径）</span>
-        </div>
-        <template x-for="(e, i) in (cfg.exports || [])" :key="i">
+        <template x-for="(e,i) in (cfg.exports||[])" :key="i">
           <div class="export-row">
-            <input type="text" x-model="e.name"  placeholder="MY_TOOLS" class="var-name" />
+            <input type="text" x-model="e.name"  placeholder="VARIABLE_NAME" class="var-name"  />
             <span class="eq">=</span>
-            <input type="text" x-model="e.value" placeholder="/Users/yourname/tools" class="var-value" />
+            <input type="text" x-model="e.value" placeholder="/path/or/value"  class="var-value" />
             <button class="icon-btn danger" @click="removeExportRow(i)">✕</button>
           </div>
         </template>
-        <div x-show="(cfg.exports || []).length === 0" class="muted export-empty">
-          暂无变量。点击下方「+ 添加变量」，或在目录管理中点「导出为环境变量」快速添加。
+        <div x-show="(cfg.exports||[]).length===0" class="muted text-sm">
+          暂无变量。
         </div>
       </div>
-
       <div class="export-actions">
         <button class="secondary" @click="addExportRow()">+ 添加变量</button>
         <button @click="saveExports()" :aria-busy="savingExports">💾 保存到 zshrc</button>
       </div>
     </section>
+
+    <!-- zshrc analysis -->
+    <section class="settings-section">
+      <div class="section-header-row">
+        <h3>📄 Shell 配置解析</h3>
+        <button class="btn-sm" @click="loadZshrcAnalysis()" :aria-busy="zshrcLoading">↻ 解析 ~/.zshrc</button>
+      </div>
+
+      <div class="zshrc-organizer">
+        <div class="organizer-controls">
+          <input
+            type="text"
+            x-model="zshrcOrganizationMode"
+            class="field-input"
+            placeholder="整理偏好：按功能模块、按类型、按工具链等"
+          />
+          <button
+            @click="organizeZshrcWithAI()"
+            :aria-busy="zshrcOrganizing"
+            :disabled="!aiReady"
+          >✦ AI 智能排版</button>
+        </div>
+        <p class="hint">AI 只生成预览，不会自动写入。点击「备份并应用」时会先生成新的 <code>.zshrc.hatch-backup-*</code> 备份。</p>
+
+        <div class="zshrc-preview organization-preview" x-show="zshrcOrganization">
+          <div class="preview-label">整理摘要</div>
+          <div class="organizer-summary">
+            <template x-for="(item,i) in (zshrcOrganization?.summary||[])" :key="i">
+              <span x-text="item"></span>
+            </template>
+          </div>
+          <div class="preview-label">新 ~/.zshrc 预览</div>
+          <textarea
+            class="organization-textarea"
+            x-model="zshrcOrganization.content"
+            spellcheck="false"
+          ></textarea>
+          <div class="export-actions organizer-actions">
+            <button @click="applyZshrcOrganization()" :aria-busy="zshrcApplying">备份并应用</button>
+            <button class="secondary" @click="clearZshrcOrganization()">取消预览</button>
+            <span class="muted text-sm" x-show="zshrcApplyResult" x-text="'已备份到 ' + zshrcApplyResult?.backupPath"></span>
+          </div>
+        </div>
+      </div>
+
+      <template x-if="zshrcEntries.length === 0 && !zshrcLoading">
+        <p class="muted text-sm">点击「↻ 解析 ~/.zshrc」，自动识别函数、别名、环境变量等，可为每项添加备注说明。</p>
+      </template>
+
+      <template x-if="zshrcEntries.length > 0">
+        <div>
+          <!-- Filter tabs -->
+          <div class="zshrc-filter-tabs">
+            <template x-for="f in zshrcFilterOptions" :key="f.key">
+              <button
+                class="filter-tab"
+                :class="zshrcFilter === f.key ? 'active' : ''"
+                @click="zshrcFilter = f.key"
+                x-text="f.label + ' (' + zshrcCount(f.key) + ')'"
+              ></button>
+            </template>
+          </div>
+
+          <!-- Entry list -->
+          <div class="zshrc-entry-list">
+            <template x-for="e in filteredZshrcEntries" :key="e.key">
+              <div class="zshrc-entry" :class="'zshrc-'+e.type">
+                <div class="zshrc-entry-header">
+                  <span class="zshrc-type-badge" x-text="zshrcTypeIcon(e.type)"></span>
+                  <strong class="zshrc-key"
+                    x-text="e.key.startsWith('comment:') || e.key.startsWith('other:') || e.key.startsWith('source:') ? '' : e.key"
+                  ></strong>
+                  <span class="zshrc-value-preview muted"
+                    :title="e.value"
+                    x-text="e.type==='function' ? e.value.split('\\n')[0] : e.value"
+                  ></span>
+                  <button class="btn-annotate" @click="startAnnotate(e)">
+                    <span x-show="!e.note" class="muted">+ 备注</span>
+                    <span x-show="e.note" class="annotation-text" x-text="e.note"></span>
+                  </button>
+                  <button
+                    class="btn-annotate ai-note-btn"
+                    @click="fillAnnotationWithAI(e)"
+                    :aria-busy="aiBusyEntry===e.key"
+                    title="使用 AI 生成备注"
+                  >✦ AI</button>
+                </div>
+
+                <!-- Inline annotation editor -->
+                <div class="annotation-editor" x-show="annotationTarget === e.key">
+                  <input
+                    type="text"
+                    x-model="annotationText"
+                    placeholder="添加备注说明…"
+                    class="annotation-input"
+                    @keyup.enter="saveAnnotation(e.key)"
+                    @keyup.escape="cancelAnnotate()"
+                  />
+                  <button @click="saveAnnotation(e.key)">保存</button>
+                  <button class="secondary" @click="cancelAnnotate()">取消</button>
+                  <button class="secondary danger-text" x-show="e.note" @click="deleteAnnotation(e.key)">删除</button>
+                </div>
+
+                <!-- Expand function body -->
+                <template x-if="e.type === 'function'">
+                  <div>
+                    <button class="btn-expand-fn" @click="toggleFn(e.key)">
+                      <span x-text="expandedFns[e.key] ? '▲ 收起' : '▼ 展开函数体'"></span>
+                    </button>
+                    <pre class="fn-body" x-show="expandedFns[e.key]" x-text="e.value"></pre>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </section>
   </main>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       AI SETTINGS
+  ══════════════════════════════════════════════════════════════════ -->
+  <main x-show="tab==='ai' && !selectedDir">
+    <section class="page-hero settings-hero">
+      <div>
+        <p class="eyebrow">OpenAI-compatible</p>
+        <h1>AI 配置</h1>
+        <p class="page-subtitle">配置兼容 OpenAI Chat Completions 协议的模型，用于脚本元信息和 Shell 备注的智能填写。</p>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-pill">
+          <span x-text="aiForm.enabled ? 'ON' : 'OFF'"></span>
+          <small>AI 状态</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section ai-config-section">
+      <div class="section-header-row">
+        <h3>✦ 模型连接</h3>
+        <span class="badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '可用' : '未完成'"></span>
+      </div>
+
+      <div class="ai-form-grid">
+        <label class="checkbox-label ai-enable">
+          <input type="checkbox" x-model="aiForm.enabled" />
+          启用 AI 智能填写
+        </label>
+
+        <label class="field-stack">
+          <span>API Base URL</span>
+          <input
+            type="text"
+            x-model="aiForm.baseUrl"
+            placeholder="https://api.deepseek.com/v1"
+            class="field-input"
+          />
+        </label>
+
+        <label class="field-stack">
+          <span>API Key</span>
+          <input
+            type="password"
+            x-model="aiForm.apiKey"
+            placeholder="sk-..."
+            class="field-input"
+            autocomplete="off"
+          />
+        </label>
+
+        <label class="field-stack">
+          <span>模型名</span>
+          <input
+            type="text"
+            x-model="aiForm.model"
+            placeholder="deepseek-chat / glm-4-plus / gpt-4o-mini"
+            class="field-input"
+          />
+        </label>
+      </div>
+
+      <div class="ai-provider-hints">
+        <button class="preset-btn" @click="aiForm.baseUrl='https://api.deepseek.com/v1'; aiForm.model=aiForm.model||'deepseek-chat'">DeepSeek</button>
+        <button class="preset-btn" @click="aiForm.baseUrl='https://open.bigmodel.cn/api/paas/v4'; aiForm.model=aiForm.model||'glm-4-plus'">GLM</button>
+        <button class="preset-btn" @click="aiForm.baseUrl='https://api.openai.com/v1'; aiForm.model=aiForm.model||'gpt-4o-mini'">OpenAI</button>
+      </div>
+
+      <div class="export-actions">
+        <button @click="saveAIConfig()" :aria-busy="aiSaving">💾 保存配置</button>
+        <button class="secondary" @click="testAIConfig()" :disabled="!aiForm.baseUrl || !aiForm.apiKey || !aiForm.model" :aria-busy="aiTesting">测试连接</button>
+        <span class="muted text-sm" x-show="aiTestResult" x-text="aiTestResult"></span>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>可用能力</h3>
+      <div class="ai-capability-list">
+        <div class="ai-capability">
+          <strong>脚本智能填写</strong>
+          <span>在脚本卡片点击「✦ 智能填写」，AI 会读取脚本内容并填充名称、描述、类型、子命令、标签和预设。结果会进入编辑抽屉，仍需手动保存。</span>
+        </div>
+        <div class="ai-capability">
+          <strong>Shell 备注生成</strong>
+          <span>在 Shell 配置解析列表点击「✦ AI」，AI 会为函数、alias、export、source 等生成一句说明。结果会进入备注输入框，仍需手动保存。</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       EDIT SCRIPT META — side drawer
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="overlay" x-show="editTarget" x-transition @click.self="cancelEdit()">
+    <div class="edit-drawer" x-show="editTarget">
+      <div class="drawer-header">
+        <strong>✏ 编辑脚本元信息</strong>
+        <button class="icon-btn" @click="cancelEdit()">✕</button>
+      </div>
+      <div class="drawer-path" x-text="editTarget?.path"></div>
+
+      <div class="drawer-body">
+
+        <label class="field-label">显示名称</label>
+        <input type="text" x-model="editForm.name" placeholder="脚本名称" class="field-input" />
+
+        <label class="field-label">描述</label>
+        <textarea x-model="editForm.desc" placeholder="简单描述这个脚本做什么" class="field-textarea" rows="2"></textarea>
+
+        <label class="field-label">标签 <span class="muted text-xs">（逗号分隔）</span></label>
+        <input type="text" x-model="editForm.tagsRaw" placeholder="日报, 数据处理, 运维" class="field-input" />
+
+        <label class="field-label">类型</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" x-model="editForm.type" value="oneshot" />
+            <span>oneshot</span><span class="muted text-xs"> — 运行一次，输出结果</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" x-model="editForm.type" value="service" />
+            <span>service</span><span class="muted text-xs"> — 可 start / stop / restart</span>
+          </label>
+        </div>
+
+        <!-- Service-specific fields -->
+        <template x-if="editForm.type==='service'">
+          <div>
+            <label class="field-label">子命令 <span class="muted text-xs">（逗号分隔）</span></label>
+            <input type="text" x-model="editForm.commandsRaw"
+              placeholder="start, stop, restart, reload, status"
+              class="field-input" />
+
+            <label class="field-label">PID 文件路径 <span class="muted text-xs">（可选）</span></label>
+            <input type="text" x-model="editForm.pidFile"
+              :placeholder="'/tmp/hatch/' + baseName(editTarget?.path||'') + '.pid'"
+              class="field-input" />
+          </div>
+        </template>
+
+        <!-- Oneshot: args toggle -->
+        <template x-if="editForm.type==='oneshot'">
+          <div>
+            <label class="field-label">运行参数</label>
+            <label class="checkbox-label">
+              <input type="checkbox" x-model="editForm.needsArgs" />
+              运行时显示参数输入框
+            </label>
+          </div>
+        </template>
+
+        <!-- Command presets (both types) -->
+        <label class="field-label" style="margin-top:18px">命令预设</label>
+        <div class="preset-section">
+          <div class="preset-section-header">
+            <span>固定参数快捷方式</span>
+            <button class="btn-sm" @click="addPreset()">+ 添加预设</button>
+          </div>
+          <template x-if="(editForm.presets||[]).length === 0">
+            <div class="preset-empty">暂无预设。添加后，脚本卡片上会显示一键运行按钮。</div>
+          </template>
+          <div class="preset-edit-list" x-show="(editForm.presets||[]).length > 0">
+            <template x-for="(p,i) in editForm.presets" :key="i">
+              <div class="preset-edit-row">
+                <input
+                  type="text"
+                  x-model="p.name"
+                  placeholder="名称（如：本月报表）"
+                  class="preset-name-input"
+                />
+                <input
+                  type="text"
+                  x-model="p.args"
+                  placeholder="参数（如：file.txt 2026-04-01 2026-04-30）"
+                  class="preset-args-input"
+                />
+                <button class="icon-btn danger" @click="removePreset(i)">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="drawer-footer">
+        <button @click="saveEdit()" :aria-busy="editSaving">💾 保存</button>
+        <button class="secondary" @click="cancelEdit()">取消</button>
+        <button class="secondary danger-text" @click="resetEdit()" title="清除手动覆盖，恢复自动检测">↺ 重置</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

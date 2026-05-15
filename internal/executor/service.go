@@ -45,6 +45,9 @@ func (s *ServiceManager) Start(args []string) error {
 
 	cmdArgs := buildZshArgs(s.scriptPath, args)
 	cmd := newBackgroundCmd("/bin/zsh", cmdArgs...)
+	if s.em != nil {
+		s.em.Log(s.scriptPath, "[hatch] command: "+buildScriptCommandForLog(s.scriptPath, args), "stdout")
+	}
 
 	if err := cmd.Start(); err != nil {
 		if s.em != nil {
@@ -76,6 +79,9 @@ func (s *ServiceManager) Stop() error {
 	if err != nil {
 		s.removePid()
 		return nil
+	}
+	if s.em != nil {
+		s.em.Log(s.scriptPath, fmt.Sprintf("[hatch] command: SIGTERM pid %d", pid), "stdout")
 	}
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
 		s.removePid()

@@ -6,12 +6,24 @@ export function AddDirectory(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddDirectory'](arg1, arg2, arg3);
 }
 
+export function ApplyZshrcOrganization(arg1) {
+  return window['go']['main']['App']['ApplyZshrcOrganization'](arg1);
+}
+
 export function CheckZshrc() {
   return window['go']['main']['App']['CheckZshrc']();
 }
 
+export function DeleteScriptMeta(arg1) {
+  return window['go']['main']['App']['DeleteScriptMeta'](arg1);
+}
+
 export function GetAllServiceStatuses() {
   return window['go']['main']['App']['GetAllServiceStatuses']();
+}
+
+export function GetAutoLaunchEnabled() {
+  return window['go']['main']['App']['GetAutoLaunchEnabled']();
 }
 
 export function GetConfig() {
@@ -22,6 +34,10 @@ export function GetScriptsByDir(arg1) {
   return window['go']['main']['App']['GetScriptsByDir'](arg1);
 }
 
+export function ParseZshrc() {
+  return window['go']['main']['App']['ParseZshrc']();
+}
+
 export function RemoveDirectory(arg1) {
   return window['go']['main']['App']['RemoveDirectory'](arg1);
 }
@@ -30,8 +46,20 @@ export function RunScript(arg1, arg2, arg3) {
   return window['go']['main']['App']['RunScript'](arg1, arg2, arg3);
 }
 
+export function SaveAIConfig(arg1) {
+  return window['go']['main']['App']['SaveAIConfig'](arg1);
+}
+
 export function SaveExports(arg1) {
   return window['go']['main']['App']['SaveExports'](arg1);
+}
+
+export function SaveScriptMeta(arg1) {
+  return window['go']['main']['App']['SaveScriptMeta'](arg1);
+}
+
+export function SaveZshrcAnnotation(arg1, arg2) {
+  return window['go']['main']['App']['SaveZshrcAnnotation'](arg1, arg2);
 }
 
 export function ScanAll() {
@@ -40,6 +68,26 @@ export function ScanAll() {
 
 export function ServiceAction(arg1, arg2, arg3) {
   return window['go']['main']['App']['ServiceAction'](arg1, arg2, arg3);
+}
+
+export function SetAutoLaunchEnabled(arg1) {
+  return window['go']['main']['App']['SetAutoLaunchEnabled'](arg1);
+}
+
+export function SuggestScriptMeta(arg1) {
+  return window['go']['main']['App']['SuggestScriptMeta'](arg1);
+}
+
+export function SuggestZshrcAnnotation(arg1) {
+  return window['go']['main']['App']['SuggestZshrcAnnotation'](arg1);
+}
+
+export function SuggestZshrcOrganization(arg1) {
+  return window['go']['main']['App']['SuggestZshrcOrganization'](arg1);
+}
+
+export function TestAIConfig(arg1) {
+  return window['go']['main']['App']['TestAIConfig'](arg1);
 }
 
 export function UpdateDirectoryExport(arg1, arg2) {

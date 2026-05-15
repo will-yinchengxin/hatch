@@ -20,18 +20,25 @@ type ArgDef struct {
 	Required bool   `json:"required"`
 }
 
+// CommandPreset is a saved named invocation of a script with fixed arguments.
+type CommandPreset struct {
+	Name string `json:"name"` // display name, e.g. "2026年4月日报"
+	Args string `json:"args"` // space-separated args string
+}
+
 type ScriptMeta struct {
-	Path      string     `json:"path"`
-	Name      string     `json:"name"`
-	Desc      string     `json:"desc"`
-	Type      ScriptType `json:"type"`
-	Language  string     `json:"language"`
-	Commands  []string   `json:"commands"`
-	PidFile   string     `json:"pidFile"`
-	Args      []ArgDef   `json:"args"`
-	Tags      []string   `json:"tags"`
-	LastRunAt int64      `json:"lastRunAt"`
-	UpdatedAt int64      `json:"updatedAt"`
+	Path      string          `json:"path"`
+	Name      string          `json:"name"`
+	Desc      string          `json:"desc"`
+	Type      ScriptType      `json:"type"`
+	Language  string          `json:"language"`
+	Commands  []string        `json:"commands"`
+	PidFile   string          `json:"pidFile"`
+	Args      []ArgDef        `json:"args"`
+	Presets   []CommandPreset `json:"presets,omitempty"`
+	Tags      []string        `json:"tags"`
+	LastRunAt int64           `json:"lastRunAt"`
+	UpdatedAt int64           `json:"updatedAt"`
 }
 
 type Directory struct {
@@ -45,10 +52,20 @@ type ExportVar struct {
 	Value string `json:"value"`
 }
 
+type AIConfig struct {
+	Enabled bool   `json:"enabled"`
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey"`
+	Model   string `json:"model"`
+}
+
 type Config struct {
-	Directories  []Directory           `json:"directories"`
-	Exports      []ExportVar           `json:"exports"`
-	OverrideMeta map[string]ScriptMeta `json:"overrideMeta"`
+	Directories      []Directory           `json:"directories"`
+	Exports          []ExportVar           `json:"exports"`
+	OverrideMeta     map[string]ScriptMeta `json:"overrideMeta"`
+	ZshrcAnnotations map[string]string     `json:"zshrcAnnotations,omitempty"`
+	AI               AIConfig              `json:"ai,omitempty"`
+	AutoLaunch       bool                  `json:"autoLaunch,omitempty"`
 }
 
 func defaultPath() (string, error) {

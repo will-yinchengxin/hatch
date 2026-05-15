@@ -22,7 +22,14 @@
       "Bash(codesign --force --deep --sign - /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app)",
       "Bash(codesign --verify --deep --strict /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app)",
       "Bash(/opt/homebrew/bin/create-dmg *)",
-      "Bash(chmod +x *)"
+      "Bash(chmod +x *)",
+      "Bash(make *)",
+      "Bash(node --input-type=module)",
+      "Bash(cp /Users/yinchengxin/Downloads/logo.png /Users/yinchengxin/MyHub/hatch/build/appicon.png)",
+      "Bash(cp /Users/yinchengxin/Downloads/logo.png /Users/yinchengxin/MyHub/hatch/frontend/src/assets/images/logo.png)",
+      "Bash(identify /Users/yinchengxin/MyHub/hatch/frontend/src/assets/images/logo.png)",
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/yinchengxin/MyHub/hatch/frontend/src/assets/images/logo.png)",
+      "Bash(sips *)"
     ]
   }
 }

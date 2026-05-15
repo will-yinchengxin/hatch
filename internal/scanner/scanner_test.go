@@ -156,7 +156,14 @@ func TestScanDir_OverrideApplied(t *testing.T) {
 	dir := t.TempDir()
 	path := writeScript(t, dir, "plain.sh", "#!/bin/bash\necho hi\n")
 	overrides := map[string]config.ScriptMeta{
-		path: {Name: "Overridden", Desc: "custom desc"},
+		path: {
+			Name: "Overridden",
+			Desc: "custom desc",
+			Args: []config.ArgDef{},
+			Presets: []config.CommandPreset{
+				{Name: "Today", Args: "2026-05-15"},
+			},
+		},
 	}
 	scripts, err := ScanDir(dir, overrides)
 	if err != nil {
@@ -167,6 +174,15 @@ func TestScanDir_OverrideApplied(t *testing.T) {
 	}
 	if scripts[0].Desc != "custom desc" {
 		t.Errorf("override desc not applied, got %q", scripts[0].Desc)
+	}
+	if scripts[0].Args == nil {
+		t.Errorf("override empty args should be preserved as non-nil slice")
+	}
+	if len(scripts[0].Presets) != 1 {
+		t.Fatalf("override presets not applied, got %#v", scripts[0].Presets)
+	}
+	if scripts[0].Presets[0].Name != "Today" || scripts[0].Presets[0].Args != "2026-05-15" {
+		t.Errorf("unexpected preset: %#v", scripts[0].Presets[0])
 	}
 }
 

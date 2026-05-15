@@ -148,8 +148,11 @@ func mergeOverride(base, ov config.ScriptMeta) config.ScriptMeta {
 	if ov.PidFile != "" {
 		base.PidFile = ov.PidFile
 	}
-	if len(ov.Args) > 0 {
+	if ov.Args != nil {
 		base.Args = ov.Args
+	}
+	if len(ov.Presets) > 0 {
+		base.Presets = ov.Presets
 	}
 	if len(ov.Tags) > 0 {
 		base.Tags = ov.Tags

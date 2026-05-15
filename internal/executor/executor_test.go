@@ -24,6 +24,31 @@ func TestShellQuote(t *testing.T) {
 	}
 }
 
+func TestBuildZshArgs_GuardsMissingZshrc(t *testing.T) {
+	args := buildZshArgs("/bin/echo", []string{"hello"})
+	if len(args) != 3 {
+		t.Fatalf("buildZshArgs returned %d args, want 3: %#v", len(args), args)
+	}
+	cmd := args[2]
+	if !strings.Contains(cmd, `[[ -r "${ZDOTDIR:-$HOME}/.zshrc" ]]`) {
+		t.Fatalf("zshrc source is not guarded: %q", cmd)
+	}
+	if !strings.Contains(cmd, `source "${ZDOTDIR:-$HOME}/.zshrc"`) {
+		t.Fatalf("zshrc source command missing: %q", cmd)
+	}
+	if !strings.Contains(cmd, `exec '/bin/echo' 'hello'`) {
+		t.Fatalf("script exec command missing: %q", cmd)
+	}
+}
+
+func TestBuildScriptCommandForLog(t *testing.T) {
+	got := buildScriptCommandForLog("/tmp/my tool.sh", []string{"hello hatch", "it's ok"})
+	want := "'/tmp/my tool.sh' 'hello hatch' 'it'\\''s ok'"
+	if got != want {
+		t.Fatalf("command log = %q, want %q", got, want)
+	}
+}
+
 // --- oneshot ---
 
 func TestRunOneshot_Echo(t *testing.T) {
@@ -73,6 +98,9 @@ func TestRunOneshot_EmitsEvents(t *testing.T) {
 	}
 	if len(logs) == 0 {
 		t.Error("expected at least one log event")
+	}
+	if !strings.Contains(logs[0].Line, "[hatch] command: '/bin/echo' 'line1'") {
+		t.Errorf("first log should include command, got %#v", logs[0])
 	}
 	if len(dones) != 1 {
 		t.Errorf("expected 1 done event, got %d", len(dones))

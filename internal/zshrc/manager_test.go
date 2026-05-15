@@ -40,9 +40,49 @@ func TestWriteBlock_CreatesBlock(t *testing.T) {
 	if !strings.Contains(got, `export MyTools=`) {
 		t.Error("export line not found")
 	}
+	if !strings.Contains(got, `export PATH=$MyTools:$PATH`) {
+		t.Error("PATH line not found")
+	}
 	// user content must be preserved
 	if !strings.Contains(got, "export FOO=bar") {
 		t.Error("existing user content was removed")
+	}
+}
+
+func TestWriteBlock_PathStyle(t *testing.T) {
+	path := tmpZshrc(t, "")
+	exports := map[string]string{
+		"GO_HOME":    "/Users/yinchengxin/go/go1.26.1/bin",
+		"GO_PATH":    "/Users/yinchengxin/go/bin",
+		"WILL_TOOLS": "/Users/yinchengxin/tools",
+	}
+	if err := WriteBlock(path, exports); err != nil {
+		t.Fatal(err)
+	}
+	got := readFile(t, path)
+	for _, want := range []string{
+		"export GO_HOME=/Users/yinchengxin/go/go1.26.1/bin\n",
+		"export GO_PATH=/Users/yinchengxin/go/bin\n",
+		"export WILL_TOOLS=/Users/yinchengxin/tools\n",
+		"export PATH=$GO_HOME:$GO_PATH:$WILL_TOOLS:$PATH\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("managed block missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestWriteBlock_QuotesUnsafeValue(t *testing.T) {
+	path := tmpZshrc(t, "")
+	if err := WriteBlock(path, map[string]string{"MY_TOOLS": "/Users/me/My Tools"}); err != nil {
+		t.Fatal(err)
+	}
+	got := readFile(t, path)
+	if !strings.Contains(got, "export MY_TOOLS='/Users/me/My Tools'\n") {
+		t.Fatalf("unsafe value should be single-quoted:\n%s", got)
+	}
+	if !strings.Contains(got, "export PATH=$MY_TOOLS:$PATH\n") {
+		t.Fatalf("PATH should reference variable, not raw path:\n%s", got)
 	}
 }
 

@@ -1,5 +1,23 @@
 export namespace config {
 	
+	export class AIConfig {
+	    enabled: boolean;
+	    baseUrl: string;
+	    apiKey: string;
+	    model: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.baseUrl = source["baseUrl"];
+	        this.apiKey = source["apiKey"];
+	        this.model = source["model"];
+	    }
+	}
 	export class ArgDef {
 	    name: string;
 	    flag: string;
@@ -18,6 +36,20 @@ export namespace config {
 	        this.required = source["required"];
 	    }
 	}
+	export class CommandPreset {
+	    name: string;
+	    args: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CommandPreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.args = source["args"];
+	    }
+	}
 	export class ScriptMeta {
 	    path: string;
 	    name: string;
@@ -27,6 +59,7 @@ export namespace config {
 	    commands: string[];
 	    pidFile: string;
 	    args: ArgDef[];
+	    presets?: CommandPreset[];
 	    tags: string[];
 	    lastRunAt: number;
 	    updatedAt: number;
@@ -45,6 +78,7 @@ export namespace config {
 	        this.commands = source["commands"];
 	        this.pidFile = source["pidFile"];
 	        this.args = this.convertValues(source["args"], ArgDef);
+	        this.presets = this.convertValues(source["presets"], CommandPreset);
 	        this.tags = source["tags"];
 	        this.lastRunAt = source["lastRunAt"];
 	        this.updatedAt = source["updatedAt"];
@@ -102,6 +136,9 @@ export namespace config {
 	    directories: Directory[];
 	    exports: ExportVar[];
 	    overrideMeta: Record<string, ScriptMeta>;
+	    zshrcAnnotations?: Record<string, string>;
+	    ai?: AIConfig;
+	    autoLaunch?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -112,6 +149,9 @@ export namespace config {
 	        this.directories = this.convertValues(source["directories"], Directory);
 	        this.exports = this.convertValues(source["exports"], ExportVar);
 	        this.overrideMeta = this.convertValues(source["overrideMeta"], ScriptMeta, true);
+	        this.zshrcAnnotations = source["zshrcAnnotations"];
+	        this.ai = this.convertValues(source["ai"], AIConfig);
+	        this.autoLaunch = source["autoLaunch"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -139,6 +179,64 @@ export namespace config {
 
 export namespace main {
 	
+	export class AIScriptSuggestion {
+	    name: string;
+	    desc: string;
+	    type: string;
+	    commands: string[];
+	    pidFile: string;
+	    needsArgs: boolean;
+	    tags: string[];
+	    presets: config.CommandPreset[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AIScriptSuggestion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.desc = source["desc"];
+	        this.type = source["type"];
+	        this.commands = source["commands"];
+	        this.pidFile = source["pidFile"];
+	        this.needsArgs = source["needsArgs"];
+	        this.tags = source["tags"];
+	        this.presets = this.convertValues(source["presets"], config.CommandPreset);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ZshrcApplyResult {
+	    zshrcPath: string;
+	    backupPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ZshrcApplyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.zshrcPath = source["zshrcPath"];
+	        this.backupPath = source["backupPath"];
+	    }
+	}
 	export class ZshrcInfo {
 	    shell: string;
 	    isZsh: boolean;
@@ -155,6 +253,45 @@ export namespace main {
 	        this.isZsh = source["isZsh"];
 	        this.zshrcPath = source["zshrcPath"];
 	        this.hatchLines = source["hatchLines"];
+	    }
+	}
+	export class ZshrcOrganizationSuggestion {
+	    summary: string[];
+	    content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ZshrcOrganizationSuggestion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.summary = source["summary"];
+	        this.content = source["content"];
+	    }
+	}
+
+}
+
+export namespace zshrc {
+	
+	export class Entry {
+	    type: string;
+	    key: string;
+	    value: string;
+	    note: string;
+	    lineNum: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.key = source["key"];
+	        this.value = source["value"];
+	        this.note = source["note"];
+	        this.lineNum = source["lineNum"];
 	    }
 	}
 
