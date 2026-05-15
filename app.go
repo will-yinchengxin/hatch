@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +57,18 @@ type ZshrcOrganizationSuggestion struct {
 type ZshrcApplyResult struct {
 	ZshrcPath  string `json:"zshrcPath"`
 	BackupPath string `json:"backupPath"`
+}
+
+type ClaudeCodeStatus struct {
+	ClaudeInstalled bool     `json:"claudeInstalled"`
+	ClaudeVersion   string   `json:"claudeVersion"`
+	VPNConnected    bool     `json:"vpnConnected"`
+	VPNInterfaces   []string `json:"vpnInterfaces"`
+	HasUsageData    bool     `json:"hasUsageData"`
+	FiveHourPct     float64  `json:"fiveHourPct"`
+	FiveHourReset   string   `json:"fiveHourReset"`
+	SevenDayPct     float64  `json:"sevenDayPct"`
+	SevenDayReset   string   `json:"sevenDayReset"`
 }
 
 func NewApp() *App {
@@ -700,6 +714,170 @@ func extractJSONObject(s string) string {
 		return s[start : end+1]
 	}
 	return s
+}
+
+// ─── Script file I/O ─────────────────────────────────────────────────────────
+
+// ReadScriptFile returns the raw text content of a script file.
+func (a *App) ReadScriptFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// WriteScriptFile writes new content to an existing script file, ensures it is
+// executable, and sources ~/.zshrc so the Hatch process picks up any env changes.
+func (a *App) WriteScriptFile(path, content string) error {
+	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+		return err
+	}
+	a.autoSource()
+	return nil
+}
+
+// CreateScriptFile creates a new script file inside dirPath, makes it
+// executable, and sources ~/.zshrc.  Returns the full path of the created file.
+func (a *App) CreateScriptFile(dirPath, filename, content string) (string, error) {
+	fullPath := filepath.Join(dirPath, filename)
+	if _, err := os.Stat(fullPath); err == nil {
+		return "", fmt.Errorf("文件已存在: %s", fullPath)
+	}
+	if err := os.WriteFile(fullPath, []byte(content), 0755); err != nil {
+		return "", err
+	}
+	a.autoSource()
+	return fullPath, nil
+}
+
+// SuggestScriptContent asks the configured AI to write or improve a script.
+// It returns the raw script text (no Markdown fences).
+func (a *App) SuggestScriptContent(path, currentContent, instruction string) (string, error) {
+	a.mu.RLock()
+	ai := a.cfg.AI
+	a.mu.RUnlock()
+	if err := validateAIConfig(ai); err != nil {
+		return "", err
+	}
+	system := "你是 macOS shell 脚本编写助手。根据用户指令直接输出完整的脚本内容。\n" +
+		"要求：\n" +
+		"1. 只输出脚本文本，不要任何解释，不要 Markdown 代码块（不要用三个反引号包裹输出）。\n" +
+		"2. 脚本必须以合适的 shebang 开头（如 #!/bin/zsh 或 #!/usr/bin/env python3）。\n" +
+		"3. 保留已有内容中有价值的逻辑，除非指令要求完全重写。"
+	userBytes, _ := json.Marshal(map[string]any{
+		"path":           path,
+		"currentContent": currentContent,
+		"instruction":    instruction,
+	})
+	raw, err := a.callAI(ai, system, string(userBytes))
+	if err != nil {
+		return "", err
+	}
+	// Strip markdown fences if the model adds them anyway
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimPrefix(raw, "```zsh")
+	raw = strings.TrimPrefix(raw, "```shell")
+	raw = strings.TrimPrefix(raw, "```sh")
+	raw = strings.TrimPrefix(raw, "```bash")
+	raw = strings.TrimPrefix(raw, "```python")
+	raw = strings.TrimPrefix(raw, "```")
+	raw = strings.TrimSuffix(raw, "```")
+	return strings.TrimSpace(raw), nil
+}
+
+// autoSource runs `source ~/.zshrc` in a background login shell so that any
+// new exports/PATH entries take effect for scripts launched by Hatch.
+// Errors are silently ignored — this is a best-effort operation.
+func (a *App) autoSource() {
+	go func() {
+		_ = exec.Command("/bin/zsh", "-l", "-c", "source ~/.zshrc 2>/dev/null || true").Run()
+	}()
+}
+
+// ─── Claude Code status ───────────────────────────────────────────────────────
+
+// GetClaudeCodeStatus checks whether claude CLI is installed, whether a VPN is
+// active, and reads cached rate-limit usage from the statusline cache file.
+func (a *App) GetClaudeCodeStatus() ClaudeCodeStatus {
+	st := ClaudeCodeStatus{}
+
+	// ── Claude installation ──────────────────────────────────────────────────
+	claudePath, err := exec.LookPath("claude")
+	if err == nil && claudePath != "" {
+		st.ClaudeInstalled = true
+		out, _ := exec.Command(claudePath, "--version").Output()
+		st.ClaudeVersion = strings.TrimSpace(string(out))
+	}
+
+	// ── VPN detection via ifconfig ───────────────────────────────────────────
+	// Any utun interface with an IPv4 (inet) address is treated as VPN.
+	ifOut, _ := exec.Command("ifconfig").Output()
+	var currentIface string
+	for _, line := range strings.Split(string(ifOut), "\n") {
+		if strings.HasPrefix(line, "utun") {
+			// e.g. "utun0: flags=..."
+			currentIface = strings.SplitN(line, ":", 2)[0]
+		} else if currentIface != "" && strings.Contains(line, "inet ") && !strings.Contains(line, "inet6") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				st.VPNConnected = true
+				st.VPNInterfaces = append(st.VPNInterfaces, currentIface+": "+fields[1])
+			}
+			currentIface = ""
+		} else if !strings.HasPrefix(line, "\t") && !strings.HasPrefix(line, " ") {
+			currentIface = ""
+		}
+	}
+
+	// ── Rate-limit usage from statusline cache ───────────────────────────────
+	home, _ := os.UserHomeDir()
+	cachePath := home + "/.cache/will-statusline/last.json"
+	data, err := os.ReadFile(cachePath)
+	if err == nil {
+		var cache struct {
+			RateLimits struct {
+				FiveHour struct {
+					UsedPercentage float64 `json:"used_percentage"`
+					ResetsAt       int64   `json:"resets_at"`
+				} `json:"five_hour"`
+				SevenDay struct {
+					UsedPercentage float64 `json:"used_percentage"`
+					ResetsAt       int64   `json:"resets_at"`
+				} `json:"seven_day"`
+			} `json:"rate_limits"`
+		}
+		if json.Unmarshal(data, &cache) == nil {
+			st.HasUsageData = true
+			st.FiveHourPct = cache.RateLimits.FiveHour.UsedPercentage
+			st.FiveHourReset = claudeFormatReset(cache.RateLimits.FiveHour.ResetsAt)
+			st.SevenDayPct = cache.RateLimits.SevenDay.UsedPercentage
+			st.SevenDayReset = claudeFormatReset(cache.RateLimits.SevenDay.ResetsAt)
+		}
+	}
+	return st
+}
+
+// claudeFormatReset converts a Unix timestamp to a human-readable countdown.
+func claudeFormatReset(ts int64) string {
+	if ts == 0 {
+		return ""
+	}
+	diff := ts - time.Now().Unix()
+	if diff <= 0 {
+		return "已重置"
+	}
+	mins := diff / 60
+	hours := diff / 3600
+	days := diff / 86400
+	switch {
+	case days >= 1:
+		return fmt.Sprintf("%dd%dh", days, hours%24)
+	case hours >= 1:
+		return fmt.Sprintf("%dh%dm", hours, mins%60)
+	default:
+		return fmt.Sprintf("%dm", mins)
+	}
 }
 
 // syncZshrc rebuilds the managed block from cfg.Exports. Caller must hold mu.

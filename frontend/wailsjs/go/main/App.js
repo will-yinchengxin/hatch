@@ -14,6 +14,10 @@ export function CheckZshrc() {
   return window['go']['main']['App']['CheckZshrc']();
 }
 
+export function CreateScriptFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateScriptFile'](arg1, arg2, arg3);
+}
+
 export function DeleteScriptMeta(arg1) {
   return window['go']['main']['App']['DeleteScriptMeta'](arg1);
 }
@@ -26,6 +30,10 @@ export function GetAutoLaunchEnabled() {
   return window['go']['main']['App']['GetAutoLaunchEnabled']();
 }
 
+export function GetClaudeCodeStatus() {
+  return window['go']['main']['App']['GetClaudeCodeStatus']();
+}
+
 export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }
@@ -36,6 +44,10 @@ export function GetScriptsByDir(arg1) {
 
 export function ParseZshrc() {
   return window['go']['main']['App']['ParseZshrc']();
+}
+
+export function ReadScriptFile(arg1) {
+  return window['go']['main']['App']['ReadScriptFile'](arg1);
 }
 
 export function RemoveDirectory(arg1) {
@@ -74,6 +86,10 @@ export function SetAutoLaunchEnabled(arg1) {
   return window['go']['main']['App']['SetAutoLaunchEnabled'](arg1);
 }
 
+export function SuggestScriptContent(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SuggestScriptContent'](arg1, arg2, arg3);
+}
+
 export function SuggestScriptMeta(arg1) {
   return window['go']['main']['App']['SuggestScriptMeta'](arg1);
 }
@@ -92,4 +108,8 @@ export function TestAIConfig(arg1) {
 
 export function UpdateDirectoryExport(arg1, arg2) {
   return window['go']['main']['App']['UpdateDirectoryExport'](arg1, arg2);
+}
+
+export function WriteScriptFile(arg1, arg2) {
+  return window['go']['main']['App']['WriteScriptFile'](arg1, arg2);
 }

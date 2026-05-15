@@ -29,7 +29,13 @@
       "Bash(cp /Users/yinchengxin/Downloads/logo.png /Users/yinchengxin/MyHub/hatch/frontend/src/assets/images/logo.png)",
       "Bash(identify /Users/yinchengxin/MyHub/hatch/frontend/src/assets/images/logo.png)",
       "Bash(sips -g pixelWidth -g pixelHeight /Users/yinchengxin/MyHub/hatch/frontend/src/assets/images/logo.png)",
-      "Bash(sips *)"
+      "Bash(sips *)",
+      "Read(//Users/yinchengxin/.claude/**)",
+      "Bash(claude --version)",
+      "Read(//Users/yinchengxin/.cache/will-statusline/**)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if 'rate' in k.lower\\(\\) or 'limit' in k.lower\\(\\) or 'usage' in k.lower\\(\\)}, indent=2\\)\\)\")",
+      "Bash(scutil --nc list)",
+      "Bash(awk '/^utun/{iface=$1} /inet [0-9]/{if\\(iface\\) print iface, $2; iface=\"\"}')"
     ]
   }
 }

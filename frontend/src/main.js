@@ -30,6 +30,11 @@ const SuggestZshrcOrganization = (mode) => window['go']['main']['App']['SuggestZ
 const ApplyZshrcOrganization = (content) => window['go']['main']['App']['ApplyZshrcOrganization'](content);
 const GetAutoLaunchEnabled = () => window['go']['main']['App']['GetAutoLaunchEnabled']();
 const SetAutoLaunchEnabled = (enabled) => window['go']['main']['App']['SetAutoLaunchEnabled'](enabled);
+const GetClaudeCodeStatus   = ()                            => window['go']['main']['App']['GetClaudeCodeStatus']();
+const ReadScriptFile        = (path)                        => window['go']['main']['App']['ReadScriptFile'](path);
+const WriteScriptFile       = (path, content)               => window['go']['main']['App']['WriteScriptFile'](path, content);
+const CreateScriptFile      = (dirPath, filename, content)  => window['go']['main']['App']['CreateScriptFile'](dirPath, filename, content);
+const SuggestScriptContent  = (path, cur, inst)             => window['go']['main']['App']['SuggestScriptContent'](path, cur, inst);
 
 window.hatchApp = function () {
   return {
@@ -98,6 +103,23 @@ window.hatchApp = function () {
 
     autoLaunchEnabled: false,
     autoLaunchSaving: false,
+
+    // Claude Code status
+    claudeStatus: null,
+    claudeStatusLoading: false,
+
+    // Script content editor
+    scriptEditorTarget: null,   // ScriptMeta of the script being edited
+    scriptEditorContent: '',
+    scriptEditorSaving: false,
+    scriptEditorAIBusy: false,
+    scriptEditorInstruction: '',
+
+    // New script creation
+    newScriptOpen: false,
+    newScriptForm: { filename: '', content: '#!/bin/zsh\n\n' },
+    newScriptSaving: false,
+    newScriptAIBusy: false,
 
     // ── Computed ───────────────────────────────────────────────────────
     get scriptDirs() {
@@ -709,6 +731,135 @@ window.hatchApp = function () {
         section:  '#',
         other:    '…',
       }[type] || '?';
+    },
+
+    // ── Claude Code status ────────────────────────────────────────────
+    async loadClaudeStatus() {
+      this.claudeStatusLoading = true;
+      try {
+        this.claudeStatus = await GetClaudeCodeStatus();
+      } catch (e) {
+        this.showError(`获取 Claude Code 状态失败: ${e}`);
+      } finally {
+        this.claudeStatusLoading = false;
+      }
+    },
+
+    claudeUsagePill(pct) {
+      if (pct >= 80) return 'usage-high';
+      if (pct >= 50) return 'usage-mid';
+      return 'usage-low';
+    },
+
+    // ── Script content editor ──────────────────────────────────────────
+    async openScriptEditor(script) {
+      this.scriptEditorTarget = script;
+      this.scriptEditorInstruction = '';
+      try {
+        this.scriptEditorContent = await ReadScriptFile(script.path);
+      } catch (e) {
+        this.showError(`读取文件失败: ${e}`);
+        this.scriptEditorTarget = null;
+      }
+    },
+
+    closeScriptEditor() {
+      this.scriptEditorTarget = null;
+      this.scriptEditorContent = '';
+      this.scriptEditorInstruction = '';
+    },
+
+    async saveScriptContent() {
+      if (!this.scriptEditorTarget) return;
+      this.scriptEditorSaving = true;
+      try {
+        await WriteScriptFile(this.scriptEditorTarget.path, this.scriptEditorContent);
+        if (this.selectedDir) await this.scanDir(this.selectedDir);
+        this.closeScriptEditor();
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.scriptEditorSaving = false;
+      }
+    },
+
+    async scriptAIGenerate() {
+      if (!this.aiReady) {
+        this.tab = 'ai';
+        this.showError('请先完成并启用 AI 配置');
+        return;
+      }
+      if (!this.scriptEditorInstruction.trim()) {
+        this.showError('请输入 AI 指令（如：加错误处理、重写为 python3）');
+        return;
+      }
+      this.scriptEditorAIBusy = true;
+      try {
+        const result = await SuggestScriptContent(
+          this.scriptEditorTarget?.path || '',
+          this.scriptEditorContent,
+          this.scriptEditorInstruction
+        );
+        this.scriptEditorContent = result;
+      } catch (e) {
+        this.showError(`AI 生成失败: ${e}`);
+      } finally {
+        this.scriptEditorAIBusy = false;
+      }
+    },
+
+    // ── New script creation ────────────────────────────────────────────
+    openNewScript() {
+      this.newScriptForm = { filename: '', content: '#!/bin/zsh\n\n' };
+      this.newScriptOpen = true;
+    },
+
+    closeNewScript() {
+      this.newScriptOpen = false;
+      this.newScriptForm = { filename: '', content: '#!/bin/zsh\n\n' };
+    },
+
+    async saveNewScript() {
+      if (!this.selectedDir || !this.newScriptForm.filename.trim()) return;
+      this.newScriptSaving = true;
+      try {
+        await CreateScriptFile(
+          this.selectedDir.path,
+          this.newScriptForm.filename.trim(),
+          this.newScriptForm.content
+        );
+        await this.scanDir(this.selectedDir);
+        this.closeNewScript();
+      } catch (e) {
+        this.showError(`创建失败: ${e}`);
+      } finally {
+        this.newScriptSaving = false;
+      }
+    },
+
+    async newScriptAIGenerate() {
+      if (!this.aiReady) {
+        this.tab = 'ai';
+        this.showError('请先完成并启用 AI 配置');
+        return;
+      }
+      if (!this.scriptEditorInstruction.trim()) {
+        this.showError('请输入 AI 指令');
+        return;
+      }
+      this.newScriptAIBusy = true;
+      try {
+        const result = await SuggestScriptContent(
+          this.newScriptForm.filename || 'new-script',
+          this.newScriptForm.content,
+          this.scriptEditorInstruction
+        );
+        this.newScriptForm.content = result;
+      } catch (e) {
+        this.showError(`AI 生成失败: ${e}`);
+      } finally {
+        this.newScriptAIBusy = false;
+      }
     },
 
     // ── Helpers ────────────────────────────────────────────────────────

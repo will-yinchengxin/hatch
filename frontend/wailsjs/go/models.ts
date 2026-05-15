@@ -223,6 +223,34 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ClaudeCodeStatus {
+	    claudeInstalled: boolean;
+	    claudeVersion: string;
+	    vpnConnected: boolean;
+	    vpnInterfaces: string[];
+	    hasUsageData: boolean;
+	    fiveHourPct: number;
+	    fiveHourReset: string;
+	    sevenDayPct: number;
+	    sevenDayReset: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClaudeCodeStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.claudeInstalled = source["claudeInstalled"];
+	        this.claudeVersion = source["claudeVersion"];
+	        this.vpnConnected = source["vpnConnected"];
+	        this.vpnInterfaces = source["vpnInterfaces"];
+	        this.hasUsageData = source["hasUsageData"];
+	        this.fiveHourPct = source["fiveHourPct"];
+	        this.fiveHourReset = source["fiveHourReset"];
+	        this.sevenDayPct = source["sevenDayPct"];
+	        this.sevenDayReset = source["sevenDayReset"];
+	    }
+	}
 	export class ZshrcApplyResult {
 	    zshrcPath: string;
 	    backupPath: string;

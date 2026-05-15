@@ -41,6 +41,7 @@ hatch/
 │   │   ├── service.go        # ServiceManager — start/stop/restart via PID files
 │   │   ├── stream.go         # Emitter — typed wrappers for Wails EventsEmit
 │   │   └── cmd.go            # newBackgroundCmd, buildZshArgs helpers
+│   ├── autostart/autostart.go # macOS LaunchAgent install/remove (login autostart)
 │   ├── store/store.go        # JSON-backed script metadata cache (runtime state)
 │   └── zshrc/
 │       ├── manager.go        # Read/write/remove the Hatch managed block in ~/.zshrc
@@ -87,6 +88,7 @@ type Config struct {
     OverrideMeta     map[string]ScriptMeta // user edits keyed by script path
     ZshrcAnnotations map[string]string     // user notes on ~/.zshrc entries, keyed by entry key
     AI               AIConfig              // OpenAI-compatible model settings
+    AutoLaunch       bool                  // true = LaunchAgent plist installed at ~/Library/LaunchAgents/
 }
 
 type AIConfig struct {
@@ -158,9 +160,13 @@ Only non-zero fields from the override replace the auto-detected value.
 | `TestAIConfig(ai)` | Send a small Chat Completions request to verify model connectivity |
 | `SuggestScriptMeta(meta)` | Read a script file and ask AI for name/desc/type/commands/tags/presets suggestions |
 | `SuggestZshrcAnnotation(entry)` | Ask AI for a short Chinese note for one parsed zshrc entry |
+| `SuggestZshrcOrganization(mode)` | Ask AI to reorganize `~/.zshrc`; returns `{summary, content}` preview — does NOT write |
+| `ApplyZshrcOrganization(content)` | Backup `~/.zshrc` then write approved content; returns `{zshrcPath, backupPath}` |
+| `GetAutoLaunchEnabled()` | Returns `true` if `~/Library/LaunchAgents/com.hatch.app.plist` exists |
+| `SetAutoLaunchEnabled(enabled)` | Install or remove the LaunchAgent plist; also persists `Config.AutoLaunch` |
 
-**New methods not yet in `wailsjs/App.js`** (regenerated on next `wails build`):
-Call them directly in `main.js` via `window['go']['main']['App']['MethodName']()`.
+**Methods still called via `window['go']` in `main.js`** (not yet in generated wailsjs bindings):
+`SuggestZshrcOrganization`, `ApplyZshrcOrganization`, `GetAutoLaunchEnabled`, `SetAutoLaunchEnabled`.
 
 ### AI integration model
 
@@ -170,6 +176,7 @@ Current AI support targets APIs compatible with OpenAI Chat Completions (`POST /
 - `APIKey` is stored locally in `~/Library/Application Support/Hatch/config.json`. There is no keychain integration yet.
 - AI requests are synchronous Wails calls with a 45 s HTTP timeout.
 - Script analysis reads the script file, truncates content to 12,000 bytes, and asks for strict JSON.
+- Zshrc reorganization reads the full file, truncates content to 24,000 bytes, and returns `{summary, content}`.
 - AI suggestions are not auto-saved. They populate the edit drawer or annotation input; the user still clicks Save.
 - If AI is disabled or incomplete, frontend navigates to the AI tab and shows an error.
 
@@ -190,15 +197,16 @@ Current AI support targets APIs compatible with OpenAI Chat Completions (`POST /
 ## Service Execution Model (`internal/executor/`)
 
 **Oneshot** (`oneshot.go`):
-- Runs via `/bin/zsh -l -c` (login shell, sources zshrc, full PATH)
+- Runs via `/bin/zsh -l -c`. The `-c` script explicitly `source ~/.zshrc` before `exec`-ing the target, because Wails apps launched from Finder/Dock do not get an interactive terminal and `/bin/zsh -l` alone does not read `~/.zshrc`.
 - `stdout` and `stderr` streamed line-by-line via `Emitter.Log`
+- First log line is `[hatch] command: <quoted invocation>` for traceability
 - `Emitter.Done` fires on completion with exit code
 
 **Service** (`service.go` — `ServiceManager`):
 - Start: launches script in background with `Setpgid: true` (own process group)
 - PID written to `pidFile` (default `/tmp/hatch/<name>.pid`)
 - Status: `kill -0 <pid>` liveness probe; stale PID files auto-removed
-- Stop: `SIGTERM` + PID file cleanup
+- Stop: `SIGTERM` + PID file cleanup; emits `[hatch] command: SIGTERM pid N` log line
 - Restart: Stop (ignore error) → Start
 - On app startup: `restoreServices()` rebuilds `ServiceManager` for all stored service scripts and probes each one
 
@@ -219,8 +227,14 @@ export SCRIPTS="/Users/you/scripts"
 Rules:
 - Block is replaced atomically on every write; lines outside are never touched
 - Keys written in **alphabetical order** for stable diffs
+- After writing all `export VAR=value` lines, `buildBlock` appends `export PATH=$VAR1:$VAR2:$PATH` so exported directory vars are automatically on PATH
+- `$` characters in export values are escaped before regex substitution to prevent `ReplaceAllString` from interpreting them as back-references
 - `RemoveBlock` called automatically when the exports list becomes empty
 - `WriteBlock` appends if no block exists, or replaces via regex if it does
+
+**Additional helpers** (`manager.go`):
+- `Backup(path) (string, error)` — copies the file to `<path>.hatch-backup-<YYYYMMDD-HHMMSS>` (non-overwriting, increments suffix on collision)
+- `WriteContent(path, content) error` — replaces the entire file; ensures trailing newline
 
 ### Shell config parser (`parser.go`)
 
@@ -277,6 +291,11 @@ quickExportDir != null         →  Quick export modal overlay
 | `zshrcFilter` | `string` | Active type filter in Shell 配置解析 |
 | `annotationTarget` | `string\|null` | Key of entry being annotated |
 | `expandedFns` | `{key: bool}` | Which function bodies are expanded |
+| `autoLaunchEnabled` / `autoLaunchSaving` | `bool` | Login autostart toggle state |
+| `zshrcOrganizing` / `zshrcApplying` | `bool` | AI zshrc org loading states |
+| `zshrcOrganizationMode` | `string` | User instruction for AI org (editable textarea) |
+| `zshrcOrganization` | `{summary, content}\|null` | AI preview result before applying |
+| `zshrcApplyResult` | `{zshrcPath, backupPath}\|null` | Result shown after successful apply |
 
 ### Edit drawer flow
 
@@ -314,15 +333,24 @@ Fields:
 - Provider shortcut pills: DeepSeek, GLM, OpenAI
 - Actions: `💾 保存配置` and `测试连接`
 
-The tab also documents two current capabilities:
+The tab also documents three current capabilities:
 - **脚本智能填写** — fills the script edit drawer from AI suggestions.
 - **Shell 备注生成** — fills the zshrc annotation editor from AI suggestions.
+- **~/.zshrc 智能整理** — reorganizes the entire zshrc; shows a preview with summary bullets before the user applies it.
 
 ### Shell config AI flow
 
 In **Shell 配置解析**, each entry has both manual `+ 备注` and `✦ AI`.
 
 `✦ AI` calls `SuggestZshrcAnnotation(entry)` and fills `annotationText`; the user must still click `保存`. Existing manual annotation behavior remains unchanged.
+
+### Zshrc organization AI flow
+
+In the **AI tab**, the `~/.zshrc 智能整理` section:
+1. User optionally edits the instruction textarea (`zshrcOrganizationMode`)
+2. Click `✦ AI整理预览` → `SuggestZshrcOrganization(mode)` → fills `zshrcOrganization` with summary bullets + full content
+3. User reviews the preview; click `✓ 应用整理` → `ApplyZshrcOrganization(content)` → backup created, file written
+4. `zshrcApplyResult` shows backup path on success; user can restore manually if needed
 
 ---
 
@@ -387,7 +415,7 @@ Sections:
 
 ### Settings tab (4 sections)
 
-1. **Shell 状态** — current shell, zshrc path, managed block line count
+1. **Shell 状态** — current shell, zshrc path, managed block line count, **login autostart toggle** (`autoLaunchEnabled` → `SetAutoLaunchEnabled`)
 2. **📁 目录管理** — list with export/remove actions; add-dir form
 3. **🔑 环境变量** — editable list with live `# >>> Hatch managed block` preview
 4. **📄 Shell 配置解析** — parsed view of `~/.zshrc`:
@@ -447,6 +475,8 @@ All user data lives outside the app bundle and survives reinstalls.
 | Script metadata cache | `~/Library/Application Support/Hatch/scripts.json` | `internal/store` on first `Replace()` |
 | Service PID files (default) | `/tmp/hatch/<script-name>.pid` | `internal/executor/service.go` on service start |
 | Shell managed block | `~/.zshrc` (Hatch block only) | `internal/zshrc/manager.go` on export save |
+| Login autostart plist | `~/Library/LaunchAgents/com.hatch.app.plist` | `internal/autostart` on toggle |
+| Zshrc backups | `~/.zshrc.hatch-backup-<YYYYMMDD-HHMMSS>` | `zshrc.Backup()` before AI rewrite |
 
 > `os.UserConfigDir()` resolves to `~/Library/Application Support` on macOS.
 > Both `config.json` and `scripts.json` are therefore in the same directory.
@@ -467,6 +497,12 @@ rm -rf ~/Library/Application\ Support/Hatch/
 
 # Remove stale PID files
 rm -rf /tmp/hatch/
+
+# Remove login autostart
+rm -f ~/Library/LaunchAgents/com.hatch.app.plist
+
+# Remove zshrc backups (review before deleting)
+ls ~/.zshrc.hatch-backup-*
 ```
 
 ---
@@ -475,10 +511,12 @@ rm -rf /tmp/hatch/
 
 - **New Go methods not in wailsjs yet**: Call them as `window['go']['main']['App']['Method']()` directly in `main.js` until the next `wails build` regenerates the bindings.
 - **`mergeOverride` only applies non-zero fields** — setting `Commands: []` in an override does NOT clear auto-detected commands; use `DeleteScriptMeta` to fully reset.
-- **`Presets` in override**: stored inside `OverrideMeta[path].Presets`; fully replaced on every `SaveScriptMeta` call.
+- **`Args` override uses nil check** — `ov.Args != nil` (not `len > 0`), so an explicit empty slice `[]ArgDef{}` correctly hides the args input box.
+- **`Presets` in override**: stored inside `OverrideMeta[path].Presets`; applied when `len > 0`; fully replaced on every `SaveScriptMeta` call.
+- **`buildBlock` adds PATH line** — every `export VAR=/path` written to the managed block is also appended to `export PATH=$VAR1:...:$PATH`, so all exported dirs are on PATH automatically.
 - **`ZshrcAnnotations` keys**: for named entries (functions, aliases, exports) the key is the identifier itself; for positional entries (source, other, section/comment) it is `"type:lineNum"` — these keys change if the file is edited.
 - **Service script detection requires both `start` AND `stop`** in the first 200 lines.
-- **Login shell execution** (`/bin/zsh -l -c`) means `~/.zshrc` is sourced for every run — PATH and exports are available to scripts.
+- **Login shell + explicit source** — scripts run as `/bin/zsh -l -c 'source ~/.zshrc; exec script args'`. The explicit `source` is required because Wails apps launched from Finder/Dock are not interactive shells, and `-l` alone does not read `~/.zshrc` in that environment.
 - **`Setpgid: true`** on service processes means `Stop()` sends SIGTERM to the script's own process group, not the Hatch process group.
 - **Corrupt store JSON** silently resets to empty (no crash) — normal after first run.
 - **Map iteration is non-deterministic** — `buildBlock` in `zshrc/manager.go` sorts keys before writing to ensure stable, diff-friendly output.
@@ -487,3 +525,105 @@ rm -rf /tmp/hatch/
 - **AI suggestions require user confirmation** — script metadata and zshrc notes are filled into existing manual UI and must be saved explicitly.
 - **OpenAI-compatible URL handling** — `BaseURL` accepts either provider base (`.../v1`) or full `/chat/completions`; backend appends `/chat/completions` only when missing.
 - **Generated Wails bindings** — `frontend/wailsjs/` is generated. New methods can be called directly from `window['go']['main']['App']` until a Wails build regenerates files.
+
+---
+
+## Pico CSS Integration Notes
+
+Pico CSS (`@picocss/pico`) is imported in `frontend/src/main.js`. Its default blue primary color and semantic-element styles must be carefully overridden.
+
+### CSS load order (critical)
+
+`index.html` must NOT have a `<link rel="stylesheet" href="/src/style.css" />` tag. Both Pico and the custom CSS load via JS imports in `main.js`:
+
+```js
+import '@picocss/pico/css/pico.min.css';  // first — Pico's defaults
+import './style.css';                       // second — our overrides win the cascade
+```
+
+If `style.css` is also linked in `index.html`, it loads *before* Pico (the `<link>` fires before JS runs), so Pico's injected `<style>` tags land later and override our rules. The `<link>` tag must be absent.
+
+### Pico primary color override
+
+Pico v2 uses CSS variables for its primary color. Override them in `:root` inside `style.css` to replace Pico's blue with the warm clay palette:
+
+```css
+--pico-primary:                  #c15f3c;
+--pico-primary-background:       #c15f3c;
+--pico-primary-border:           #c15f3c;
+--pico-primary-hover:            #a94f32;
+--pico-primary-hover-background: #a94f32;
+--pico-primary-focus:            rgba(193,95,60,0.35);
+--pico-primary-inverse:          #fffaf4;
+```
+
+### Semantic element padding reset
+
+Pico adds padding/margin to `header`, `nav`, `main`, `article`, etc. Clear it at the top of `style.css` so class-based layout rules take full control:
+
+```css
+header, nav, main, footer, section, article, aside {
+  padding: 0;
+  margin: 0;
+}
+```
+
+Do NOT use `display: revert` here — it breaks elements that rely on Pico's display type or the browser default. Only reset spacing.
+
+### `aria-busy` button color
+
+When a button has `aria-busy="true"`, Pico overrides the background with its primary color. Override explicitly in `style.css`:
+
+```css
+button[aria-busy="true"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fffaf4;
+}
+/* Ghost/muted buttons keep a neutral busy state */
+button.secondary[aria-busy="true"],
+button.btn-refresh[aria-busy="true"] {
+  background: var(--surface-3);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+```
+
+### `role="button"` elements
+
+Pico applies button-like styles (blue background) to any element with `role="button"`. The dir-card (`<div role="button">`) needs an explicit reset:
+
+```css
+[role="button"]:not(button):not(a):not(input):not(select):not(textarea) {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+```
+
+### Preset button click handler in nested `x-for`
+
+In Alpine.js nested `x-for`, calling a method that reads a reactive sub-object key set immediately before the call can silently fail due to Alpine.js's reactive batching. Use an inline click handler instead of a method:
+
+```html
+<!-- safe: fully inline, no indirect method call -->
+@click.stop="$event.preventDefault(); scriptArgs[s.path] = p.args; runScript(s)"
+```
+
+Avoid:
+```html
+<!-- fragile: runPreset sets scriptArgs then reads it inside runScript -->
+@click="runPreset(s, p)"
+```
+
+### Vite dev server auto-open
+
+`frontend/vite.config.js` configures `npm run dev` to auto-open the browser:
+
+```js
+export default defineConfig({
+  server: { open: true },
+});
+```

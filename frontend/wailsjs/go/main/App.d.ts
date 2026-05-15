@@ -10,17 +10,23 @@ export function ApplyZshrcOrganization(arg1:string):Promise<main.ZshrcApplyResul
 
 export function CheckZshrc():Promise<main.ZshrcInfo>;
 
+export function CreateScriptFile(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function DeleteScriptMeta(arg1:string):Promise<void>;
 
 export function GetAllServiceStatuses():Promise<Record<string, string>>;
 
 export function GetAutoLaunchEnabled():Promise<boolean>;
 
+export function GetClaudeCodeStatus():Promise<main.ClaudeCodeStatus>;
+
 export function GetConfig():Promise<config.Config>;
 
 export function GetScriptsByDir(arg1:string):Promise<Array<config.ScriptMeta>>;
 
 export function ParseZshrc():Promise<Array<zshrc.Entry>>;
+
+export function ReadScriptFile(arg1:string):Promise<string>;
 
 export function RemoveDirectory(arg1:string):Promise<void>;
 
@@ -40,6 +46,8 @@ export function ServiceAction(arg1:string,arg2:string,arg3:Array<string>):Promis
 
 export function SetAutoLaunchEnabled(arg1:boolean):Promise<void>;
 
+export function SuggestScriptContent(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function SuggestScriptMeta(arg1:config.ScriptMeta):Promise<main.AIScriptSuggestion>;
 
 export function SuggestZshrcAnnotation(arg1:zshrc.Entry):Promise<string>;
@@ -49,3 +57,5 @@ export function SuggestZshrcOrganization(arg1:string):Promise<main.ZshrcOrganiza
 export function TestAIConfig(arg1:config.AIConfig):Promise<string>;
 
 export function UpdateDirectoryExport(arg1:string,arg2:string):Promise<void>;
+
+export function WriteScriptFile(arg1:string,arg2:string):Promise<void>;
