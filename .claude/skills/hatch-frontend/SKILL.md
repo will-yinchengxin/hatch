@@ -135,19 +135,21 @@ main（max-width: 1080px, centered, padding: 24px 22px 44px）
   │           ├── .card-footer.service-footer（service: 状态 + 控制按钮）
   │           └── .log-panel（内联日志，dark terminal）
   │
-  ├── 设置页（tab=settings）
-  │   ├── .page-hero.settings-hero
-  │   └── section.settings-section × 4
-  │       ├── Shell 状态（.zshrc-info）
-  │       ├── 目录管理（.dir-setting-list + .add-dir-form + 快速导出 modal）
-  │       ├── 环境变量（.export-list + .zshrc-preview + .export-actions）
-  │       └── Shell 配置解析（.zshrc-organizer + .zshrc-filter-tabs + .zshrc-entry-list）
+  ├── 脚本首页工作区设置（.workspace-settings，accordion）
+  │   ├── .ws-section（wsShellOpen）— ⚙ 环境与路径配置
+  │   ├── .ws-section（wsDirsOpen）— 📁 目录管理
+  │   ├── .ws-section（wsEnvOpen）— 🔑 环境变量
+  │   └── .ws-section（wsZshrcOpen）— 📄 Shell 配置解析
   │
   └── AI 页（tab=ai && !selectedDir）
-      ├── .page-hero.settings-hero
-      └── section.settings-section × 2
-          ├── 模型连接（.ai-form-grid + provider pills + 保存/测试）
-          └── 可用能力（.ai-capability-list，2列）
+      ├── .page-hero.ai-hero（+ .hero-stat-card × 3）
+      └── .ai-layout
+          ├── nav.ai-sidenav（4 个 sub-tab 按钮）
+          └── .ai-content（aiSubTab 切换）
+              ├── 概览（overview）— 能力介绍
+              ├── 连接（connect）— 模型配置 + trace log 查看器
+              ├── Skills — 列表 / 同步 / 创建
+              └── 工具（tools）— .ai-usage-row（claude card + codex card）
 
 .overlay（fixed 全屏遮罩，右侧 edit drawer 或居中 modal）
   ├── .edit-drawer（460px，右侧滑入）
@@ -252,15 +254,14 @@ main（max-width: 1080px, centered, padding: 24px 22px 44px）
 ### 视图路由
 
 ```
-tab = 'scripts' | 'settings' | 'ai'
+tab = 'scripts' | 'ai'   （settings 已合并入 scripts 首页 accordion）
 selectedDir = null | { path, exportName, isScriptDir }
+aiSubTab = 'overview' | 'connect' | 'skills' | 'tools'
 
-tab='scripts' && !selectedDir  → 目录卡片列表
-tab='scripts' && selectedDir   → 脚本列表
-tab='settings'                 → 设置面板（4 区块）
-tab='ai'                       → AI 配置
-editTarget != null             → 右侧编辑抽屉叠加
-quickExportDir != null         → 居中快速导出 modal 叠加
+scripts + !selectedDir  → 目录卡片 + workspace-settings accordion
+scripts + selectedDir   → 脚本列表
+ai                      → AI 侧边栏布局
+editTarget != null      → 右侧编辑抽屉叠加
 ```
 
 ### 关键状态字段
@@ -272,12 +273,20 @@ quickExportDir != null         → 居中快速导出 modal 叠加
 | `statuses` | `{path: string}` | `"running"\|"stopped"`，每 3s 轮询 |
 | `runningSet` | `{path: true}` | oneshot 运行中标志 |
 | `scriptLogs` | `{path: [{line,stream}]}` | 每脚本最多 500 行 |
-| `scriptExitCodes` | `{path: number}` | 退出码 |
 | `logTarget` | `string\|null` | 当前展开日志的脚本 path |
 | `editTarget` / `editForm` | — | 编辑抽屉 |
-| `aiForm` | `{enabled,baseUrl,apiKey,model}` | AI 配置 |
-| `zshrcEntries` | `Entry[]` | 解析后的 zshrc 条目 |
-| `autoLaunchEnabled` | `bool` | 开机自启状态 |
+| `aiForm` | `{enabled,baseUrl,apiKey,model}` | AI 连接配置 |
+| `aiSubTab` | `string` | AI 子页面（overview/connect/skills/tools） |
+| `claudeStatus` / `codexStatus` | `object\|null` | AI 工具状态卡片数据 |
+| `skills` | `array` | ListSkills() 结果 |
+| `skillsStats` | `{total,claude,codex}` | hero stat 用 |
+| `traceLog / traceLogDate` | — | trace log 查看器 |
+| `dataPaths / dataPathsForm` | — | trace log dir / skills dir 配置 |
+| `zshrcEntries / zshrcFilter` | — | 解析后 zshrc + 类型过滤 |
+| `autoLaunchEnabled` | `bool` | 开机自启 |
+| `wsShellOpen / wsDirsOpen / wsEnvOpen / wsZshrcOpen` | `bool` | workspace accordion 展开状态 |
+| `success / successTimer` | — | 成功 toast，3s 自动消失 |
+| `error` | `string` | 错误 toast，6s 自动消失 |
 
 ### 事件监听（setupEvents）
 
@@ -308,6 +317,27 @@ window['go']['main']['App']['MethodName'](arg)
 3. **aria-busy button 颜色**：`button[aria-busy="true"] { background: var(--primary); }` （否则 Pico 用蓝色）
 4. **role="button" 背景**：dir-card 用了 `role="button"`，需要显式覆盖 Pico 的蓝色 primary 背景
 5. **Pico primary 变量**：在 `:root` 中覆盖所有 `--pico-primary-*` 变量为 clay 色
+
+### AI 模块 CSS 类
+
+| 类 | 用途 |
+|---|---|
+| `.ai-layout` | 侧边栏 + 内容区，flex row |
+| `.ai-sidenav` | 左侧 sub-tab 导航，flex column |
+| `.ai-sidenav button.active` | 激活 sub-tab，primary 色 |
+| `.ai-content` | 右侧内容区，flex: 1 |
+| `.ai-usage-row` | 2列 grid，1fr 1fr，equal height |
+| `.ai-usage-card` | flex column，撑满高度 |
+| `.hero-stat-card` | hero 统计卡片，14px 圆角，72px 最小高度 |
+| `.hero-stat-card--skills` | purple 边框 + 总数+分项布局 |
+| `.hero-stat-value` | 26px 粗体值 |
+| `.hero-stat-value--sm` | 15px 小值（长文本） |
+| `.hero-stat-total` | 36px purple 数字 |
+| `.success-toast` | 成功提示，绿色，右下角 fixed |
+| `.workspace-settings` | 脚本首页 accordion 容器 |
+| `.ws-section` | accordion 单区块 |
+| `.ws-section-header` | accordion 标题行（cursor pointer） |
+| `.ws-chevron` | 折叠箭头 |
 
 ---
 

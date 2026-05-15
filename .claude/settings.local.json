@@ -41,7 +41,10 @@
       "Bash(python3 *)",
       "Bash(iconutil -c icns /tmp/hatch_icon.iconset -o /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app/Contents/Resources/iconfile.icns)",
       "Bash(touch /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app)",
-      "Bash(/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app)"
+      "Bash(/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app)",
+      "Bash(awk *)",
+      "Bash(/Users/yinchengxin/.local/bin/claude --help)",
+      "Bash(grep -B5 '> \"${CACHE_FILE}.tmp\"' ~/.claude/statusline.sh)"
     ]
   }
 }
