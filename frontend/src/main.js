@@ -36,6 +36,8 @@ const ReadScriptFile        = (path)                        => window['go']['mai
 const WriteScriptFile       = (path, content)               => window['go']['main']['App']['WriteScriptFile'](path, content);
 const CreateScriptFile      = (dirPath, filename, content)  => window['go']['main']['App']['CreateScriptFile'](dirPath, filename, content);
 const SuggestScriptContent  = (path, cur, inst)             => window['go']['main']['App']['SuggestScriptContent'](path, cur, inst);
+const GetAITraces           = ()                            => window['go']['main']['App']['GetAITraces']();
+const ClearAITraces         = ()                            => window['go']['main']['App']['ClearAITraces']();
 
 window.hatchApp = function () {
   return {
@@ -125,6 +127,10 @@ window.hatchApp = function () {
     newScriptForm: { filename: '', content: '#!/bin/zsh\n\n' },
     newScriptSaving: false,
     newScriptAIBusy: false,
+
+    // AI trace log
+    aiTraces: [],
+    aiTraceExpanded: {},
 
     // ── Computed ───────────────────────────────────────────────────────
     get scriptDirs() {
@@ -255,7 +261,11 @@ window.hatchApp = function () {
 
     // ── Events ─────────────────────────────────────────────────────────
     setupEvents() {
-      EventsOff('executor:log', 'executor:done', 'executor:status');
+      EventsOff('executor:log', 'executor:done', 'executor:status', 'ai:trace');
+      EventsOn('ai:trace', (trace) => {
+        this.aiTraces = [trace, ...this.aiTraces].slice(0, 50);
+      });
+
       EventsOn('executor:log', (ev) => {
         const { id, line, stream } = ev;
         if (!this.scriptLogs[id]) this.scriptLogs[id] = [];
@@ -724,6 +734,29 @@ window.hatchApp = function () {
 
     toggleFn(key) {
       this.expandedFns = { ...this.expandedFns, [key]: !this.expandedFns[key] };
+    },
+
+    // ── AI trace log ──────────────────────────────────────────────────
+    async loadAITraces() {
+      try {
+        this.aiTraces = await GetAITraces() || [];
+      } catch (_) {}
+    },
+
+    async clearAITracesLog() {
+      try {
+        await ClearAITraces();
+        this.aiTraces = [];
+        this.aiTraceExpanded = {};
+      } catch (_) {}
+    },
+
+    toggleAITrace(id) {
+      this.aiTraceExpanded = { ...this.aiTraceExpanded, [id]: !this.aiTraceExpanded[id] };
+    },
+
+    aiTraceStatus(t) {
+      return t.error ? 'error' : 'ok';
     },
 
     zshrcTypeIcon(type) {

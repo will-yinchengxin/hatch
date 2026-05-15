@@ -20,6 +20,8 @@ import (
 	"hatch/internal/scanner"
 	"hatch/internal/store"
 	"hatch/internal/zshrc"
+
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -28,7 +30,27 @@ type App struct {
 	store    *store.Store
 	services map[string]*executor.ServiceManager
 	mu       sync.RWMutex
+
+	tracesMu sync.Mutex
+	traces   []AICallTrace
+	traceSeq int64
 }
+
+// AICallTrace records one AI API call for inspection in the frontend.
+type AICallTrace struct {
+	ID           int64  `json:"id"`
+	At           string `json:"at"`
+	Op           string `json:"op"`
+	Model        string `json:"model"`
+	URL          string `json:"url"`
+	SystemPrompt string `json:"systemPrompt"`
+	UserPrompt   string `json:"userPrompt"`
+	RawResponse  string `json:"rawResponse"`
+	Error        string `json:"error"`
+	DurationMs   int64  `json:"durationMs"`
+}
+
+const maxTraces = 50
 
 // ZshrcInfo is returned by CheckZshrc.
 type ZshrcInfo struct {
@@ -507,7 +529,7 @@ content: 完整的新 ~/.zshrc 文件内容。
 		"entries": entries,
 		"content": content,
 	})
-	raw, err := a.callAI(ai, system, string(userBytes))
+	raw, err := a.callAIOp("SuggestZshrcOrganization", ai, system, string(userBytes))
 	if err != nil {
 		return ZshrcOrganizationSuggestion{}, err
 	}
@@ -568,7 +590,7 @@ func (a *App) TestAIConfig(ai config.AIConfig) (string, error) {
 	if !ai.Enabled {
 		ai.Enabled = true
 	}
-	return a.callAI(ai, "你是 Hatch 的配置检测助手。请只回复 pong。", "ping")
+	return a.callAIOp("TestAIConfig", ai, "你是 Hatch 的配置检测助手。请只回复 pong。", "ping")
 }
 
 // SuggestScriptMeta reads a script and asks the configured model for metadata.
@@ -610,7 +632,7 @@ presets: 常用命令预设数组，元素为 {"name":"", "args":""}，没有可
 		"tags":     meta.Tags,
 		"content":  content,
 	})
-	raw, err := a.callAI(ai, system, string(userBytes))
+	raw, err := a.callAIOp("SuggestScriptMeta", ai, system, string(userBytes))
 	if err != nil {
 		return AIScriptSuggestion{}, err
 	}
@@ -637,7 +659,7 @@ func (a *App) SuggestZshrcAnnotation(entry zshrc.Entry) (string, error) {
 	system := `你是 shell 配置解释助手。请为一条 zshrc 配置生成简短中文备注，说明它的作用、影响或风险。
 只输出备注正文，不要 Markdown，不要加引号，控制在 60 个中文字符以内。`
 	userBytes, _ := json.Marshal(entry)
-	raw, err := a.callAI(ai, system, string(userBytes))
+	raw, err := a.callAIOp("SuggestZshrcAnnotation", ai, system, string(userBytes))
 	if err != nil {
 		return "", err
 	}
@@ -660,14 +682,34 @@ func validateAIConfig(ai config.AIConfig) error {
 	return nil
 }
 
+// GetAITraces returns the in-memory trace log of recent AI calls (newest first).
+func (a *App) GetAITraces() []AICallTrace {
+	a.tracesMu.Lock()
+	defer a.tracesMu.Unlock()
+	out := make([]AICallTrace, len(a.traces))
+	copy(out, a.traces)
+	return out
+}
+
+// ClearAITraces empties the in-memory AI call log.
+func (a *App) ClearAITraces() {
+	a.tracesMu.Lock()
+	defer a.tracesMu.Unlock()
+	a.traces = nil
+}
+
 func (a *App) callAI(ai config.AIConfig, systemPrompt, userPrompt string) (string, error) {
+	return a.callAIOp("unknown", ai, systemPrompt, userPrompt)
+}
+
+func (a *App) callAIOp(op string, ai config.AIConfig, systemPrompt, userPrompt string) (string, error) {
 	if err := validateAIConfig(ai); err != nil {
 		return "", err
 	}
 	baseURL := strings.TrimRight(strings.TrimSpace(ai.BaseURL), "/")
-	url := baseURL
-	if !strings.HasSuffix(url, "/chat/completions") {
-		url += "/chat/completions"
+	apiURL := baseURL
+	if !strings.HasSuffix(apiURL, "/chat/completions") {
+		apiURL += "/chat/completions"
 	}
 	body := map[string]any{
 		"model": strings.TrimSpace(ai.Model),
@@ -685,24 +727,50 @@ func (a *App) callAI(ai config.AIConfig, systemPrompt, userPrompt string) (strin
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payload))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(ai.APIKey))
 
+	start := time.Now()
 	client := &http.Client{Timeout: 45 * time.Second}
 	resp, err := client.Do(req)
+	durationMs := time.Since(start).Milliseconds()
+
+	trace := AICallTrace{
+		At:           time.Now().Format("15:04:05"),
+		Op:           op,
+		Model:        strings.TrimSpace(ai.Model),
+		URL:          apiURL,
+		SystemPrompt: systemPrompt,
+		UserPrompt:   userPrompt,
+		DurationMs:   durationMs,
+	}
+	a.tracesMu.Lock()
+	a.traceSeq++
+	trace.ID = a.traceSeq
+	a.tracesMu.Unlock()
+
 	if err != nil {
+		trace.Error = err.Error()
+		a.recordTrace(trace)
 		return "", err
 	}
+
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	trace.RawResponse = string(data)
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		trace.Error = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		a.recordTrace(trace)
 		return "", fmt.Errorf("AI 请求失败: HTTP %d %s", resp.StatusCode, strings.TrimSpace(string(data)))
 	}
 	if len(data) == 0 {
+		trace.Error = fmt.Sprintf("空响应 (HTTP %d)", resp.StatusCode)
+		a.recordTrace(trace)
 		return "", fmt.Errorf("AI 返回空响应 (HTTP %d)", resp.StatusCode)
 	}
 	var decoded struct {
@@ -717,12 +785,32 @@ func (a *App) callAI(ai config.AIConfig, systemPrompt, userPrompt string) (strin
 		if len(preview) > 300 {
 			preview = preview[:300] + "…"
 		}
+		trace.Error = fmt.Sprintf("解析失败: %v", err)
+		a.recordTrace(trace)
 		return "", fmt.Errorf("解析 AI 响应失败: %w — 收到: %s", err, preview)
 	}
 	if len(decoded.Choices) == 0 {
+		trace.Error = "choices 为空"
+		a.recordTrace(trace)
 		return "", fmt.Errorf("AI 返回为空")
 	}
-	return strings.TrimSpace(decoded.Choices[0].Message.Content), nil
+	result := strings.TrimSpace(decoded.Choices[0].Message.Content)
+	a.recordTrace(trace)
+	return result, nil
+}
+
+func (a *App) recordTrace(t AICallTrace) {
+	a.tracesMu.Lock()
+	// Prepend newest first, cap at maxTraces
+	a.traces = append([]AICallTrace{t}, a.traces...)
+	if len(a.traces) > maxTraces {
+		a.traces = a.traces[:maxTraces]
+	}
+	a.tracesMu.Unlock()
+	// Notify frontend in real-time
+	if a.ctx != nil {
+		wailsRuntime.EventsEmit(a.ctx, "ai:trace", t)
+	}
 }
 
 func extractJSONObject(s string) string {
@@ -793,20 +881,26 @@ func (a *App) SuggestScriptContent(path, currentContent, instruction string) (st
 		"currentContent": currentContent,
 		"instruction":    instruction,
 	})
-	raw, err := a.callAI(ai, system, string(userBytes))
+	raw, err := a.callAIOp("SuggestScriptContent", ai, system, string(userBytes))
 	if err != nil {
 		return "", err
 	}
 	// Strip markdown fences if the model adds them anyway
 	raw = strings.TrimSpace(raw)
-	raw = strings.TrimPrefix(raw, "```zsh")
-	raw = strings.TrimPrefix(raw, "```shell")
-	raw = strings.TrimPrefix(raw, "```sh")
-	raw = strings.TrimPrefix(raw, "```bash")
-	raw = strings.TrimPrefix(raw, "```python")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	return strings.TrimSpace(raw), nil
+	for _, fence := range []string{"```zsh", "```shell", "```sh", "```bash", "```python", "```ruby", "```node", "```"} {
+		if strings.HasPrefix(raw, fence) {
+			raw = strings.TrimPrefix(raw, fence)
+			// Remove the language tag's trailing newline
+			raw = strings.TrimLeft(raw, " \t\r\n")
+			break
+		}
+	}
+	raw = strings.TrimSuffix(strings.TrimSpace(raw), "```")
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("AI 返回了空内容（原始响应可在 AI 调用日志中查看）")
+	}
+	return raw, nil
 }
 
 // autoSource runs `source ~/.zshrc` in a background login shell so that any

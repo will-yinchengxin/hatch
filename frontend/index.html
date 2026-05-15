@@ -27,7 +27,7 @@
     <nav class="tab-nav" x-show="!selectedDir">
       <button class="tab" :class="tab==='scripts'  ? 'active' : ''" @click="tab='scripts'">📜 脚本</button>
       <button class="tab" :class="tab==='settings' ? 'active' : ''" @click="tab='settings'">⚙ 设置</button>
-      <button class="tab" :class="tab==='ai' ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses()">✦ AI</button>
+      <button class="tab" :class="tab==='ai' ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses(); loadAITraces()">✦ AI</button>
     </nav>
 
     <div class="header-right">
@@ -832,6 +832,55 @@
           </template>
         </div>
       </template>
+    </section>
+
+    <!-- ── AI 调用日志 ──────────────────────────────────────────────── -->
+    <section class="settings-section ai-trace-section">
+      <div class="section-header-row">
+        <h3>📡 调用日志</h3>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="badge" x-text="aiTraces.length + ' 条'" style="font-variant-numeric:tabular-nums"></span>
+          <button class="btn-sm btn-ghost" @click="clearAITracesLog()" x-show="aiTraces.length > 0">清空</button>
+        </div>
+      </div>
+
+      <div x-show="aiTraces.length === 0" class="muted text-sm" style="padding:14px 0">
+        暂无记录。发起任意 AI 操作后，完整的请求与响应会实时出现在这里。
+      </div>
+
+      <div class="ai-trace-list" x-show="aiTraces.length > 0">
+        <template x-for="t in aiTraces" :key="t.id">
+          <div class="ai-trace-item" :class="t.error ? 'ai-trace-error' : 'ai-trace-ok'">
+            <!-- row header (always visible) -->
+            <div class="ai-trace-row" @click="toggleAITrace(t.id)">
+              <span class="ai-trace-status-dot" :class="t.error ? 'dot-error' : 'dot-ok'"></span>
+              <span class="ai-trace-op" x-text="t.op"></span>
+              <span class="ai-trace-model muted text-sm" x-text="t.model"></span>
+              <span class="ai-trace-dur text-sm" x-text="t.durationMs + 'ms'"></span>
+              <span class="ai-trace-time muted text-sm" x-text="t.at"></span>
+              <span class="ai-trace-chevron muted" x-text="aiTraceExpanded[t.id] ? '▲' : '▼'"></span>
+            </div>
+
+            <!-- error summary (always visible if error) -->
+            <div x-show="t.error" class="ai-trace-error-line text-sm" x-text="t.error"></div>
+
+            <!-- expanded detail -->
+            <div x-show="aiTraceExpanded[t.id]" class="ai-trace-detail">
+              <div class="ai-trace-block-label">URL</div>
+              <pre class="ai-trace-block ai-trace-url" x-text="t.url"></pre>
+
+              <div class="ai-trace-block-label">System Prompt</div>
+              <pre class="ai-trace-block" x-text="t.systemPrompt"></pre>
+
+              <div class="ai-trace-block-label">User Prompt</div>
+              <pre class="ai-trace-block" x-text="t.userPrompt"></pre>
+
+              <div class="ai-trace-block-label" x-text="t.error ? '原始响应 / 错误' : '原始响应'"></div>
+              <pre class="ai-trace-block" :class="t.error ? 'ai-trace-block-err' : ''" x-text="t.rawResponse || t.error"></pre>
+            </div>
+          </div>
+        </template>
+      </div>
     </section>
   </main>
 
