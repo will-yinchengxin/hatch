@@ -5,6 +5,7 @@ export namespace config {
 	    baseUrl: string;
 	    apiKey: string;
 	    model: string;
+	    traceRetainDays?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AIConfig(source);
@@ -16,6 +17,7 @@ export namespace config {
 	        this.baseUrl = source["baseUrl"];
 	        this.apiKey = source["apiKey"];
 	        this.model = source["model"];
+	        this.traceRetainDays = source["traceRetainDays"];
 	    }
 	}
 	export class ArgDef {
@@ -139,6 +141,8 @@ export namespace config {
 	    zshrcAnnotations?: Record<string, string>;
 	    ai?: AIConfig;
 	    autoLaunch?: boolean;
+	    traceLogDir?: string;
+	    skillsDir?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -152,6 +156,8 @@ export namespace config {
 	        this.zshrcAnnotations = source["zshrcAnnotations"];
 	        this.ai = this.convertValues(source["ai"], AIConfig);
 	        this.autoLaunch = source["autoLaunch"];
+	        this.traceLogDir = source["traceLogDir"];
+	        this.skillsDir = source["skillsDir"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -179,6 +185,36 @@ export namespace config {
 
 export namespace main {
 	
+	export class AICallTrace {
+	    id: number;
+	    at: string;
+	    op: string;
+	    model: string;
+	    url: string;
+	    systemPrompt: string;
+	    userPrompt: string;
+	    rawResponse: string;
+	    error: string;
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AICallTrace(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.at = source["at"];
+	        this.op = source["op"];
+	        this.model = source["model"];
+	        this.url = source["url"];
+	        this.systemPrompt = source["systemPrompt"];
+	        this.userPrompt = source["userPrompt"];
+	        this.rawResponse = source["rawResponse"];
+	        this.error = source["error"];
+	        this.durationMs = source["durationMs"];
+	    }
+	}
 	export class AIScriptSuggestion {
 	    name: string;
 	    desc: string;
@@ -223,6 +259,82 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class AITraceFileInfo {
+	    date: string;
+	    count: number;
+	    bytes: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AITraceFileInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.count = source["count"];
+	        this.bytes = source["bytes"];
+	    }
+	}
+	export class AITraceStorageInfo {
+	    dir: string;
+	    retainDays: number;
+	    files: AITraceFileInfo[];
+	    totalBytes: number;
+	    totalTraces: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AITraceStorageInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dir = source["dir"];
+	        this.retainDays = source["retainDays"];
+	        this.files = this.convertValues(source["files"], AITraceFileInfo);
+	        this.totalBytes = source["totalBytes"];
+	        this.totalTraces = source["totalTraces"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AppDataPaths {
+	    traceLogDir: string;
+	    traceLogDirIsSet: boolean;
+	    skillsDir: string;
+	    skillsDirIsSet: boolean;
+	    defaultTraceDir: string;
+	    defaultSkillsDir: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppDataPaths(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.traceLogDir = source["traceLogDir"];
+	        this.traceLogDirIsSet = source["traceLogDirIsSet"];
+	        this.skillsDir = source["skillsDir"];
+	        this.skillsDirIsSet = source["skillsDirIsSet"];
+	        this.defaultTraceDir = source["defaultTraceDir"];
+	        this.defaultSkillsDir = source["defaultSkillsDir"];
+	    }
+	}
 	export class ClaudeCodeStatus {
 	    claudeInstalled: boolean;
 	    claudeVersion: string;
@@ -233,6 +345,7 @@ export namespace main {
 	    fiveHourReset: string;
 	    sevenDayPct: number;
 	    sevenDayReset: string;
+	    planType: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ClaudeCodeStatus(source);
@@ -249,6 +362,7 @@ export namespace main {
 	        this.fiveHourReset = source["fiveHourReset"];
 	        this.sevenDayPct = source["sevenDayPct"];
 	        this.sevenDayReset = source["sevenDayReset"];
+	        this.planType = source["planType"];
 	    }
 	}
 	export class CodexUsageWindow {
@@ -324,6 +438,62 @@ export namespace main {
 		}
 	}
 	
+	export class SkillEntry {
+	    name: string;
+	    description: string;
+	    inClaude: boolean;
+	    inCodex: boolean;
+	    hasAgents: boolean;
+	    hasRefs: boolean;
+	    modTime: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.inClaude = source["inClaude"];
+	        this.inCodex = source["inCodex"];
+	        this.hasAgents = source["hasAgents"];
+	        this.hasRefs = source["hasRefs"];
+	        this.modTime = source["modTime"];
+	    }
+	}
+	export class SkillImportResult {
+	    imported: string[];
+	    skipped: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.imported = source["imported"];
+	        this.skipped = source["skipped"];
+	    }
+	}
+	export class SkillsStats {
+	    total: number;
+	    claude: number;
+	    codex: number;
+	    both: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkillsStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.claude = source["claude"];
+	        this.codex = source["codex"];
+	        this.both = source["both"];
+	    }
+	}
 	export class ZshrcApplyResult {
 	    zshrcPath: string;
 	    backupPath: string;

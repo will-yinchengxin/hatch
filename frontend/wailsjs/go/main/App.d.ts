@@ -10,11 +10,23 @@ export function ApplyZshrcOrganization(arg1:string):Promise<main.ZshrcApplyResul
 
 export function CheckZshrc():Promise<main.ZshrcInfo>;
 
+export function ClearAITraces():Promise<void>;
+
 export function CreateScriptFile(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function CreateSkillTemplate(arg1:string):Promise<string>;
 
 export function DeleteScriptMeta(arg1:string):Promise<void>;
 
+export function DeleteSkill(arg1:string):Promise<void>;
+
+export function GetAITraceStorageInfo():Promise<main.AITraceStorageInfo>;
+
+export function GetAITraces():Promise<Array<main.AICallTrace>>;
+
 export function GetAllServiceStatuses():Promise<Record<string, string>>;
+
+export function GetAppDataPaths():Promise<main.AppDataPaths>;
 
 export function GetAutoLaunchEnabled():Promise<boolean>;
 
@@ -26,6 +38,14 @@ export function GetConfig():Promise<config.Config>;
 
 export function GetScriptsByDir(arg1:string):Promise<Array<config.ScriptMeta>>;
 
+export function GetSkillContent(arg1:string):Promise<string>;
+
+export function GetSkills():Promise<Array<main.SkillEntry>>;
+
+export function GetSkillsStats():Promise<main.SkillsStats>;
+
+export function ImportSkillsFrom(arg1:string):Promise<main.SkillImportResult>;
+
 export function ParseZshrc():Promise<Array<zshrc.Entry>>;
 
 export function ReadScriptFile(arg1:string):Promise<string>;
@@ -36,9 +56,13 @@ export function RunScript(arg1:string,arg2:string,arg3:Array<string>):Promise<vo
 
 export function SaveAIConfig(arg1:config.AIConfig):Promise<void>;
 
+export function SaveAppDataPaths(arg1:string,arg2:string):Promise<void>;
+
 export function SaveExports(arg1:Array<config.ExportVar>):Promise<void>;
 
 export function SaveScriptMeta(arg1:config.ScriptMeta):Promise<void>;
+
+export function SaveSkillContent(arg1:string,arg2:string):Promise<void>;
 
 export function SaveZshrcAnnotation(arg1:string,arg2:string):Promise<void>;
 
@@ -47,6 +71,8 @@ export function ScanAll():Promise<Array<config.ScriptMeta>>;
 export function ServiceAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SetAutoLaunchEnabled(arg1:boolean):Promise<void>;
+
+export function SetSkillSync(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SuggestScriptContent(arg1:string,arg2:string,arg3:string):Promise<string>;
 

@@ -14,16 +14,40 @@ export function CheckZshrc() {
   return window['go']['main']['App']['CheckZshrc']();
 }
 
+export function ClearAITraces() {
+  return window['go']['main']['App']['ClearAITraces']();
+}
+
 export function CreateScriptFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateScriptFile'](arg1, arg2, arg3);
+}
+
+export function CreateSkillTemplate(arg1) {
+  return window['go']['main']['App']['CreateSkillTemplate'](arg1);
 }
 
 export function DeleteScriptMeta(arg1) {
   return window['go']['main']['App']['DeleteScriptMeta'](arg1);
 }
 
+export function DeleteSkill(arg1) {
+  return window['go']['main']['App']['DeleteSkill'](arg1);
+}
+
+export function GetAITraceStorageInfo() {
+  return window['go']['main']['App']['GetAITraceStorageInfo']();
+}
+
+export function GetAITraces() {
+  return window['go']['main']['App']['GetAITraces']();
+}
+
 export function GetAllServiceStatuses() {
   return window['go']['main']['App']['GetAllServiceStatuses']();
+}
+
+export function GetAppDataPaths() {
+  return window['go']['main']['App']['GetAppDataPaths']();
 }
 
 export function GetAutoLaunchEnabled() {
@@ -46,6 +70,22 @@ export function GetScriptsByDir(arg1) {
   return window['go']['main']['App']['GetScriptsByDir'](arg1);
 }
 
+export function GetSkillContent(arg1) {
+  return window['go']['main']['App']['GetSkillContent'](arg1);
+}
+
+export function GetSkills() {
+  return window['go']['main']['App']['GetSkills']();
+}
+
+export function GetSkillsStats() {
+  return window['go']['main']['App']['GetSkillsStats']();
+}
+
+export function ImportSkillsFrom(arg1) {
+  return window['go']['main']['App']['ImportSkillsFrom'](arg1);
+}
+
 export function ParseZshrc() {
   return window['go']['main']['App']['ParseZshrc']();
 }
@@ -66,12 +106,20 @@ export function SaveAIConfig(arg1) {
   return window['go']['main']['App']['SaveAIConfig'](arg1);
 }
 
+export function SaveAppDataPaths(arg1, arg2) {
+  return window['go']['main']['App']['SaveAppDataPaths'](arg1, arg2);
+}
+
 export function SaveExports(arg1) {
   return window['go']['main']['App']['SaveExports'](arg1);
 }
 
 export function SaveScriptMeta(arg1) {
   return window['go']['main']['App']['SaveScriptMeta'](arg1);
+}
+
+export function SaveSkillContent(arg1, arg2) {
+  return window['go']['main']['App']['SaveSkillContent'](arg1, arg2);
 }
 
 export function SaveZshrcAnnotation(arg1, arg2) {
@@ -88,6 +136,10 @@ export function ServiceAction(arg1, arg2, arg3) {
 
 export function SetAutoLaunchEnabled(arg1) {
   return window['go']['main']['App']['SetAutoLaunchEnabled'](arg1);
+}
+
+export function SetSkillSync(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetSkillSync'](arg1, arg2, arg3);
 }
 
 export function SuggestScriptContent(arg1, arg2, arg3) {

@@ -25,9 +25,8 @@
     </div>
 
     <nav class="tab-nav" x-show="!selectedDir">
-      <button class="tab" :class="tab==='scripts'  ? 'active' : ''" @click="tab='scripts'">📜 脚本</button>
-      <button class="tab" :class="tab==='settings' ? 'active' : ''" @click="tab='settings'">⚙ 设置</button>
-      <button class="tab" :class="tab==='ai' ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses(); loadAITraces()">✦ AI</button>
+      <button class="tab" :class="tab==='scripts' ? 'active' : ''" @click="tab='scripts'">工作台</button>
+      <button class="tab" :class="tab==='ai'      ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses(); loadAITraces()">✦ AI</button>
     </nav>
 
     <div class="header-right">
@@ -52,6 +51,13 @@
       </label>
     </div>
   </header>
+
+  <!-- ── Success toast ──────────────────────────────────────────────── -->
+  <div class="success-toast" x-show="success" x-transition.opacity.duration.200ms>
+    <span class="success-toast-icon">✓</span>
+    <span class="success-toast-msg" x-text="success"></span>
+    <button class="icon-btn" @click="success=''; clearTimeout(successTimer)">✕</button>
+  </div>
 
   <!-- ── Error toast ────────────────────────────────────────────────── -->
   <div class="error-toast" x-show="error" x-transition.opacity.duration.200ms>
@@ -90,8 +96,7 @@
     </div>
 
     <div class="empty-state" x-show="!loading && scriptDirs.length===0">
-      <p>还没有配置脚本目录。</p>
-      <button @click="tab='settings'">⚙ 去设置</button>
+      <p>还没有配置脚本目录，在下方「目录管理」中添加。</p>
     </div>
 
     <div class="dir-card-list" x-show="!loading && scriptDirs.length>0">
@@ -113,6 +118,246 @@
         </div>
       </template>
     </div>
+
+    <!-- ══ 工作台设置区（折叠式） ══════════════════════════════════════ -->
+    <div class="workspace-settings">
+
+      <!-- ── Shell 状态 + 路径配置 ─────────────────────────────────── -->
+      <section class="settings-section ws-section">
+        <div class="ws-section-header" @click="wsShellOpen=!wsShellOpen">
+          <h3>⚙ 环境与路径配置</h3>
+          <span class="ws-chevron" x-text="wsShellOpen ? '▲' : '▼'"></span>
+        </div>
+        <div x-show="wsShellOpen" x-transition>
+          <!-- Shell status -->
+          <div class="zshrc-info" x-show="zshrcInfo" style="margin-bottom:16px">
+            <div class="info-row">
+              <span class="info-label">当前 Shell</span>
+              <code x-text="zshrcInfo?.shell||'-'"></code>
+              <span class="badge" :class="zshrcInfo?.isZsh?'badge-ok':'badge-warn'"
+                x-text="zshrcInfo?.isZsh?'✓ zsh':'⚠ 非 zsh'"></span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">zshrc 路径</span>
+              <code x-text="zshrcInfo?.zshrcPath||'-'"></code>
+            </div>
+            <div class="info-row" x-show="(zshrcInfo?.hatchLines||[]).length>0">
+              <span class="info-label">Managed block</span>
+              <code x-text="(zshrcInfo?.hatchLines?.length||0)+' 行'"></code>
+            </div>
+          </div>
+
+          <!-- App data paths -->
+          <h4 style="margin:0 0 10px;font-size:13px;color:var(--text-muted)">数据目录</h4>
+          <div class="data-paths-grid">
+            <div class="data-path-row">
+              <div class="data-path-info">
+                <span class="data-path-label">AI 调试日志</span>
+                <code class="data-path-val" x-text="dataPaths.traceLogDir || dataPaths.defaultTraceDir"></code>
+                <span class="badge badge-ok text-xs" x-show="dataPaths.traceLogDirIsSet">自定义</span>
+                <span class="muted text-xs" x-show="!dataPaths.traceLogDirIsSet">默认</span>
+              </div>
+              <input type="text" class="data-path-input field-input"
+                x-model="dataPathsForm.traceLogDir"
+                :placeholder="dataPaths.defaultTraceDir" />
+            </div>
+            <div class="data-path-row">
+              <div class="data-path-info">
+                <span class="data-path-label">Skills 主目录</span>
+                <code class="data-path-val" x-text="dataPaths.skillsDir || dataPaths.defaultSkillsDir"></code>
+                <span class="badge badge-ok text-xs" x-show="dataPaths.skillsDirIsSet">自定义</span>
+                <span class="muted text-xs" x-show="!dataPaths.skillsDirIsSet">默认</span>
+              </div>
+              <input type="text" class="data-path-input field-input"
+                x-model="dataPathsForm.skillsDir"
+                :placeholder="dataPaths.defaultSkillsDir" />
+            </div>
+          </div>
+          <div class="export-actions" style="margin-top:10px">
+            <button @click="saveDataPaths()" :aria-busy="dataPathsSaving">💾 保存路径配置</button>
+            <button class="secondary" @click="resetDataPaths()">恢复默认</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 目录管理 ────────────────────────────────────────────────── -->
+      <section class="settings-section ws-section">
+        <div class="ws-section-header" @click="wsDirsOpen=!wsDirsOpen">
+          <h3>📁 目录管理</h3>
+          <div class="ws-section-meta">
+            <span class="badge" x-text="(cfg.directories||[]).length + ' 个目录'"></span>
+            <span class="ws-chevron" x-text="wsDirsOpen ? '▲' : '▼'"></span>
+          </div>
+        </div>
+        <div x-show="wsDirsOpen" x-transition>
+          <div class="dir-setting-list" x-show="(cfg.directories||[]).length>0">
+            <template x-for="d in (cfg.directories||[])" :key="d.path">
+              <div class="dir-setting-row">
+                <div class="dir-setting-info">
+                  <code x-text="d.path" class="dir-setting-path"></code>
+                  <span class="badge badge-export" x-show="d.exportName" x-text="'$'+d.exportName"></span>
+                  <span class="muted text-xs" x-show="!d.isScriptDir">仅路径导出</span>
+                </div>
+                <div class="dir-setting-actions">
+                  <template x-if="!d.exportName">
+                    <button class="btn-quick-export" @click="quickExport(d)">📤 导出路径</button>
+                  </template>
+                  <template x-if="d.exportName">
+                    <button class="secondary text-sm" @click="clearExport(d)">✕ 取消导出</button>
+                  </template>
+                  <button class="icon-btn danger" @click="removeDirectory(d.path)">✕</button>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="add-dir-form" style="margin-top:12px">
+            <input type="text" x-model="newDir.path" placeholder="/path/to/scripts" class="path-input" @keyup.enter="addDirectory()" />
+            <input type="text" x-model="newDir.exportName" placeholder="导出变量名（可选）" class="export-name-input" />
+            <label class="checkbox-label"><input type="checkbox" x-model="newDir.isScriptDir" />脚本目录</label>
+            <button @click="addDirectory()" :disabled="!newDir.path">+ 添加</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 环境变量 ────────────────────────────────────────────────── -->
+      <section class="settings-section ws-section">
+        <div class="ws-section-header" @click="wsEnvOpen=!wsEnvOpen">
+          <h3>🔑 环境变量</h3>
+          <div class="ws-section-meta">
+            <span class="badge" x-text="exportCount + ' 个变量'"></span>
+            <span class="ws-chevron" x-text="wsEnvOpen ? '▲' : '▼'"></span>
+          </div>
+        </div>
+        <div x-show="wsEnvOpen" x-transition>
+          <p class="hint">写入 <code>~/.zshrc</code> Hatch managed block，保存后新终端生效。</p>
+          <div class="zshrc-preview" x-show="(cfg.exports||[]).some(e=>e.name)">
+            <div class="preview-label">写入 ~/.zshrc 预览：</div>
+            <pre class="preview-pre" x-text="exportsPreview()"></pre>
+          </div>
+          <div class="export-list">
+            <template x-for="(e,i) in (cfg.exports||[])" :key="i">
+              <div class="export-row">
+                <input type="text" x-model="e.name"  placeholder="VARIABLE_NAME" class="var-name"  />
+                <span class="eq">=</span>
+                <input type="text" x-model="e.value" placeholder="/path/or/value" class="var-value" />
+                <button class="icon-btn danger" @click="removeExportRow(i)">✕</button>
+              </div>
+            </template>
+            <div x-show="(cfg.exports||[]).length===0" class="muted text-sm">暂无变量。</div>
+          </div>
+          <div class="export-actions">
+            <button class="secondary" @click="addExportRow()">+ 添加变量</button>
+            <button @click="saveExports()" :aria-busy="savingExports">💾 保存到 zshrc</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Shell 配置解析 ──────────────────────────────────────────── -->
+      <section class="settings-section ws-section">
+        <div class="ws-section-header" @click="wsZshrcOpen=!wsZshrcOpen">
+          <h3>📄 Shell 配置解析</h3>
+          <div class="ws-section-meta">
+            <span class="badge" x-show="zshrcEntries.length" x-text="zshrcEntries.length + ' 条'"></span>
+            <button class="btn-sm" @click.stop="loadZshrcAnalysis()" :aria-busy="zshrcLoading">↻ 解析</button>
+            <span class="ws-chevron" x-text="wsZshrcOpen ? '▲' : '▼'"></span>
+          </div>
+        </div>
+        <div x-show="wsZshrcOpen" x-transition>
+          <div class="zshrc-organizer">
+            <div class="organizer-controls">
+              <input type="text" x-model="zshrcOrganizationMode" class="field-input" placeholder="整理偏好：按功能模块、按类型、按工具链等" />
+              <button @click="organizeZshrcWithAI()" :aria-busy="zshrcOrganizing" :disabled="!aiReady">✦ AI 智能排版</button>
+            </div>
+            <p class="hint">AI 只生成预览，不会自动写入。点击「备份并应用」时会先生成 <code>.zshrc.hatch-backup-*</code> 备份。</p>
+            <div class="zshrc-preview organization-preview" x-show="zshrcOrganization">
+              <div class="preview-label">整理摘要</div>
+              <div class="organizer-summary">
+                <template x-for="(item,i) in (zshrcOrganization?.summary||[])" :key="i">
+                  <span x-text="item"></span>
+                </template>
+              </div>
+              <div class="preview-label">新 ~/.zshrc 预览</div>
+              <textarea class="organization-textarea" x-model="zshrcOrganization.content" spellcheck="false"></textarea>
+              <div class="export-actions organizer-actions">
+                <button @click="applyZshrcOrganization()" :aria-busy="zshrcApplying">备份并应用</button>
+                <button class="secondary" @click="clearZshrcOrganization()">取消预览</button>
+                <span class="muted text-sm" x-show="zshrcApplyResult" x-text="'已备份到 ' + zshrcApplyResult?.backupPath"></span>
+              </div>
+            </div>
+          </div>
+          <template x-if="zshrcEntries.length === 0 && !zshrcLoading">
+            <p class="muted text-sm">点击「↻ 解析」，识别函数、别名、环境变量等，可为每项添加备注说明。</p>
+          </template>
+          <template x-if="zshrcEntries.length > 0">
+            <div>
+              <div class="zshrc-filter-tabs">
+                <template x-for="f in zshrcFilterOptions" :key="f.key">
+                  <button class="filter-tab" :class="zshrcFilter === f.key ? 'active' : ''"
+                    @click="zshrcFilter = f.key" x-text="f.label + ' (' + zshrcCount(f.key) + ')'"></button>
+                </template>
+              </div>
+              <div class="zshrc-entry-list">
+                <template x-for="e in filteredZshrcEntries" :key="e.key">
+                  <div class="zshrc-entry" :class="'zshrc-'+e.type">
+                    <div class="zshrc-entry-header">
+                      <span class="zshrc-type-badge" x-text="zshrcTypeIcon(e.type)"></span>
+                      <strong class="zshrc-key"
+                        x-text="e.key.startsWith('comment:') || e.key.startsWith('other:') || e.key.startsWith('source:') ? '' : e.key"></strong>
+                      <span class="zshrc-value-preview muted" :title="e.value"
+                        x-text="e.type==='function' ? e.value.split('\\n')[0] : e.value"></span>
+                      <button class="btn-annotate" @click="startAnnotate(e)">
+                        <span x-show="!e.note" class="muted">+ 备注</span>
+                        <span x-show="e.note" class="annotation-text" x-text="e.note"></span>
+                      </button>
+                      <button class="btn-annotate ai-note-btn" @click="fillAnnotationWithAI(e)"
+                        :aria-busy="aiBusyEntry===e.key" title="使用 AI 生成备注">✦ AI</button>
+                    </div>
+                    <div class="annotation-editor" x-show="annotationTarget === e.key">
+                      <input type="text" x-model="annotationText" placeholder="添加备注说明…" class="annotation-input"
+                        @keyup.enter="saveAnnotation(e.key)" @keyup.escape="cancelAnnotate()" />
+                      <button @click="saveAnnotation(e.key)">保存</button>
+                      <button class="secondary" @click="cancelAnnotate()">取消</button>
+                      <button class="secondary danger-text" x-show="e.note" @click="deleteAnnotation(e.key)">删除</button>
+                    </div>
+                    <template x-if="e.type === 'function'">
+                      <div>
+                        <button class="btn-expand-fn" @click="toggleFn(e.key)">
+                          <span x-text="expandedFns[e.key] ? '▲ 收起' : '▼ 展开函数体'"></span>
+                        </button>
+                        <pre class="fn-body" x-show="expandedFns[e.key]" x-text="e.value"></pre>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <!-- Quick export modal (shared) -->
+      <div class="overlay" x-show="quickExportDir" x-transition @click.self="quickExportDir=null">
+        <div class="modal">
+          <h4>📤 导出为环境变量</h4>
+          <p class="muted text-sm">将目录路径写入 <code>~/.zshrc</code>，新终端中可用 <code>$变量名</code> 引用。</p>
+          <div class="modal-row">
+            <span class="mono-label">export</span>
+            <input type="text" x-model="quickExportName" placeholder="MY_TOOLS" class="var-name"
+              @keyup.enter="confirmQuickExport()" x-ref="exportNameInput" />
+            <span class="mono-label">=</span>
+            <code x-text="quickExportDir?.path" class="preview-val"></code>
+          </div>
+          <div class="zshrc-preview quick-export-preview" x-show="quickExportName">
+            <div class="preview-label">将写入 Hatch managed block</div>
+            <pre class="preview-pre" x-text="quickExportPreview()"></pre>
+          </div>
+          <div class="modal-actions">
+            <button @click="confirmQuickExport()" :disabled="!quickExportName">✓ 写入 zshrc</button>
+            <button class="secondary" @click="quickExportDir=null;quickExportName=''">取消</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /workspace-settings -->
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
@@ -295,593 +540,469 @@
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       SETTINGS
+       AI — Left-sidebar sub-navigation layout
   ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='settings'">
-    <section class="page-hero settings-hero">
+  <main x-show="tab==='ai' && !selectedDir" class="ai-main">
+
+    <!-- ── Hero ──────────────────────────────────────────────────────── -->
+    <section class="page-hero ai-hero">
       <div>
-        <p class="eyebrow">Preferences</p>
-        <h1>设置</h1>
-        <p class="page-subtitle">维护脚本目录、shell 导出变量和 zshrc 备注。</p>
+        <p class="eyebrow">AI 工具中心</p>
+        <h1>AI &amp; Skills</h1>
+        <p class="page-subtitle">管理模型连接、Skills 仓库，监控工具用量。</p>
       </div>
       <div class="hero-stats">
-        <div class="stat-pill">
-          <span x-text="directoryCount"></span>
-          <small>目录</small>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">AI 状态</div>
+          <div class="hero-stat-body">
+            <span class="hero-stat-value" x-text="aiForm.enabled ? 'ON' : 'OFF'" :style="aiForm.enabled ? 'color:var(--green)' : 'color:var(--text-muted)'"></span>
+          </div>
         </div>
-        <div class="stat-pill">
-          <span x-text="exportCount"></span>
-          <small>变量</small>
+        <div class="hero-stat-card" x-show="aiForm.model">
+          <div class="hero-stat-label">模型</div>
+          <div class="hero-stat-body">
+            <span class="hero-stat-value hero-stat-value--sm" x-text="(aiForm.model || '—').split('/').pop()"></span>
+          </div>
         </div>
-      </div>
-    </section>
-
-    <!-- Shell status -->
-    <section class="settings-section">
-      <h3>Shell 状态</h3>
-      <div class="zshrc-info" x-show="zshrcInfo">
-        <div class="info-row">
-          <span class="info-label">当前 Shell</span>
-          <code x-text="zshrcInfo?.shell||'-'"></code>
-          <span class="badge" :class="zshrcInfo?.isZsh?'badge-ok':'badge-warn'"
-            x-text="zshrcInfo?.isZsh?'✓ zsh':'⚠ 非 zsh'"></span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">zshrc 路径</span>
-          <code x-text="zshrcInfo?.zshrcPath||'-'"></code>
-        </div>
-        <div class="info-row" x-show="(zshrcInfo?.hatchLines||[]).length>0">
-          <span class="info-label">Managed block</span>
-          <code x-text="(zshrcInfo?.hatchLines?.length||0)+' 行'"></code>
-        </div>
-      </div>
-    </section>
-
-    <!-- Directories -->
-    <section class="settings-section">
-      <h3>📁 目录管理</h3>
-      <div class="dir-setting-list" x-show="(cfg.directories||[]).length>0">
-        <template x-for="d in (cfg.directories||[])" :key="d.path">
-          <div class="dir-setting-row">
-            <div class="dir-setting-info">
-              <code x-text="d.path" class="dir-setting-path"></code>
-              <span class="badge badge-export" x-show="d.exportName" x-text="'$'+d.exportName"></span>
-              <span class="muted text-xs" x-show="!d.isScriptDir">仅路径导出</span>
-            </div>
-            <div class="dir-setting-actions">
-              <template x-if="!d.exportName">
-                <button class="btn-quick-export" @click="quickExport(d)">📤 导出路径</button>
-              </template>
-              <template x-if="d.exportName">
-                <button class="secondary text-sm" @click="clearExport(d)">✕ 取消导出</button>
-              </template>
-              <button class="icon-btn danger" @click="removeDirectory(d.path)">✕</button>
+        <div class="hero-stat-card hero-stat-card--skills">
+          <div class="hero-stat-label">Skills</div>
+          <div class="hero-stat-body">
+            <span class="hero-stat-total" x-text="skillsStats.total || 0"></span>
+            <div class="hero-stat-breakdown">
+              <div>claude: <strong x-text="skillsStats.claude || 0"></strong></div>
+              <div>codex: <strong x-text="skillsStats.codex || 0"></strong></div>
             </div>
           </div>
-        </template>
-      </div>
-      <div class="muted text-sm" x-show="(cfg.directories||[]).length===0" style="margin-bottom:12px">还没有添加目录。</div>
-
-      <!-- Quick export modal -->
-      <div class="overlay" x-show="quickExportDir" x-transition @click.self="quickExportDir=null">
-        <div class="modal">
-          <h4>📤 导出为环境变量</h4>
-          <p class="muted text-sm">
-            将目录路径写入 <code>~/.zshrc</code>，新终端中可用 <code>$变量名</code> 引用。
-          </p>
-          <div class="modal-row">
-            <span class="mono-label">export</span>
-            <input type="text" x-model="quickExportName" placeholder="MY_TOOLS" class="var-name"
-              @keyup.enter="confirmQuickExport()" x-ref="exportNameInput" />
-            <span class="mono-label">=</span>
-            <code x-text="quickExportDir?.path" class="preview-val"></code>
-          </div>
-          <div class="zshrc-preview quick-export-preview" x-show="quickExportName">
-            <div class="preview-label">将写入 Hatch managed block</div>
-            <pre class="preview-pre" x-text="quickExportPreview()"></pre>
-          </div>
-          <div class="modal-actions">
-            <button @click="confirmQuickExport()" :disabled="!quickExportName">✓ 写入 zshrc</button>
-            <button class="secondary" @click="quickExportDir=null;quickExportName=''">取消</button>
-          </div>
         </div>
-      </div>
-
-      <!-- Add dir form -->
-      <div class="add-dir-form">
-        <input type="text" x-model="newDir.path" placeholder="/path/to/scripts" class="path-input" @keyup.enter="addDirectory()" />
-        <input type="text" x-model="newDir.exportName" placeholder="导出变量名（可选）" class="export-name-input" />
-        <label class="checkbox-label">
-          <input type="checkbox" x-model="newDir.isScriptDir" />脚本目录
-        </label>
-        <button @click="addDirectory()" :disabled="!newDir.path">+ 添加</button>
       </div>
     </section>
 
-    <!-- Env vars -->
-    <section class="settings-section">
-      <h3>🔑 环境变量</h3>
-      <p class="hint">写入 <code>~/.zshrc</code> Hatch managed block，保存后新终端生效。</p>
+    <!-- ── Layout: sidenav + content ─────────────────────────────────── -->
+    <div class="ai-layout">
 
-      <div class="zshrc-preview" x-show="(cfg.exports||[]).some(e=>e.name)">
-        <div class="preview-label">写入 ~/.zshrc 预览：</div>
-        <pre class="preview-pre" x-text="exportsPreview()"></pre>
-      </div>
+      <!-- Left sidebar -->
+      <nav class="ai-sidenav">
+        <button class="ai-sidenav-item" :class="aiSubTab==='overview' ? 'active' : ''"
+          @click="aiSubTab='overview'">
+          <span class="ai-sidenav-icon">📖</span>
+          <span>概览</span>
+        </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='connect' ? 'active' : ''"
+          @click="aiSubTab='connect'">
+          <span class="ai-sidenav-icon">🔌</span>
+          <span>连接</span>
+          <span class="ai-sidenav-badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '✓' : '!'"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='skills' ? 'active' : ''"
+          @click="aiSubTab='skills'; loadSkills()">
+          <span class="ai-sidenav-icon">📚</span>
+          <span>Skills</span>
+          <span class="ai-sidenav-count" x-show="skillsStats.total > 0" x-text="skillsStats.total"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='tools' ? 'active' : ''"
+          @click="aiSubTab='tools'; loadAIUsageStatuses()">
+          <span class="ai-sidenav-icon">⚡</span>
+          <span>工具</span>
+        </button>
+      </nav>
 
-      <div class="export-list">
-        <template x-for="(e,i) in (cfg.exports||[])" :key="i">
-          <div class="export-row">
-            <input type="text" x-model="e.name"  placeholder="VARIABLE_NAME" class="var-name"  />
-            <span class="eq">=</span>
-            <input type="text" x-model="e.value" placeholder="/path/or/value"  class="var-value" />
-            <button class="icon-btn danger" @click="removeExportRow(i)">✕</button>
-          </div>
-        </template>
-        <div x-show="(cfg.exports||[]).length===0" class="muted text-sm">
-          暂无变量。
+      <!-- Right content -->
+      <div class="ai-content">
+
+        <!-- ══ 概览 ══════════════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='overview'">
+          <section class="settings-section">
+            <h3>可用能力</h3>
+            <div class="ai-capability-list">
+              <div class="ai-capability">
+                <strong>✦ 脚本智能填写</strong>
+                <span>脚本卡片点击「✦ 智能填写」，AI 读取内容填充元信息，进入编辑抽屉后手动保存。</span>
+              </div>
+              <div class="ai-capability">
+                <strong>✦ Shell 备注生成</strong>
+                <span>Shell 解析列表点击「✦ AI」，AI 为函数/alias/export 生成一句说明，进入输入框后手动保存。</span>
+              </div>
+              <div class="ai-capability">
+                <strong>📄 脚本内容编辑</strong>
+                <span>脚本卡片点击「📄 内容」，输入 AI 指令后点「生成」，AI 按指令修改脚本，确认后保存写入。</span>
+              </div>
+              <div class="ai-capability">
+                <strong>🗂 zshrc 智能整理</strong>
+                <span>工作台「Shell 配置解析」区域，AI 重排 ~/.zshrc 结构，预览确认后应用，原文自动备份。</span>
+              </div>
+            </div>
+          </section>
+          <section class="settings-section">
+            <h3>快速开始</h3>
+            <p class="hint">1. 前往「连接」配置 OpenAI 兼容的 API 密钥和模型。</p>
+            <p class="hint">2. 前往「Skills」管理本地 Skill 仓库，一键同步到 Claude Code / Codex。</p>
+            <p class="hint">3. 前往「工具」检测 Claude Code 和 Codex 安装状态及用量。</p>
+            <button class="secondary" @click="aiSubTab='connect'" x-show="!aiReady" style="margin-top:8px">
+              → 去配置 AI 连接
+            </button>
+          </section>
         </div>
-      </div>
-      <div class="export-actions">
-        <button class="secondary" @click="addExportRow()">+ 添加变量</button>
-        <button @click="saveExports()" :aria-busy="savingExports">💾 保存到 zshrc</button>
-      </div>
-    </section>
 
-    <!-- zshrc analysis -->
-    <section class="settings-section">
-      <div class="section-header-row">
-        <h3>📄 Shell 配置解析</h3>
-        <button class="btn-sm" @click="loadZshrcAnalysis()" :aria-busy="zshrcLoading">↻ 解析 ~/.zshrc</button>
-      </div>
+        <!-- ══ 连接 ══════════════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='connect'">
+          <!-- Model config -->
+          <section class="settings-section ai-config-section">
+            <div class="section-header-row">
+              <h3>✦ 模型连接</h3>
+              <span class="badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '可用' : '未完成'"></span>
+            </div>
 
-      <div class="zshrc-organizer">
-        <div class="organizer-controls">
-          <input
-            type="text"
-            x-model="zshrcOrganizationMode"
-            class="field-input"
-            placeholder="整理偏好：按功能模块、按类型、按工具链等"
-          />
-          <button
-            @click="organizeZshrcWithAI()"
-            :aria-busy="zshrcOrganizing"
-            :disabled="!aiReady"
-          >✦ AI 智能排版</button>
-        </div>
-        <p class="hint">AI 只生成预览，不会自动写入。点击「备份并应用」时会先生成新的 <code>.zshrc.hatch-backup-*</code> 备份。</p>
+            <label class="checkbox-label ai-enable" style="margin-bottom:12px">
+              <input type="checkbox" x-model="aiForm.enabled" />
+              启用 AI 智能功能
+            </label>
 
-        <div class="zshrc-preview organization-preview" x-show="zshrcOrganization">
-          <div class="preview-label">整理摘要</div>
-          <div class="organizer-summary">
-            <template x-for="(item,i) in (zshrcOrganization?.summary||[])" :key="i">
-              <span x-text="item"></span>
-            </template>
-          </div>
-          <div class="preview-label">新 ~/.zshrc 预览</div>
-          <textarea
-            class="organization-textarea"
-            x-model="zshrcOrganization.content"
-            spellcheck="false"
-          ></textarea>
-          <div class="export-actions organizer-actions">
-            <button @click="applyZshrcOrganization()" :aria-busy="zshrcApplying">备份并应用</button>
-            <button class="secondary" @click="clearZshrcOrganization()">取消预览</button>
-            <span class="muted text-sm" x-show="zshrcApplyResult" x-text="'已备份到 ' + zshrcApplyResult?.backupPath"></span>
-          </div>
-        </div>
-      </div>
+            <label class="field-stack">
+              <span>API Base URL</span>
+              <input type="text" x-model="aiForm.baseUrl" placeholder="https://api.deepseek.com/v1" class="field-input" />
+            </label>
+            <label class="field-stack">
+              <span>API Key</span>
+              <input type="password" x-model="aiForm.apiKey" placeholder="sk-..." class="field-input" autocomplete="off" />
+            </label>
+            <label class="field-stack">
+              <span>模型名</span>
+              <input type="text" x-model="aiForm.model" placeholder="deepseek-chat / glm-4-plus / gpt-4o-mini" class="field-input" />
+            </label>
 
-      <template x-if="zshrcEntries.length === 0 && !zshrcLoading">
-        <p class="muted text-sm">点击「↻ 解析 ~/.zshrc」，自动识别函数、别名、环境变量等，可为每项添加备注说明。</p>
-      </template>
+            <div class="ai-provider-hints" style="margin-top:10px">
+              <button class="preset-btn" @click="aiForm.baseUrl='https://api.deepseek.com/v1'; aiForm.model=aiForm.model||'deepseek-chat'">DeepSeek</button>
+              <button class="preset-btn" @click="aiForm.baseUrl='https://open.bigmodel.cn/api/paas/v4'; aiForm.model=aiForm.model||'glm-4-plus'">GLM</button>
+              <button class="preset-btn" @click="aiForm.baseUrl='https://api.openai.com/v1'; aiForm.model=aiForm.model||'gpt-4o-mini'">OpenAI</button>
+            </div>
 
-      <template x-if="zshrcEntries.length > 0">
-        <div>
-          <!-- Filter tabs -->
-          <div class="zshrc-filter-tabs">
-            <template x-for="f in zshrcFilterOptions" :key="f.key">
-              <button
-                class="filter-tab"
-                :class="zshrcFilter === f.key ? 'active' : ''"
-                @click="zshrcFilter = f.key"
-                x-text="f.label + ' (' + zshrcCount(f.key) + ')'"
-              ></button>
-            </template>
-          </div>
+            <div class="export-actions" style="margin-top:14px">
+              <button @click="saveAIConfig()" :aria-busy="aiSaving">💾 保存</button>
+              <button class="secondary" @click="testAIConfig()" :disabled="!aiForm.baseUrl || !aiForm.apiKey || !aiForm.model" :aria-busy="aiTesting">测试连接</button>
+              <span class="muted text-sm" x-show="aiTestResult" x-text="aiTestResult"></span>
+            </div>
+          </section>
 
-          <!-- Entry list -->
-          <div class="zshrc-entry-list">
-            <template x-for="e in filteredZshrcEntries" :key="e.key">
-              <div class="zshrc-entry" :class="'zshrc-'+e.type">
-                <div class="zshrc-entry-header">
-                  <span class="zshrc-type-badge" x-text="zshrcTypeIcon(e.type)"></span>
-                  <strong class="zshrc-key"
-                    x-text="e.key.startsWith('comment:') || e.key.startsWith('other:') || e.key.startsWith('source:') ? '' : e.key"
-                  ></strong>
-                  <span class="zshrc-value-preview muted"
-                    :title="e.value"
-                    x-text="e.type==='function' ? e.value.split('\\n')[0] : e.value"
-                  ></span>
-                  <button class="btn-annotate" @click="startAnnotate(e)">
-                    <span x-show="!e.note" class="muted">+ 备注</span>
-                    <span x-show="e.note" class="annotation-text" x-text="e.note"></span>
-                  </button>
-                  <button
-                    class="btn-annotate ai-note-btn"
-                    @click="fillAnnotationWithAI(e)"
-                    :aria-busy="aiBusyEntry===e.key"
-                    title="使用 AI 生成备注"
-                  >✦ AI</button>
+          <!-- Trace log -->
+          <section class="settings-section ai-trace-section">
+            <div class="section-header-row ai-trace-header" @click="aiTraceCollapsed=!aiTraceCollapsed; if(!aiTraceCollapsed){loadAITraces(); loadTraceStorage()}" style="cursor:pointer">
+              <h3>📡 调用日志 <span class="muted text-sm" x-show="aiTraces.length" x-text="'(' + aiTraces.length + ' 条)'"></span></h3>
+              <div style="display:flex;align-items:center;gap:10px" @click.stop>
+                <button class="btn-sm" @click="clearAITracesLog()" x-show="aiTraces.length > 0">清空</button>
+                <span class="muted" x-text="aiTraceCollapsed ? '▼' : '▲'"></span>
+              </div>
+            </div>
+
+            <div x-show="!aiTraceCollapsed">
+              <div class="ai-trace-meta">
+                <div class="ai-trace-meta-row">
+                  <span class="muted text-sm" x-show="aiTraceStorage">
+                    <template x-if="aiTraceStorage">
+                      <span>
+                        <code class="inline-code" x-text="aiTraceStorage.dir"></code>
+                        &nbsp;·&nbsp;<span x-text="aiTraceStorage.files?.length || 0"></span> 个文件
+                        &nbsp;·&nbsp;<span x-text="formatBytes(aiTraceStorage.totalBytes || 0)"></span>
+                      </span>
+                    </template>
+                  </span>
+                  <div class="ai-trace-retain-row">
+                    <label class="retain-label muted text-sm">保留</label>
+                    <input type="number" class="retain-input" :value="aiForm.traceRetainDays || 3" min="1" max="30"
+                      @change="saveRetainDays($event.target.value)" :disabled="aiRetainDaysSaving" />
+                    <span class="muted text-sm">天</span>
+                    <span class="muted text-sm" x-show="aiRetainDaysSaving">…</span>
+                  </div>
                 </div>
-
-                <!-- Inline annotation editor -->
-                <div class="annotation-editor" x-show="annotationTarget === e.key">
-                  <input
-                    type="text"
-                    x-model="annotationText"
-                    placeholder="添加备注说明…"
-                    class="annotation-input"
-                    @keyup.enter="saveAnnotation(e.key)"
-                    @keyup.escape="cancelAnnotate()"
-                  />
-                  <button @click="saveAnnotation(e.key)">保存</button>
-                  <button class="secondary" @click="cancelAnnotate()">取消</button>
-                  <button class="secondary danger-text" x-show="e.note" @click="deleteAnnotation(e.key)">删除</button>
-                </div>
-
-                <!-- Expand function body -->
-                <template x-if="e.type === 'function'">
-                  <div>
-                    <button class="btn-expand-fn" @click="toggleFn(e.key)">
-                      <span x-text="expandedFns[e.key] ? '▲ 收起' : '▼ 展开函数体'"></span>
-                    </button>
-                    <pre class="fn-body" x-show="expandedFns[e.key]" x-text="e.value"></pre>
+                <template x-if="aiTraceStorage && aiTraceStorage.files && aiTraceStorage.files.length > 0">
+                  <div class="ai-trace-files">
+                    <template x-for="f in (aiTraceStorage.files||[]).slice().sort((a,b)=>b.date.localeCompare(a.date))" :key="f.date">
+                      <span class="ai-trace-file-chip">
+                        <span x-text="f.date"></span>
+                        <span class="muted" x-text="'('+f.count+'条, '+formatBytes(f.bytes)+')'"></span>
+                      </span>
+                    </template>
                   </div>
                 </template>
               </div>
+
+              <div x-show="aiTraces.length === 0" class="muted text-sm" style="padding:14px 0">
+                暂无记录。发起任意 AI 操作后，完整的请求与响应会实时出现在这里。
+              </div>
+
+              <div class="ai-trace-list" x-show="aiTraces.length > 0">
+                <template x-for="t in aiTraces" :key="t.id">
+                  <div class="ai-trace-item" :class="t.error ? 'ai-trace-error' : 'ai-trace-ok'">
+                    <div class="ai-trace-row" @click="toggleAITrace(t.id)">
+                      <span class="ai-trace-status-dot" :class="t.error ? 'dot-error' : 'dot-ok'"></span>
+                      <span class="ai-trace-op" x-text="t.op"></span>
+                      <span class="ai-trace-model muted text-sm" x-text="t.model"></span>
+                      <span class="ai-trace-dur text-sm" x-text="t.durationMs + 'ms'"></span>
+                      <span class="ai-trace-time muted text-sm" x-text="t.at"></span>
+                      <span class="ai-trace-chevron muted" x-text="aiTraceExpanded[t.id] ? '▲' : '▼'"></span>
+                    </div>
+                    <div x-show="t.error" class="ai-trace-error-line text-sm" x-text="t.error"></div>
+                    <div x-show="aiTraceExpanded[t.id]" class="ai-trace-detail">
+                      <div class="ai-trace-block-label">URL</div>
+                      <pre class="ai-trace-block ai-trace-url" x-text="t.url"></pre>
+                      <div class="ai-trace-block-label">System Prompt</div>
+                      <pre class="ai-trace-block" x-text="t.systemPrompt"></pre>
+                      <div class="ai-trace-block-label">User Prompt</div>
+                      <pre class="ai-trace-block" x-text="t.userPrompt"></pre>
+                      <div class="ai-trace-block-label" x-text="t.error ? '原始响应 / 错误' : '原始响应'"></div>
+                      <pre class="ai-trace-block" :class="t.error ? 'ai-trace-block-err' : ''" x-text="t.rawResponse || t.error"></pre>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ Skills ════════════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='skills'">
+          <section class="settings-section ai-skills-section">
+            <div class="section-header-row">
+              <h3>📚 Skills 管理</h3>
+              <div class="skills-header-actions">
+                <button class="btn-sm" @click="importSkills('claude')" :aria-busy="skillImporting==='claude'">↓ 从 Claude 导入</button>
+                <button class="btn-sm" @click="importSkills('codex')"  :aria-busy="skillImporting==='codex'">↓ 从 Codex 导入</button>
+                <button class="btn-sm" @click="loadSkills()" :aria-busy="skillsLoading">↻</button>
+              </div>
+            </div>
+
+            <template x-if="skillImportResult">
+              <div class="skill-import-result text-sm">
+                <template x-if="skillImportResult.imported && skillImportResult.imported.length">
+                  <span class="badge badge-ok">✓ 导入 <span x-text="skillImportResult.imported.length"></span> 个：<span x-text="(skillImportResult.imported||[]).join(', ')"></span></span>
+                </template>
+                <template x-if="skillImportResult.skipped && skillImportResult.skipped.length">
+                  <span class="badge">已跳过 <span x-text="skillImportResult.skipped.length"></span> 个（已存在）</span>
+                </template>
+                <button class="btn-sm" @click="skillImportResult=null" style="margin-left:8px">×</button>
+              </div>
             </template>
-          </div>
-        </div>
-      </template>
-    </section>
-  </main>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       AI SETTINGS
-  ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='ai' && !selectedDir">
-    <section class="page-hero settings-hero">
-      <div>
-        <p class="eyebrow">OpenAI-compatible</p>
-        <h1>AI 配置</h1>
-        <p class="page-subtitle">配置兼容 OpenAI Chat Completions 协议的模型，用于脚本元信息和 Shell 备注的智能填写。</p>
-      </div>
-      <div class="hero-stats">
-        <div class="stat-pill">
-          <span x-text="aiForm.enabled ? 'ON' : 'OFF'"></span>
-          <small>AI 状态</small>
-        </div>
-      </div>
-    </section>
-
-    <section class="settings-section ai-config-section">
-      <div class="section-header-row">
-        <h3>✦ 模型连接</h3>
-        <span class="badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '可用' : '未完成'"></span>
-      </div>
-
-      <div class="ai-form-grid">
-        <label class="checkbox-label ai-enable">
-          <input type="checkbox" x-model="aiForm.enabled" />
-          启用 AI 智能填写
-        </label>
-
-        <label class="field-stack">
-          <span>API Base URL</span>
-          <input
-            type="text"
-            x-model="aiForm.baseUrl"
-            placeholder="https://api.deepseek.com/v1"
-            class="field-input"
-          />
-        </label>
-
-        <label class="field-stack">
-          <span>API Key</span>
-          <input
-            type="password"
-            x-model="aiForm.apiKey"
-            placeholder="sk-..."
-            class="field-input"
-            autocomplete="off"
-          />
-        </label>
-
-        <label class="field-stack">
-          <span>模型名</span>
-          <input
-            type="text"
-            x-model="aiForm.model"
-            placeholder="deepseek-chat / glm-4-plus / gpt-4o-mini"
-            class="field-input"
-          />
-        </label>
-      </div>
-
-      <div class="ai-provider-hints">
-        <button class="preset-btn" @click="aiForm.baseUrl='https://api.deepseek.com/v1'; aiForm.model=aiForm.model||'deepseek-chat'">DeepSeek</button>
-        <button class="preset-btn" @click="aiForm.baseUrl='https://open.bigmodel.cn/api/paas/v4'; aiForm.model=aiForm.model||'glm-4-plus'">GLM</button>
-        <button class="preset-btn" @click="aiForm.baseUrl='https://api.openai.com/v1'; aiForm.model=aiForm.model||'gpt-4o-mini'">OpenAI</button>
-      </div>
-
-      <div class="export-actions">
-        <button @click="saveAIConfig()" :aria-busy="aiSaving">💾 保存配置</button>
-        <button class="secondary" @click="testAIConfig()" :disabled="!aiForm.baseUrl || !aiForm.apiKey || !aiForm.model" :aria-busy="aiTesting">测试连接</button>
-        <span class="muted text-sm" x-show="aiTestResult" x-text="aiTestResult"></span>
-      </div>
-    </section>
-
-    <section class="settings-section">
-      <h3>可用能力</h3>
-      <div class="ai-capability-list">
-        <div class="ai-capability">
-          <strong>脚本智能填写</strong>
-          <span>在脚本卡片点击「✦ 智能填写」，AI 会读取脚本内容并填充名称、描述、类型、子命令、标签和预设。结果会进入编辑抽屉，仍需手动保存。</span>
-        </div>
-        <div class="ai-capability">
-          <strong>Shell 备注生成</strong>
-          <span>在 Shell 配置解析列表点击「✦ AI」，AI 会为函数、alias、export、source 等生成一句说明。结果会进入备注输入框，仍需手动保存。</span>
-        </div>
-        <div class="ai-capability">
-          <strong>脚本内容编辑</strong>
-          <span>在脚本卡片点击「📄 内容」，可直接查看和编辑脚本文件。输入 AI 指令（支持换行）后点击「生成」，AI 按指令修改内容；确认后点击「保存」写入文件并自动 chmod +x。</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Claude Code Status -->
-    <section class="settings-section">
-      <div class="section-header-row">
-        <h3>⚡ Claude Code 用量</h3>
-        <button class="btn-sm" @click="loadClaudeStatus()" :aria-busy="claudeStatusLoading">↻ 检测</button>
-      </div>
-      <p class="hint">检测本地是否安装了 claude CLI 和 VPN，并读取 Claude Code 速率限制用量缓存。</p>
-
-      <template x-if="!claudeStatus && !claudeStatusLoading">
-        <p class="muted text-sm">点击「↻ 检测」获取 Claude Code 状态。</p>
-      </template>
-
-      <template x-if="claudeStatus">
-        <div class="claude-status-card">
-          <div class="claude-status-row">
-            <div class="claude-status-item">
-              <span class="claude-status-icon" :class="claudeStatus.claudeInstalled ? 'icon-ok' : 'icon-off'">
-                <span x-text="claudeStatus.claudeInstalled ? '✓' : '✕'"></span>
-              </span>
-              <div>
-                <div class="claude-status-label">claude CLI</div>
-                <div class="claude-status-value" x-text="claudeStatus.claudeInstalled ? (claudeStatus.claudeVersion || '已安装') : '未安装'"></div>
-              </div>
+            <div class="skill-new-row">
+              <input type="text" x-model="skillNewName" placeholder="new-skill-name（字母/数字/连字符）" class="skill-new-input" @keydown.enter="openNewSkillEditor()" />
+              <button class="btn-sm btn-primary" @click="openNewSkillEditor()">+ 新建</button>
             </div>
-            <div class="claude-status-item">
-              <span class="claude-status-icon" :class="claudeStatus.vpnConnected ? 'icon-ok' : 'icon-off'">
-                <span x-text="claudeStatus.vpnConnected ? '✓' : '○'"></span>
-              </span>
-              <div>
-                <div class="claude-status-label">VPN</div>
-                <div class="claude-status-value">
-                  <span x-show="claudeStatus.vpnConnected">
-                    <template x-for="iface in claudeStatus.vpnInterfaces" :key="iface">
-                      <code class="iface-tag" x-text="iface"></code>
-                    </template>
-                  </span>
-                  <span x-show="!claudeStatus.vpnConnected" class="muted">未检测到 VPN</span>
+
+            <div x-show="skillsLoading" class="muted text-sm" style="padding:12px 0">加载中…</div>
+            <div x-show="!skillsLoading && skills.length === 0" class="muted text-sm" style="padding:12px 0">
+              暂无 Skills。点击「↓ 从 Claude 导入」或「↓ 从 Codex 导入」，或手动新建。
+            </div>
+
+            <div class="skill-list" x-show="!skillsLoading && skills.length > 0">
+              <template x-for="s in skills" :key="s.name">
+                <div class="skill-item" :class="skillEditTarget === s.name ? 'skill-item-editing' : ''">
+                  <div class="skill-row">
+                    <div class="skill-info">
+                      <span class="skill-name" x-text="s.name"></span>
+                      <span class="skill-desc muted text-sm" x-text="s.description || '无描述'" :class="!s.description ? 'skill-no-desc' : ''"></span>
+                      <div class="skill-badges">
+                        <span class="skill-badge skill-badge-agents" x-show="s.hasAgents">agents</span>
+                        <span class="skill-badge skill-badge-refs" x-show="s.hasRefs">refs</span>
+                      </div>
+                    </div>
+                    <div class="skill-sync-group">
+                      <label class="skill-sync-toggle" :class="skillSyncBusy[s.name+':claude'] ? 'sync-busy' : ''">
+                        <input type="checkbox"
+                          :checked="s.inClaude"
+                          :disabled="!!skillSyncBusy[s.name+':claude']"
+                          @change="toggleSkillSync(s.name, 'claude', $event.target.checked)"
+                        />
+                        <span class="sync-label" :class="s.inClaude ? 'sync-on' : 'sync-off'">Claude</span>
+                      </label>
+                      <label class="skill-sync-toggle" :class="skillSyncBusy[s.name+':codex'] ? 'sync-busy' : ''">
+                        <input type="checkbox"
+                          :checked="s.inCodex"
+                          :disabled="!!skillSyncBusy[s.name+':codex']"
+                          @change="toggleSkillSync(s.name, 'codex', $event.target.checked)"
+                        />
+                        <span class="sync-label" :class="s.inCodex ? 'sync-on' : 'sync-off'">Codex</span>
+                      </label>
+                    </div>
+                    <div class="skill-actions">
+                      <button class="btn-sm" @click="skillEditTarget===s.name ? closeSkillEditor() : openSkillEditor(s.name)"
+                        x-text="skillEditTarget===s.name ? '收起' : '编辑'"></button>
+                      <button class="btn-sm btn-danger" @click="deleteSkill(s.name)">删除</button>
+                    </div>
+                  </div>
+                  <div x-show="skillEditTarget === s.name" class="skill-editor-panel">
+                    <textarea class="skill-editor-textarea" x-model="skillEditContent" rows="16" spellcheck="false"></textarea>
+                    <div class="skill-editor-footer">
+                      <button @click="saveSkillContent()" :aria-busy="skillEditSaving">💾 保存</button>
+                      <button class="secondary" @click="closeSkillEditor()">取消</button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
+              </template>
 
-          <template x-if="claudeStatus.hasUsageData">
-            <div class="claude-usage-row">
-              <div class="claude-usage-pill" :class="usagePill(claudeStatus.fiveHourPct)">
-                <span class="cup-window">5h</span>
-                <span class="cup-metric">
-                  <span class="cup-label">已用</span>
-                  <strong class="cup-pct" x-text="Math.round(claudeStatus.fiveHourPct) + '%'"></strong>
-                </span>
-                <span class="cup-metric cup-left">
-                  <span class="cup-label">剩余</span>
-                  <strong x-text="Math.max(0, 100 - Math.round(claudeStatus.fiveHourPct)) + '%'"></strong>
-                </span>
-                <span class="cup-bar">
-                  <span class="cup-fill" :style="'width:' + Math.min(claudeStatus.fiveHourPct, 100) + '%'"></span>
-                </span>
-                <span class="cup-reset" x-show="claudeStatus.fiveHourReset">
-                  ↻ <span x-text="claudeStatus.fiveHourReset"></span>
-                </span>
-              </div>
-              <div class="claude-usage-pill" :class="usagePill(claudeStatus.sevenDayPct)">
-                <span class="cup-window">7d</span>
-                <span class="cup-metric">
-                  <span class="cup-label">已用</span>
-                  <strong class="cup-pct" x-text="Math.round(claudeStatus.sevenDayPct) + '%'"></strong>
-                </span>
-                <span class="cup-metric cup-left">
-                  <span class="cup-label">剩余</span>
-                  <strong x-text="Math.max(0, 100 - Math.round(claudeStatus.sevenDayPct)) + '%'"></strong>
-                </span>
-                <span class="cup-bar">
-                  <span class="cup-fill" :style="'width:' + Math.min(claudeStatus.sevenDayPct, 100) + '%'"></span>
-                </span>
-                <span class="cup-reset" x-show="claudeStatus.sevenDayReset">
-                  ↻ <span x-text="claudeStatus.sevenDayReset"></span>
-                </span>
-              </div>
-            </div>
-          </template>
-          <template x-if="!claudeStatus.hasUsageData">
-            <div style="margin-top:10px">
-              <template x-if="!claudeStatus.claudeInstalled">
-                <p class="muted text-sm">⚠ claude CLI 未安装，请先安装 Claude Code（<code>npm i -g @anthropic-ai/claude-code</code>）。</p>
-              </template>
-              <template x-if="claudeStatus.claudeInstalled && !claudeStatus.vpnConnected">
-                <p class="muted text-sm">⚠ 未检测到 VPN 连接，Claude Code 需要 VPN 才能正常访问 API 并写入用量缓存。</p>
-              </template>
-              <template x-if="claudeStatus.claudeInstalled && claudeStatus.vpnConnected">
-                <p class="muted text-sm">ℹ 未找到用量缓存文件（<code>~/.cache/will-statusline/last.json</code>）。需要本地 statusline 工具运行并写入数据后才会显示。</p>
+              <template x-if="skillEditIsNew && skillEditTarget && !skills.find(s=>s.name===skillEditTarget)">
+                <div class="skill-item skill-item-editing">
+                  <div class="skill-row">
+                    <div class="skill-info">
+                      <span class="skill-name" x-text="skillEditTarget"></span>
+                      <span class="muted text-sm">新建中…</span>
+                    </div>
+                  </div>
+                  <div class="skill-editor-panel">
+                    <textarea class="skill-editor-textarea" x-model="skillEditContent" rows="16" spellcheck="false"></textarea>
+                    <div class="skill-editor-footer">
+                      <button @click="saveSkillContent()" :aria-busy="skillEditSaving">💾 保存</button>
+                      <button class="secondary" @click="closeSkillEditor()">取消</button>
+                    </div>
+                  </div>
+                </div>
               </template>
             </div>
-          </template>
+          </section>
         </div>
-      </template>
-    </section>
 
-    <!-- Codex Usage Status -->
-    <section class="settings-section">
-      <div class="section-header-row">
-        <h3>⚡ Codex 用量</h3>
-        <button class="btn-sm" @click="loadCodexStatus()" :aria-busy="codexStatusLoading">↻ 检测</button>
-      </div>
-      <p class="hint">检测本地是否安装了 Codex CLI 和 VPN，并读取本机 Codex 会话里的速率限制快照。</p>
-
-      <template x-if="!codexStatus && !codexStatusLoading">
-        <p class="muted text-sm">点击「↻ 检测」获取 Codex 用量状态。</p>
-      </template>
-
-      <template x-if="codexStatus">
-        <div class="codex-status-card">
-          <!-- Row 1: install + VPN -->
-          <div class="codex-status-row">
-            <div class="codex-status-item">
-              <span class="codex-status-icon" :class="codexStatus.codexInstalled ? 'icon-ok' : 'icon-off'">
-                <span x-text="codexStatus.codexInstalled ? '✓' : '✕'"></span>
-              </span>
-              <div>
-                <div class="codex-status-label">Codex CLI</div>
-                <div class="codex-status-value" x-text="codexStatus.codexInstalled ? (codexStatus.codexVersion || '已安装') : '未安装'"></div>
+        <!-- ══ 工具 ══════════════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='tools'">
+          <div class="ai-usage-row">
+            <!-- Claude Code -->
+            <section class="settings-section ai-usage-card">
+              <div class="section-header-row">
+                <h3>⚡ Claude Code</h3>
+                <button class="btn-sm" @click="loadClaudeStatus()" :aria-busy="claudeStatusLoading">↻</button>
               </div>
-            </div>
-            <div class="codex-status-item">
-              <span class="codex-status-icon" :class="codexStatus.vpnConnected ? 'icon-ok' : 'icon-off'">
-                <span x-text="codexStatus.vpnConnected ? '✓' : '○'"></span>
-              </span>
-              <div>
-                <div class="codex-status-label">VPN</div>
-                <div class="codex-status-value">
-                  <span x-show="codexStatus.vpnConnected">
-                    <template x-for="iface in codexStatus.vpnInterfaces" :key="iface">
-                      <code class="iface-tag" x-text="iface"></code>
-                    </template>
-                  </span>
-                  <span x-show="!codexStatus.vpnConnected" class="muted">未检测到 VPN</span>
+              <template x-if="!claudeStatus && !claudeStatusLoading">
+                <p class="muted text-sm">点击 ↻ 检测</p>
+              </template>
+              <template x-if="claudeStatus">
+                <div class="claude-status-card">
+                  <div class="claude-status-row">
+                    <div class="claude-status-item">
+                      <span class="claude-status-icon" :class="claudeStatus.claudeInstalled ? 'icon-ok' : 'icon-off'">
+                        <span x-text="claudeStatus.claudeInstalled ? '✓' : '✕'"></span>
+                      </span>
+                      <div>
+                        <div class="claude-status-label">claude CLI</div>
+                        <div class="claude-status-value" x-text="claudeStatus.claudeInstalled ? (claudeStatus.claudeVersion || '已安装') : '未安装'"></div>
+                      </div>
+                    </div>
+                    <div class="claude-status-item">
+                      <span class="claude-status-icon" :class="claudeStatus.vpnConnected ? 'icon-ok' : 'icon-off'">
+                        <span x-text="claudeStatus.vpnConnected ? '✓' : '○'"></span>
+                      </span>
+                      <div>
+                        <div class="claude-status-label">VPN</div>
+                        <div class="claude-status-value">
+                          <span x-show="claudeStatus.vpnConnected">
+                            <template x-for="iface in claudeStatus.vpnInterfaces" :key="iface">
+                              <code class="iface-tag" x-text="iface"></code>
+                            </template>
+                          </span>
+                          <span x-show="!claudeStatus.vpnConnected" class="muted">未检测到</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <template x-if="claudeStatus.hasUsageData">
+                    <div class="claude-usage-row">
+                      <div class="claude-usage-pill" :class="usagePill(claudeStatus.fiveHourPct)">
+                        <span class="cup-window">5h</span>
+                        <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(claudeStatus.fiveHourPct)+'%'"></strong></span>
+                        <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.max(0,100-Math.round(claudeStatus.fiveHourPct))+'%'"></strong></span>
+                        <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(claudeStatus.fiveHourPct,100)+'%'"></span></span>
+                        <span class="cup-reset" x-show="claudeStatus.fiveHourReset">↻ <span x-text="claudeStatus.fiveHourReset"></span></span>
+                      </div>
+                      <div class="claude-usage-pill" :class="usagePill(claudeStatus.sevenDayPct)">
+                        <span class="cup-window">7d</span>
+                        <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(claudeStatus.sevenDayPct)+'%'"></strong></span>
+                        <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.max(0,100-Math.round(claudeStatus.sevenDayPct))+'%'"></strong></span>
+                        <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(claudeStatus.sevenDayPct,100)+'%'"></span></span>
+                        <span class="cup-reset" x-show="claudeStatus.sevenDayReset">↻ <span x-text="claudeStatus.sevenDayReset"></span></span>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="claudeStatus.hasUsageData">
+                    <p class="codex-usage-meta text-sm" style="margin-top:6px">
+                      <span x-show="claudeStatus.planType">计划：<strong x-text="claudeStatus.planType"></strong></span>
+                    </p>
+                  </template>
+                  <template x-if="!claudeStatus.hasUsageData">
+                    <p class="muted text-sm" style="margin-top:8px" x-text="claudeStatus.claudeInstalled ? 'ℹ 未找到用量缓存' : '⚠ claude CLI 未安装'"></p>
+                  </template>
                 </div>
+              </template>
+            </section>
+
+            <!-- Codex -->
+            <section class="settings-section ai-usage-card">
+              <div class="section-header-row">
+                <h3>⚡ Codex</h3>
+                <button class="btn-sm" @click="loadCodexStatus()" :aria-busy="codexStatusLoading">↻</button>
               </div>
-            </div>
+              <template x-if="!codexStatus && !codexStatusLoading">
+                <p class="muted text-sm">点击 ↻ 检测</p>
+              </template>
+              <template x-if="codexStatus">
+                <div class="codex-status-card">
+                  <div class="codex-status-row">
+                    <div class="codex-status-item">
+                      <span class="codex-status-icon" :class="codexStatus.codexInstalled ? 'icon-ok' : 'icon-off'">
+                        <span x-text="codexStatus.codexInstalled ? '✓' : '✕'"></span>
+                      </span>
+                      <div>
+                        <div class="codex-status-label">Codex CLI</div>
+                        <div class="codex-status-value" x-text="codexStatus.codexInstalled ? (codexStatus.codexVersion || '已安装') : '未安装'"></div>
+                      </div>
+                    </div>
+                    <div class="codex-status-item">
+                      <span class="codex-status-icon" :class="codexStatus.vpnConnected ? 'icon-ok' : 'icon-off'">
+                        <span x-text="codexStatus.vpnConnected ? '✓' : '○'"></span>
+                      </span>
+                      <div>
+                        <div class="codex-status-label">VPN</div>
+                        <div class="codex-status-value">
+                          <span x-show="codexStatus.vpnConnected">
+                            <template x-for="iface in codexStatus.vpnInterfaces" :key="iface">
+                              <code class="iface-tag" x-text="iface"></code>
+                            </template>
+                          </span>
+                          <span x-show="!codexStatus.vpnConnected" class="muted">未检测到</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <template x-if="codexStatus.hasUsageData">
+                    <div>
+                      <div class="codex-usage-row">
+                        <div class="codex-usage-pill" :class="usagePill(codexStatus.primary.usedPercent)" x-show="codexStatus.primary.available">
+                          <span class="cup-window" x-text="codexStatus.primary.label"></span>
+                          <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.primary.usedPercent)+'%'"></strong></span>
+                          <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.primary.leftPercent)+'%'"></strong></span>
+                          <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.primary.usedPercent,100)+'%'"></span></span>
+                          <span class="cup-reset" x-show="codexStatus.primary.resetIn">↻ <span x-text="codexStatus.primary.resetIn"></span></span>
+                        </div>
+                        <div class="codex-usage-pill" :class="usagePill(codexStatus.secondary.usedPercent)" x-show="codexStatus.secondary.available">
+                          <span class="cup-window" x-text="codexStatus.secondary.label"></span>
+                          <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.secondary.usedPercent)+'%'"></strong></span>
+                          <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.secondary.leftPercent)+'%'"></strong></span>
+                          <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.secondary.usedPercent,100)+'%'"></span></span>
+                          <span class="cup-reset" x-show="codexStatus.secondary.resetIn">↻ <span x-text="codexStatus.secondary.resetIn"></span></span>
+                        </div>
+                      </div>
+                      <p class="codex-usage-meta text-sm">
+                        <span x-show="codexStatus.planType">计划：<strong x-text="codexStatus.planType"></strong></span>
+                        <span x-show="codexStatus.limitReached">限制：<strong x-text="codexStatus.limitReached"></strong></span>
+                      </p>
+                    </div>
+                  </template>
+                  <template x-if="!codexStatus.hasUsageData">
+                    <p class="muted text-sm" style="margin-top:8px">ℹ 未找到 Codex 用量快照</p>
+                  </template>
+                </div>
+              </template>
+            </section>
           </div>
-
-          <!-- Row 2: usage pills -->
-          <template x-if="codexStatus.hasUsageData">
-            <div>
-              <div class="codex-usage-row">
-                <div class="codex-usage-pill" :class="usagePill(codexStatus.primary.usedPercent)" x-show="codexStatus.primary.available">
-                  <span class="cup-window" x-text="codexStatus.primary.label"></span>
-                  <span class="cup-metric">
-                    <span class="cup-label">已用</span>
-                    <strong class="cup-pct" x-text="Math.round(codexStatus.primary.usedPercent) + '%'"></strong>
-                  </span>
-                  <span class="cup-metric cup-left">
-                    <span class="cup-label">剩余</span>
-                    <strong x-text="Math.round(codexStatus.primary.leftPercent) + '%'"></strong>
-                  </span>
-                  <span class="cup-bar">
-                    <span class="cup-fill" :style="'width:' + Math.min(codexStatus.primary.usedPercent, 100) + '%'"></span>
-                  </span>
-                  <span class="cup-reset" x-show="codexStatus.primary.resetIn">
-                    ↻ <span x-text="codexStatus.primary.resetIn"></span>
-                  </span>
-                </div>
-                <div class="codex-usage-pill" :class="usagePill(codexStatus.secondary.usedPercent)" x-show="codexStatus.secondary.available">
-                  <span class="cup-window" x-text="codexStatus.secondary.label"></span>
-                  <span class="cup-metric">
-                    <span class="cup-label">已用</span>
-                    <strong class="cup-pct" x-text="Math.round(codexStatus.secondary.usedPercent) + '%'"></strong>
-                  </span>
-                  <span class="cup-metric cup-left">
-                    <span class="cup-label">剩余</span>
-                    <strong x-text="Math.round(codexStatus.secondary.leftPercent) + '%'"></strong>
-                  </span>
-                  <span class="cup-bar">
-                    <span class="cup-fill" :style="'width:' + Math.min(codexStatus.secondary.usedPercent, 100) + '%'"></span>
-                  </span>
-                  <span class="cup-reset" x-show="codexStatus.secondary.resetIn">
-                    ↻ <span x-text="codexStatus.secondary.resetIn"></span>
-                  </span>
-                </div>
-              </div>
-              <p class="codex-usage-meta text-sm">
-                <span x-show="codexStatus.planType">计划：<strong x-text="codexStatus.planType"></strong></span>
-                <span x-show="codexStatus.limitReached">限制：<strong x-text="codexStatus.limitReached"></strong></span>
-                <span x-show="codexStatus.snapshotAt">快照：<strong x-text="codexStatus.snapshotAt"></strong></span>
-              </p>
-            </div>
-          </template>
-          <template x-if="!codexStatus.hasUsageData">
-            <p class="muted text-sm" style="margin-top:10px">
-              未找到 Codex 用量快照。需要本机 Codex 会话写入 rate limit 数据后才会显示。
-            </p>
-          </template>
         </div>
-      </template>
-    </section>
 
-    <!-- ── AI 调用日志 ──────────────────────────────────────────────── -->
-    <section class="settings-section ai-trace-section">
-      <div class="section-header-row">
-        <h3>📡 调用日志</h3>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="badge" x-text="aiTraces.length + ' 条'" style="font-variant-numeric:tabular-nums"></span>
-          <button class="btn-sm btn-ghost" @click="clearAITracesLog()" x-show="aiTraces.length > 0">清空</button>
-        </div>
-      </div>
-
-      <div x-show="aiTraces.length === 0" class="muted text-sm" style="padding:14px 0">
-        暂无记录。发起任意 AI 操作后，完整的请求与响应会实时出现在这里。
-      </div>
-
-      <div class="ai-trace-list" x-show="aiTraces.length > 0">
-        <template x-for="t in aiTraces" :key="t.id">
-          <div class="ai-trace-item" :class="t.error ? 'ai-trace-error' : 'ai-trace-ok'">
-            <!-- row header (always visible) -->
-            <div class="ai-trace-row" @click="toggleAITrace(t.id)">
-              <span class="ai-trace-status-dot" :class="t.error ? 'dot-error' : 'dot-ok'"></span>
-              <span class="ai-trace-op" x-text="t.op"></span>
-              <span class="ai-trace-model muted text-sm" x-text="t.model"></span>
-              <span class="ai-trace-dur text-sm" x-text="t.durationMs + 'ms'"></span>
-              <span class="ai-trace-time muted text-sm" x-text="t.at"></span>
-              <span class="ai-trace-chevron muted" x-text="aiTraceExpanded[t.id] ? '▲' : '▼'"></span>
-            </div>
-
-            <!-- error summary (always visible if error) -->
-            <div x-show="t.error" class="ai-trace-error-line text-sm" x-text="t.error"></div>
-
-            <!-- expanded detail -->
-            <div x-show="aiTraceExpanded[t.id]" class="ai-trace-detail">
-              <div class="ai-trace-block-label">URL</div>
-              <pre class="ai-trace-block ai-trace-url" x-text="t.url"></pre>
-
-              <div class="ai-trace-block-label">System Prompt</div>
-              <pre class="ai-trace-block" x-text="t.systemPrompt"></pre>
-
-              <div class="ai-trace-block-label">User Prompt</div>
-              <pre class="ai-trace-block" x-text="t.userPrompt"></pre>
-
-              <div class="ai-trace-block-label" x-text="t.error ? '原始响应 / 错误' : '原始响应'"></div>
-              <pre class="ai-trace-block" :class="t.error ? 'ai-trace-block-err' : ''" x-text="t.rawResponse || t.error"></pre>
-            </div>
-          </div>
-        </template>
-      </div>
-    </section>
+      </div><!-- /ai-content -->
+    </div><!-- /ai-layout -->
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════

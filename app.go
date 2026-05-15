@@ -91,6 +91,7 @@ type ClaudeCodeStatus struct {
 	FiveHourReset   string   `json:"fiveHourReset"`
 	SevenDayPct     float64  `json:"sevenDayPct"`
 	SevenDayReset   string   `json:"sevenDayReset"`
+	PlanType        string   `json:"planType"`
 }
 
 type CodexUsageStatus struct {
@@ -138,6 +139,13 @@ func (a *App) startup(ctx context.Context) {
 	a.store = st
 
 	a.restoreServices()
+
+	// Prune old trace files on startup
+	go func() {
+		if dir, err := a.traceDir(); err == nil {
+			pruneTraceFiles(dir, a.traceRetainDays())
+		}
+	}()
 }
 
 // restoreServices rebuilds ServiceManager instances for service-type scripts
@@ -562,6 +570,52 @@ func (a *App) ApplyZshrcOrganization(content string) (ZshrcApplyResult, error) {
 	return ZshrcApplyResult{ZshrcPath: p, BackupPath: backup}, nil
 }
 
+// AppDataPaths holds all configurable directory paths.
+type AppDataPaths struct {
+	TraceLogDir      string `json:"traceLogDir"`
+	TraceLogDirIsSet bool   `json:"traceLogDirIsSet"` // true if user-configured (not default)
+	SkillsDir        string `json:"skillsDir"`
+	SkillsDirIsSet   bool   `json:"skillsDirIsSet"`
+	DefaultTraceDir  string `json:"defaultTraceDir"`
+	DefaultSkillsDir string `json:"defaultSkillsDir"`
+}
+
+// GetAppDataPaths returns current path configuration with effective values.
+func (a *App) GetAppDataPaths() AppDataPaths {
+	a.mu.RLock()
+	traceCfg := a.cfg.TraceLogDir
+	skillsCfg := a.cfg.SkillsDir
+	a.mu.RUnlock()
+
+	defTrace := defaultTraceDir()
+	defSkills := defaultSkillsDir()
+
+	return AppDataPaths{
+		TraceLogDir:      orDefault(traceCfg, defTrace),
+		TraceLogDirIsSet: traceCfg != "",
+		SkillsDir:        orDefault(skillsCfg, defSkills),
+		SkillsDirIsSet:   skillsCfg != "",
+		DefaultTraceDir:  defTrace,
+		DefaultSkillsDir: defSkills,
+	}
+}
+
+func orDefault(v, fallback string) string {
+	if v != "" {
+		return v
+	}
+	return fallback
+}
+
+// SaveAppDataPaths saves custom directory overrides (empty string = reset to default).
+func (a *App) SaveAppDataPaths(traceLogDir, skillsDir string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.TraceLogDir = strings.TrimSpace(traceLogDir)
+	a.cfg.SkillsDir = strings.TrimSpace(skillsDir)
+	return a.cfg.Save()
+}
+
 func (a *App) GetAutoLaunchEnabled() bool {
 	return autostart.Enabled()
 }
@@ -682,22 +736,6 @@ func validateAIConfig(ai config.AIConfig) error {
 	return nil
 }
 
-// GetAITraces returns the in-memory trace log of recent AI calls (newest first).
-func (a *App) GetAITraces() []AICallTrace {
-	a.tracesMu.Lock()
-	defer a.tracesMu.Unlock()
-	out := make([]AICallTrace, len(a.traces))
-	copy(out, a.traces)
-	return out
-}
-
-// ClearAITraces empties the in-memory AI call log.
-func (a *App) ClearAITraces() {
-	a.tracesMu.Lock()
-	defer a.tracesMu.Unlock()
-	a.traces = nil
-}
-
 func (a *App) callAI(ai config.AIConfig, systemPrompt, userPrompt string) (string, error) {
 	return a.callAIOp("unknown", ai, systemPrompt, userPrompt)
 }
@@ -801,12 +839,20 @@ func (a *App) callAIOp(op string, ai config.AIConfig, systemPrompt, userPrompt s
 
 func (a *App) recordTrace(t AICallTrace) {
 	a.tracesMu.Lock()
-	// Prepend newest first, cap at maxTraces
 	a.traces = append([]AICallTrace{t}, a.traces...)
 	if len(a.traces) > maxTraces {
 		a.traces = a.traces[:maxTraces]
 	}
 	a.tracesMu.Unlock()
+
+	// Persist and prune (best-effort, non-blocking)
+	go func() {
+		if dir, err := a.traceDir(); err == nil {
+			appendTraceFile(dir, t)
+			pruneTraceFiles(dir, a.traceRetainDays())
+		}
+	}()
+
 	// Notify frontend in real-time
 	if a.ctx != nil {
 		wailsRuntime.EventsEmit(a.ctx, "ai:trace", t)
@@ -919,8 +965,8 @@ func (a *App) autoSource() {
 func (a *App) GetClaudeCodeStatus() ClaudeCodeStatus {
 	st := ClaudeCodeStatus{}
 
-	claudePath, err := exec.LookPath("claude")
-	if err == nil && claudePath != "" {
+	claudePath := findCLI("claude")
+	if claudePath != "" {
 		st.ClaudeInstalled = true
 		out, _ := exec.Command(claudePath, "--version").Output()
 		st.ClaudeVersion = strings.TrimSpace(string(out))
@@ -933,6 +979,7 @@ func (a *App) GetClaudeCodeStatus() ClaudeCodeStatus {
 	data, err := os.ReadFile(cachePath)
 	if err == nil {
 		var cache struct {
+			PlanType   string `json:"plan_type"`
 			RateLimits struct {
 				FiveHour struct {
 					UsedPercentage float64 `json:"used_percentage"`
@@ -946,6 +993,7 @@ func (a *App) GetClaudeCodeStatus() ClaudeCodeStatus {
 		}
 		if json.Unmarshal(data, &cache) == nil {
 			st.HasUsageData = true
+			st.PlanType = cache.PlanType
 			st.FiveHourPct = cache.RateLimits.FiveHour.UsedPercentage
 			st.FiveHourReset = formatResetCountdown(cache.RateLimits.FiveHour.ResetsAt)
 			st.SevenDayPct = cache.RateLimits.SevenDay.UsedPercentage
@@ -989,16 +1037,21 @@ func (a *App) GetCodexUsageStatus() CodexUsageStatus {
 	return st
 }
 
-func findCodexCLI() string {
-	if path, err := exec.LookPath("codex"); err == nil && path != "" {
+// findCLI locates a CLI binary by name. Tries LookPath first (works in shell
+// launches), then falls back to a login-shell probe so GUI-launched apps can
+// find tools installed in ~/.local/bin, ~/.npm-global/bin, brew prefix, etc.
+func findCLI(name string) string {
+	if path, err := exec.LookPath(name); err == nil && path != "" {
 		return path
 	}
-	out, err := exec.Command("/bin/zsh", "-l", "-c", "command -v codex").Output()
+	out, err := exec.Command("/bin/zsh", "-l", "-c", "command -v "+name).Output()
 	if err != nil {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
 }
+
+func findCodexCLI() string { return findCLI("codex") }
 
 func detectVPNInterfaces() (bool, []string) {
 	ifOut, _ := exec.Command("ifconfig").Output()
@@ -1163,6 +1216,191 @@ func maxFloat64(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+// ─── AI trace file persistence ───────────────────────────────────────────────
+
+const defaultTraceRetainDays = 3
+
+// AITraceFileInfo describes one day's trace file for the UI.
+type AITraceFileInfo struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
+	Bytes int64  `json:"bytes"`
+}
+
+// AITraceStorageInfo is returned by GetAITraceStorageInfo.
+type AITraceStorageInfo struct {
+	Dir         string            `json:"dir"`
+	RetainDays  int               `json:"retainDays"`
+	Files       []AITraceFileInfo `json:"files"`
+	TotalBytes  int64             `json:"totalBytes"`
+	TotalTraces int               `json:"totalTraces"`
+}
+
+func (a *App) traceDir() (string, error) {
+	a.mu.RLock()
+	custom := a.cfg.TraceLogDir
+	a.mu.RUnlock()
+	if custom != "" {
+		return custom, os.MkdirAll(custom, 0o755)
+	}
+	cfgDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(cfgDir, "Hatch", "traces")
+	return dir, os.MkdirAll(dir, 0o755)
+}
+
+// defaultTraceDir returns the default trace directory path (not creating it).
+func defaultTraceDir() string {
+	cfgDir, _ := os.UserConfigDir()
+	return filepath.Join(cfgDir, "Hatch", "traces")
+}
+
+func traceFilePath(dir, date string) string {
+	return filepath.Join(dir, date+".jsonl")
+}
+
+func (a *App) traceRetainDays() int {
+	a.mu.RLock()
+	d := a.cfg.AI.TraceRetainDays
+	a.mu.RUnlock()
+	if d <= 0 {
+		return defaultTraceRetainDays
+	}
+	return d
+}
+
+// appendTraceFile appends one trace as a JSON line to today's file.
+func appendTraceFile(dir string, t AICallTrace) {
+	line, err := json.Marshal(t)
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile(traceFilePath(dir, time.Now().Format("2006-01-02")),
+		os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.Write(append(line, '\n'))
+}
+
+// pruneTraceFiles deletes JSONL files older than retainDays.
+func pruneTraceFiles(dir string, retainDays int) {
+	cutoff := time.Now().AddDate(0, 0, -retainDays)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".jsonl" {
+			continue
+		}
+		date := strings.TrimSuffix(e.Name(), ".jsonl")
+		t, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			continue
+		}
+		if t.Before(cutoff) {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
+}
+
+// readTracesFromFiles reads all traces from the last retainDays days (newest first).
+func readTracesFromFiles(dir string, retainDays int) []AICallTrace {
+	var all []AICallTrace
+	for i := 0; i < retainDays; i++ {
+		date := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
+		data, err := os.ReadFile(traceFilePath(dir, date))
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+		// Read lines in reverse (newest last in file → put at front)
+		for j := len(lines) - 1; j >= 0; j-- {
+			line := strings.TrimSpace(lines[j])
+			if line == "" {
+				continue
+			}
+			var t AICallTrace
+			if json.Unmarshal([]byte(line), &t) == nil {
+				all = append(all, t)
+			}
+		}
+	}
+	return all
+}
+
+// GetAITraces returns all persisted traces within the retain window (newest first).
+func (a *App) GetAITraces() []AICallTrace {
+	dir, err := a.traceDir()
+	if err != nil {
+		// Fall back to in-memory
+		a.tracesMu.Lock()
+		out := make([]AICallTrace, len(a.traces))
+		copy(out, a.traces)
+		a.tracesMu.Unlock()
+		return out
+	}
+	return readTracesFromFiles(dir, a.traceRetainDays())
+}
+
+// ClearAITraces deletes all trace files and empties the in-memory buffer.
+func (a *App) ClearAITraces() {
+	a.tracesMu.Lock()
+	a.traces = nil
+	a.tracesMu.Unlock()
+	dir, err := a.traceDir()
+	if err != nil {
+		return
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".jsonl" {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
+}
+
+// GetAITraceStorageInfo returns file-level info about persisted traces.
+func (a *App) GetAITraceStorageInfo() AITraceStorageInfo {
+	retainDays := a.traceRetainDays()
+	dir, err := a.traceDir()
+	info := AITraceStorageInfo{Dir: dir, RetainDays: retainDays}
+	if err != nil {
+		return info
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".jsonl" {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil {
+			continue
+		}
+		date := strings.TrimSuffix(e.Name(), ".jsonl")
+		// Count lines = count traces
+		data, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		count := 0
+		for _, l := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			if strings.TrimSpace(l) != "" {
+				count++
+			}
+		}
+		info.Files = append(info.Files, AITraceFileInfo{
+			Date:  date,
+			Count: count,
+			Bytes: fi.Size(),
+		})
+		info.TotalBytes += fi.Size()
+		info.TotalTraces += count
+	}
+	return info
 }
 
 // syncZshrc rebuilds the managed block from cfg.Exports. Caller must hold mu.

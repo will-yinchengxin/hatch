@@ -38,6 +38,17 @@ const CreateScriptFile      = (dirPath, filename, content)  => window['go']['mai
 const SuggestScriptContent  = (path, cur, inst)             => window['go']['main']['App']['SuggestScriptContent'](path, cur, inst);
 const GetAITraces           = ()                            => window['go']['main']['App']['GetAITraces']();
 const ClearAITraces         = ()                            => window['go']['main']['App']['ClearAITraces']();
+const GetAITraceStorageInfo = ()                            => window['go']['main']['App']['GetAITraceStorageInfo']();
+const GetSkills             = ()                            => window['go']['main']['App']['GetSkills']();
+const GetSkillsStats        = ()                            => window['go']['main']['App']['GetSkillsStats']();
+const GetSkillContent       = (name)                        => window['go']['main']['App']['GetSkillContent'](name);
+const SaveSkillContent      = (name, content)               => window['go']['main']['App']['SaveSkillContent'](name, content);
+const DeleteSkill           = (name)                        => window['go']['main']['App']['DeleteSkill'](name);
+const SetSkillSync          = (name, target, enabled)       => window['go']['main']['App']['SetSkillSync'](name, target, enabled);
+const ImportSkillsFrom      = (source)                      => window['go']['main']['App']['ImportSkillsFrom'](source);
+const CreateSkillTemplate   = (name)                        => window['go']['main']['App']['CreateSkillTemplate'](name);
+const GetAppDataPaths       = ()                            => window['go']['main']['App']['GetAppDataPaths']();
+const SaveAppDataPaths      = (traceDir, skillsDir)         => window['go']['main']['App']['SaveAppDataPaths'](traceDir, skillsDir);
 
 window.hatchApp = function () {
   return {
@@ -54,6 +65,8 @@ window.hatchApp = function () {
     loading: false,
     error: '',
     errorTimer: null,
+    success: '',
+    successTimer: null,
 
     statuses: {},
     runningSet: {},
@@ -131,6 +144,36 @@ window.hatchApp = function () {
     // AI trace log
     aiTraces: [],
     aiTraceExpanded: {},
+    aiTraceStorage: null,
+    aiRetainDaysSaving: false,
+    aiTraceCollapsed: true,
+
+    // Skills management
+    skills: [],
+    skillsStats: { total: 0, claude: 0, codex: 0, both: 0 },
+    skillsLoading: false,
+    skillEditTarget: null,   // skill name being edited, or null
+    skillEditContent: '',
+    skillEditSaving: false,
+    skillEditIsNew: false,
+    skillNewName: '',
+    skillSyncBusy: {},       // { "name:target": true }
+    skillImporting: null,    // null | "claude" | "codex"
+    skillImportResult: null,
+
+    // AI sub-navigation
+    aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'tools'
+
+    // Workspace-settings accordion state
+    wsShellOpen: false,
+    wsDirsOpen: true,
+    wsEnvOpen: false,
+    wsZshrcOpen: false,
+
+    // App data paths config
+    dataPaths: {},           // AppDataPaths from Go
+    dataPathsForm: { traceLogDir: '', skillsDir: '' },
+    dataPathsSaving: false,
 
     // ── Computed ───────────────────────────────────────────────────────
     get scriptDirs() {
@@ -204,6 +247,7 @@ window.hatchApp = function () {
     async init() {
       await this.loadConfig();
       await this.scanAll();
+      this.loadDataPaths();
       this.setupEvents();
       setInterval(() => this.refreshStatuses(), 3000);
     },
@@ -216,6 +260,7 @@ window.hatchApp = function () {
           baseUrl: this.cfg.ai?.baseUrl || 'https://api.openai.com/v1',
           apiKey: this.cfg.ai?.apiKey || '',
           model: this.cfg.ai?.model || '',
+          traceRetainDays: this.cfg.ai?.traceRetainDays || 3,
         };
       } catch (e) { this.showError(`加载配置失败: ${e}`);   }
       try { this.zshrcInfo = await CheckZshrc(); } catch (_) {}
@@ -380,6 +425,7 @@ window.hatchApp = function () {
         await this.loadConfig();
         await this.scanAll();
         this.newDir = { path: '', exportName: '', isScriptDir: true };
+        this.showSuccess('目录已添加');
       } catch (e) { this.showError(`添加目录失败: ${e}`);   }
     },
 
@@ -388,6 +434,7 @@ window.hatchApp = function () {
         await RemoveDirectory(path);
         await this.loadConfig();
         await this.scanAll();
+        this.showSuccess('目录已移除');
       } catch (e) { this.showError(`移除目录失败: ${e}`);   }
     },
 
@@ -402,8 +449,10 @@ window.hatchApp = function () {
       try {
         await UpdateDirectoryExport(this.quickExportDir.path, this.quickExportName);
         await this.loadConfig();
+        const name = this.quickExportName;
         this.quickExportDir = null;
         this.quickExportName = '';
+        this.showSuccess(`$${name} 已写入 ~/.zshrc`);
       } catch (e) { this.showError(`设置导出失败: ${e}`);   }
     },
 
@@ -411,6 +460,7 @@ window.hatchApp = function () {
       try {
         await UpdateDirectoryExport(dir.path, '');
         await this.loadConfig();
+        this.showSuccess('路径导出已取消');
       } catch (e) { this.showError(`取消导出失败: ${e}`);   }
     },
 
@@ -419,6 +469,7 @@ window.hatchApp = function () {
       try {
         await SaveExports(this.cfg.exports || []);
         await this.loadConfig();
+        this.showSuccess('环境变量已写入 ~/.zshrc');
       } catch (e) { this.showError(`保存失败: ${e}`);   }
       finally { this.savingExports = false; }
     },
@@ -478,9 +529,10 @@ window.hatchApp = function () {
         await SetAutoLaunchEnabled(next);
         this.autoLaunchEnabled = await GetAutoLaunchEnabled();
         this.cfg.autoLaunch = this.autoLaunchEnabled;
+        this.showSuccess(this.autoLaunchEnabled ? '开机自启已开启' : '开机自启已关闭');
       } catch (e) {
         this.autoLaunchEnabled = !next;
-        this.showError(`设置开机自启失败: ${e}`);  
+        this.showError(`设置开机自启失败: ${e}`);
       } finally {
         this.autoLaunchSaving = false;
       }
@@ -495,9 +547,10 @@ window.hatchApp = function () {
           baseUrl: (this.aiForm.baseUrl || '').trim(),
           apiKey: (this.aiForm.apiKey || '').trim(),
           model: (this.aiForm.model || '').trim(),
+          traceRetainDays: this.aiForm.traceRetainDays || 3,
         });
         await this.loadConfig();
-        this.aiTestResult = '已保存';
+        this.showSuccess('AI 配置已保存');
       } catch (e) {
         this.showError(`保存 AI 配置失败: ${e}`);  
       } finally {
@@ -516,6 +569,7 @@ window.hatchApp = function () {
           model: (this.aiForm.model || '').trim(),
         });
         this.aiTestResult = `连接成功：${result}`;
+        this.showSuccess(`✓ 连接成功：${result}`);
       } catch (e) {
         this.showError(`AI 连接失败: ${e}`);  
       } finally {
@@ -566,6 +620,7 @@ window.hatchApp = function () {
         if (this.selectedDir) await this.scanDir(this.selectedDir);
         else await this.scanAll();
         this.cancelEdit();
+        this.showSuccess('脚本元信息已保存');
       } catch (e) {
         this.showError(`保存失败: ${e}`);  
       } finally {
@@ -581,6 +636,7 @@ window.hatchApp = function () {
         if (this.selectedDir) await this.scanDir(this.selectedDir);
         else await this.scanAll();
         this.cancelEdit();
+        this.showSuccess('已重置为自动检测');
       } catch (e) {
         this.showError(`重置失败: ${e}`);  
       } finally {
@@ -668,6 +724,7 @@ window.hatchApp = function () {
         this.zshrcApplyResult = await ApplyZshrcOrganization(content);
         await this.loadZshrcAnalysis();
         await this.loadConfig();
+        this.showSuccess(`~/.zshrc 已更新，备份于 ${this.zshrcApplyResult?.backupPath?.split('/').pop()}`);
       } catch (e) {
         this.showError(`写入 zshrc 失败: ${e}`);  
       } finally {
@@ -701,6 +758,7 @@ window.hatchApp = function () {
         const e = this.zshrcEntries.find(x => x.key === key);
         if (e) e.note = this.annotationText;
         this.cancelAnnotate();
+        this.showSuccess('备注已保存');
       } catch (e) { this.showError(`保存备注失败: ${e}`);   }
     },
 
@@ -710,6 +768,7 @@ window.hatchApp = function () {
         const e = this.zshrcEntries.find(x => x.key === key);
         if (e) e.note = '';
         this.cancelAnnotate();
+        this.showSuccess('备注已删除');
       } catch (e) { this.showError(`删除备注失败: ${e}`);   }
     },
 
@@ -736,10 +795,141 @@ window.hatchApp = function () {
       this.expandedFns = { ...this.expandedFns, [key]: !this.expandedFns[key] };
     },
 
+    // ── Skills management ─────────────────────────────────────────────
+    async loadSkills() {
+      this.skillsLoading = true;
+      try {
+        [this.skills, this.skillsStats] = await Promise.all([GetSkills(), GetSkillsStats()]);
+        this.skills = this.skills || [];
+      } catch (e) { this.showError(`加载 Skills 失败: ${e}`); }
+      finally { this.skillsLoading = false; }
+    },
+
+    async openSkillEditor(name) {
+      try {
+        this.skillEditContent = await GetSkillContent(name);
+        this.skillEditTarget = name;
+        this.skillEditIsNew = false;
+      } catch (e) { this.showError(`读取 Skill 失败: ${e}`); }
+    },
+
+    async openNewSkillEditor() {
+      const name = (this.skillNewName || '').trim();
+      if (!name) { this.showError('请先输入 Skill 名称'); return; }
+      if (!/^[\w-]+$/.test(name)) { this.showError('名称只能含字母、数字、连字符'); return; }
+      this.skillEditContent = await CreateSkillTemplate(name);
+      this.skillEditTarget = name;
+      this.skillEditIsNew = true;
+      this.skillNewName = '';
+    },
+
+    closeSkillEditor() {
+      this.skillEditTarget = null;
+      this.skillEditContent = '';
+      this.skillEditIsNew = false;
+    },
+
+    async saveSkillContent() {
+      if (!this.skillEditTarget) return;
+      this.skillEditSaving = true;
+      try {
+        const name = this.skillEditTarget;
+        await SaveSkillContent(name, this.skillEditContent);
+        await this.loadSkills();
+        this.closeSkillEditor();
+        this.showSuccess(`Skill「${name}」已保存`);
+      } catch (e) { this.showError(`保存 Skill 失败: ${e}`); }
+      finally { this.skillEditSaving = false; }
+    },
+
+    async deleteSkill(name) {
+      if (!confirm(`确认删除 Skill「${name}」？此操作不会删除 Claude/Codex 中已同步的版本。`)) return;
+      try {
+        await DeleteSkill(name);
+        if (this.skillEditTarget === name) this.closeSkillEditor();
+        await this.loadSkills();
+        this.showSuccess(`Skill「${name}」已删除`);
+      } catch (e) { this.showError(`删除 Skill 失败: ${e}`); }
+    },
+
+    async toggleSkillSync(name, target, enabled) {
+      const key = name + ':' + target;
+      this.skillSyncBusy = { ...this.skillSyncBusy, [key]: true };
+      try {
+        await SetSkillSync(name, target, enabled);
+        // Update local state immediately without full reload
+        const idx = this.skills.findIndex(s => s.name === name);
+        if (idx >= 0) {
+          const s = { ...this.skills[idx] };
+          if (target === 'claude') s.inClaude = enabled;
+          else s.inCodex = enabled;
+          this.skills = [...this.skills.slice(0, idx), s, ...this.skills.slice(idx + 1)];
+        }
+        await GetSkillsStats().then(st => this.skillsStats = st).catch(() => {});
+        const label = target === 'claude' ? 'Claude' : 'Codex';
+        this.showSuccess(enabled ? `「${name}」已同步到 ${label}` : `「${name}」已从 ${label} 移除`);
+      } catch (e) { this.showError(`同步失败: ${e}`); }
+      finally {
+        const b = { ...this.skillSyncBusy };
+        delete b[key];
+        this.skillSyncBusy = b;
+      }
+    },
+
+    async importSkills(source) {
+      this.skillImporting = source;
+      this.skillImportResult = null;
+      try {
+        const r = await ImportSkillsFrom(source);
+        this.skillImportResult = r;
+        await this.loadSkills();
+        const n = (r?.imported || []).length;
+        if (n > 0) this.showSuccess(`已从 ${source === 'claude' ? 'Claude' : 'Codex'} 导入 ${n} 个 Skill`);
+        else this.showSuccess('无新 Skill 可导入（已全部存在）');
+      } catch (e) { this.showError(`导入失败: ${e}`); }
+      finally { this.skillImporting = null; }
+    },
+
+    // ── App data paths ────────────────────────────────────────────────
+    async loadDataPaths() {
+      try {
+        this.dataPaths = await GetAppDataPaths();
+        this.dataPathsForm = {
+          traceLogDir: this.dataPaths.traceLogDir || '',
+          skillsDir: this.dataPaths.skillsDir || '',
+        };
+      } catch (_) {}
+    },
+
+    async saveDataPaths() {
+      this.dataPathsSaving = true;
+      try {
+        await SaveAppDataPaths(
+          (this.dataPathsForm.traceLogDir || '').trim(),
+          (this.dataPathsForm.skillsDir   || '').trim(),
+        );
+        await this.loadDataPaths();
+        this.showSuccess('路径配置已保存');
+      } catch (e) { this.showError(`保存路径失败: ${e}`); }
+      finally { this.dataPathsSaving = false; }
+    },
+
+    async resetDataPaths() {
+      this.dataPathsForm = { traceLogDir: '', skillsDir: '' };
+      await this.saveDataPaths();
+    },
+
     // ── AI trace log ──────────────────────────────────────────────────
     async loadAITraces() {
       try {
         this.aiTraces = await GetAITraces() || [];
+      } catch (_) {}
+      await this.loadTraceStorage();
+    },
+
+    async loadTraceStorage() {
+      try {
+        this.aiTraceStorage = await GetAITraceStorageInfo();
       } catch (_) {}
     },
 
@@ -748,15 +938,36 @@ window.hatchApp = function () {
         await ClearAITraces();
         this.aiTraces = [];
         this.aiTraceExpanded = {};
+        this.aiTraceStorage = null;
+        await this.loadTraceStorage();
+        this.showSuccess('调用日志已清空');
       } catch (_) {}
+    },
+
+    async saveRetainDays(days) {
+      const d = parseInt(days, 10);
+      if (!d || d < 1) return;
+      this.aiRetainDaysSaving = true;
+      try {
+        await SaveAIConfig({ ...this.aiForm, traceRetainDays: d });
+        this.aiForm.traceRetainDays = d;
+        await this.loadTraceStorage();
+        this.showSuccess(`日志保留 ${d} 天`);
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.aiRetainDaysSaving = false;
+      }
     },
 
     toggleAITrace(id) {
       this.aiTraceExpanded = { ...this.aiTraceExpanded, [id]: !this.aiTraceExpanded[id] };
     },
 
-    aiTraceStatus(t) {
-      return t.error ? 'error' : 'ok';
+    formatBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+      return (b / 1024 / 1024).toFixed(1) + ' MB';
     },
 
     zshrcTypeIcon(type) {
@@ -775,6 +986,7 @@ window.hatchApp = function () {
     async loadAIUsageStatuses() {
       if (!this.claudeStatus) this.loadClaudeStatus();
       if (!this.codexStatus) this.loadCodexStatus();
+      if (!this.skills.length) this.loadSkills();
     },
 
     async loadClaudeStatus() {
@@ -830,6 +1042,7 @@ window.hatchApp = function () {
         await WriteScriptFile(this.scriptEditorTarget.path, this.scriptEditorContent);
         if (this.selectedDir) await this.scanDir(this.selectedDir);
         this.closeScriptEditor();
+        this.showSuccess('脚本已保存');
       } catch (e) {
         this.showError(`保存失败: ${e}`);
       } finally {
@@ -877,13 +1090,15 @@ window.hatchApp = function () {
       if (!this.selectedDir || !this.newScriptForm.filename.trim()) return;
       this.newScriptSaving = true;
       try {
+        const fname = this.newScriptForm.filename.trim();
         await CreateScriptFile(
           this.selectedDir.path,
-          this.newScriptForm.filename.trim(),
+          fname,
           this.newScriptForm.content
         );
         await this.scanDir(this.selectedDir);
         this.closeNewScript();
+        this.showSuccess(`脚本「${fname}」已创建`);
       } catch (e) {
         this.showError(`创建失败: ${e}`);
       } finally {
@@ -921,13 +1136,16 @@ window.hatchApp = function () {
       this.error = msg;
       clearTimeout(this.errorTimer);
       if (msg) {
-        this.errorTimer = setTimeout(() => {
-          this.error = '';
-          this.errorTimer = null;
-        }, 6000);
+        this.errorTimer = setTimeout(() => { this.error = ''; this.errorTimer = null; }, 6000);
       } else {
         this.errorTimer = null;
       }
+    },
+
+    showSuccess(msg) {
+      this.success = msg;
+      clearTimeout(this.successTimer);
+      this.successTimer = setTimeout(() => { this.success = ''; this.successTimer = null; }, 3000);
     },
 
     langIcon(lang) {

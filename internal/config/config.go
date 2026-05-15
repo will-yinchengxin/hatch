@@ -53,10 +53,11 @@ type ExportVar struct {
 }
 
 type AIConfig struct {
-	Enabled bool   `json:"enabled"`
-	BaseURL string `json:"baseUrl"`
-	APIKey  string `json:"apiKey"`
-	Model   string `json:"model"`
+	Enabled         bool   `json:"enabled"`
+	BaseURL         string `json:"baseUrl"`
+	APIKey          string `json:"apiKey"`
+	Model           string `json:"model"`
+	TraceRetainDays int    `json:"traceRetainDays,omitempty"` // 0 → default (3)
 }
 
 type Config struct {
@@ -66,6 +67,8 @@ type Config struct {
 	ZshrcAnnotations map[string]string     `json:"zshrcAnnotations,omitempty"`
 	AI               AIConfig              `json:"ai,omitempty"`
 	AutoLaunch       bool                  `json:"autoLaunch,omitempty"`
+	TraceLogDir      string                `json:"traceLogDir,omitempty"`  // AI call log dir, default: <configDir>/Hatch/traces
+	SkillsDir        string                `json:"skillsDir,omitempty"`    // skills master dir, default: <configDir>/Hatch/skills
 }
 
 func defaultPath() (string, error) {
