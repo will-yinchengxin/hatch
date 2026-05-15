@@ -34,6 +34,10 @@ export function GetClaudeCodeStatus() {
   return window['go']['main']['App']['GetClaudeCodeStatus']();
 }
 
+export function GetCodexUsageStatus() {
+  return window['go']['main']['App']['GetCodexUsageStatus']();
+}
+
 export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }

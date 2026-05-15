@@ -20,6 +20,8 @@ export function GetAutoLaunchEnabled():Promise<boolean>;
 
 export function GetClaudeCodeStatus():Promise<main.ClaudeCodeStatus>;
 
+export function GetCodexUsageStatus():Promise<main.CodexUsageStatus>;
+
 export function GetConfig():Promise<config.Config>;
 
 export function GetScriptsByDir(arg1:string):Promise<Array<config.ScriptMeta>>;

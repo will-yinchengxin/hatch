@@ -31,6 +31,7 @@ const ApplyZshrcOrganization = (content) => window['go']['main']['App']['ApplyZs
 const GetAutoLaunchEnabled = () => window['go']['main']['App']['GetAutoLaunchEnabled']();
 const SetAutoLaunchEnabled = (enabled) => window['go']['main']['App']['SetAutoLaunchEnabled'](enabled);
 const GetClaudeCodeStatus   = ()                            => window['go']['main']['App']['GetClaudeCodeStatus']();
+const GetCodexUsageStatus   = ()                            => window['go']['main']['App']['GetCodexUsageStatus']();
 const ReadScriptFile        = (path)                        => window['go']['main']['App']['ReadScriptFile'](path);
 const WriteScriptFile       = (path, content)               => window['go']['main']['App']['WriteScriptFile'](path, content);
 const CreateScriptFile      = (dirPath, filename, content)  => window['go']['main']['App']['CreateScriptFile'](dirPath, filename, content);
@@ -107,6 +108,10 @@ window.hatchApp = function () {
     // Claude Code status
     claudeStatus: null,
     claudeStatusLoading: false,
+
+    // Codex usage status
+    codexStatus: null,
+    codexStatusLoading: false,
 
     // Script content editor
     scriptEditorTarget: null,   // ScriptMeta of the script being edited
@@ -733,7 +738,12 @@ window.hatchApp = function () {
       }[type] || '?';
     },
 
-    // ── Claude Code status ────────────────────────────────────────────
+    // ── Claude Code / Codex usage status ──────────────────────────────
+    async loadAIUsageStatuses() {
+      if (!this.claudeStatus) this.loadClaudeStatus();
+      if (!this.codexStatus) this.loadCodexStatus();
+    },
+
     async loadClaudeStatus() {
       this.claudeStatusLoading = true;
       try {
@@ -745,7 +755,18 @@ window.hatchApp = function () {
       }
     },
 
-    claudeUsagePill(pct) {
+    async loadCodexStatus() {
+      this.codexStatusLoading = true;
+      try {
+        this.codexStatus = await GetCodexUsageStatus();
+      } catch (e) {
+        this.showError(`获取 Codex 用量失败: ${e}`);
+      } finally {
+        this.codexStatusLoading = false;
+      }
+    },
+
+    usagePill(pct) {
       if (pct >= 80) return 'usage-high';
       if (pct >= 50) return 'usage-mid';
       return 'usage-low';

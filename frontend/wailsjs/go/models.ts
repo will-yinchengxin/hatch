@@ -251,6 +251,79 @@ export namespace main {
 	        this.sevenDayReset = source["sevenDayReset"];
 	    }
 	}
+	export class CodexUsageWindow {
+	    label: string;
+	    usedPercent: number;
+	    leftPercent: number;
+	    windowMinutes: number;
+	    resetsAt: number;
+	    resetIn: string;
+	    available: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodexUsageWindow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.usedPercent = source["usedPercent"];
+	        this.leftPercent = source["leftPercent"];
+	        this.windowMinutes = source["windowMinutes"];
+	        this.resetsAt = source["resetsAt"];
+	        this.resetIn = source["resetIn"];
+	        this.available = source["available"];
+	    }
+	}
+	export class CodexUsageStatus {
+	    codexInstalled: boolean;
+	    codexVersion: string;
+	    vpnConnected: boolean;
+	    vpnInterfaces: string[];
+	    hasUsageData: boolean;
+	    planType: string;
+	    limitReached: string;
+	    snapshotAt: string;
+	    primary: CodexUsageWindow;
+	    secondary: CodexUsageWindow;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodexUsageStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.codexInstalled = source["codexInstalled"];
+	        this.codexVersion = source["codexVersion"];
+	        this.vpnConnected = source["vpnConnected"];
+	        this.vpnInterfaces = source["vpnInterfaces"];
+	        this.hasUsageData = source["hasUsageData"];
+	        this.planType = source["planType"];
+	        this.limitReached = source["limitReached"];
+	        this.snapshotAt = source["snapshotAt"];
+	        this.primary = this.convertValues(source["primary"], CodexUsageWindow);
+	        this.secondary = this.convertValues(source["secondary"], CodexUsageWindow);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ZshrcApplyResult {
 	    zshrcPath: string;
 	    backupPath: string;

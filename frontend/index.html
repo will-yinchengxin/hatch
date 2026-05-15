@@ -27,7 +27,7 @@
     <nav class="tab-nav" x-show="!selectedDir">
       <button class="tab" :class="tab==='scripts'  ? 'active' : ''" @click="tab='scripts'">📜 脚本</button>
       <button class="tab" :class="tab==='settings' ? 'active' : ''" @click="tab='settings'">⚙ 设置</button>
-      <button class="tab" :class="tab==='ai' ? 'active' : ''" @click="tab='ai'">✦ AI</button>
+      <button class="tab" :class="tab==='ai' ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses()">✦ AI</button>
     </nav>
 
     <div class="header-right">
@@ -645,7 +645,7 @@
         <h3>⚡ Claude Code 用量</h3>
         <button class="btn-sm" @click="loadClaudeStatus()" :aria-busy="claudeStatusLoading">↻ 检测</button>
       </div>
-      <p class="hint">检测本地是否安装了 claude CLI 和 VPN，并读取速率限制用量缓存。</p>
+      <p class="hint">检测本地是否安装了 claude CLI 和 VPN，并读取 Claude Code 速率限制用量缓存。</p>
 
       <template x-if="!claudeStatus && !claudeStatusLoading">
         <p class="muted text-sm">点击「↻ 检测」获取 Claude Code 状态。</p>
@@ -653,7 +653,6 @@
 
       <template x-if="claudeStatus">
         <div class="claude-status-card">
-          <!-- Row 1: install + VPN -->
           <div class="claude-status-row">
             <div class="claude-status-item">
               <span class="claude-status-icon" :class="claudeStatus.claudeInstalled ? 'icon-ok' : 'icon-off'">
@@ -661,7 +660,7 @@
               </span>
               <div>
                 <div class="claude-status-label">claude CLI</div>
-                <div class="claude-status-value" x-text="claudeStatus.claudeInstalled ? claudeStatus.claudeVersion : '未安装'"></div>
+                <div class="claude-status-value" x-text="claudeStatus.claudeInstalled ? (claudeStatus.claudeVersion || '已安装') : '未安装'"></div>
               </div>
             </div>
             <div class="claude-status-item">
@@ -682,12 +681,18 @@
             </div>
           </div>
 
-          <!-- Row 2: usage pills -->
           <template x-if="claudeStatus.hasUsageData">
             <div class="claude-usage-row">
-              <div class="claude-usage-pill" :class="claudeUsagePill(claudeStatus.fiveHourPct)">
+              <div class="claude-usage-pill" :class="usagePill(claudeStatus.fiveHourPct)">
                 <span class="cup-window">5h</span>
-                <span class="cup-pct" x-text="Math.round(claudeStatus.fiveHourPct) + '%'"></span>
+                <span class="cup-metric">
+                  <span class="cup-label">已用</span>
+                  <strong class="cup-pct" x-text="Math.round(claudeStatus.fiveHourPct) + '%'"></strong>
+                </span>
+                <span class="cup-metric cup-left">
+                  <span class="cup-label">剩余</span>
+                  <strong x-text="Math.max(0, 100 - Math.round(claudeStatus.fiveHourPct)) + '%'"></strong>
+                </span>
                 <span class="cup-bar">
                   <span class="cup-fill" :style="'width:' + Math.min(claudeStatus.fiveHourPct, 100) + '%'"></span>
                 </span>
@@ -695,9 +700,16 @@
                   ↻ <span x-text="claudeStatus.fiveHourReset"></span>
                 </span>
               </div>
-              <div class="claude-usage-pill" :class="claudeUsagePill(claudeStatus.sevenDayPct)">
+              <div class="claude-usage-pill" :class="usagePill(claudeStatus.sevenDayPct)">
                 <span class="cup-window">7d</span>
-                <span class="cup-pct" x-text="Math.round(claudeStatus.sevenDayPct) + '%'"></span>
+                <span class="cup-metric">
+                  <span class="cup-label">已用</span>
+                  <strong class="cup-pct" x-text="Math.round(claudeStatus.sevenDayPct) + '%'"></strong>
+                </span>
+                <span class="cup-metric cup-left">
+                  <span class="cup-label">剩余</span>
+                  <strong x-text="Math.max(0, 100 - Math.round(claudeStatus.sevenDayPct)) + '%'"></strong>
+                </span>
                 <span class="cup-bar">
                   <span class="cup-fill" :style="'width:' + Math.min(claudeStatus.sevenDayPct, 100) + '%'"></span>
                 </span>
@@ -708,8 +720,114 @@
             </div>
           </template>
           <template x-if="!claudeStatus.hasUsageData">
+            <div style="margin-top:10px">
+              <template x-if="!claudeStatus.claudeInstalled">
+                <p class="muted text-sm">⚠ claude CLI 未安装，请先安装 Claude Code（<code>npm i -g @anthropic-ai/claude-code</code>）。</p>
+              </template>
+              <template x-if="claudeStatus.claudeInstalled && !claudeStatus.vpnConnected">
+                <p class="muted text-sm">⚠ 未检测到 VPN 连接，Claude Code 需要 VPN 才能正常访问 API 并写入用量缓存。</p>
+              </template>
+              <template x-if="claudeStatus.claudeInstalled && claudeStatus.vpnConnected">
+                <p class="muted text-sm">ℹ 未找到用量缓存文件（<code>~/.cache/will-statusline/last.json</code>）。需要本地 statusline 工具运行并写入数据后才会显示。</p>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+    </section>
+
+    <!-- Codex Usage Status -->
+    <section class="settings-section">
+      <div class="section-header-row">
+        <h3>⚡ Codex 用量</h3>
+        <button class="btn-sm" @click="loadCodexStatus()" :aria-busy="codexStatusLoading">↻ 检测</button>
+      </div>
+      <p class="hint">检测本地是否安装了 Codex CLI 和 VPN，并读取本机 Codex 会话里的速率限制快照。</p>
+
+      <template x-if="!codexStatus && !codexStatusLoading">
+        <p class="muted text-sm">点击「↻ 检测」获取 Codex 用量状态。</p>
+      </template>
+
+      <template x-if="codexStatus">
+        <div class="codex-status-card">
+          <!-- Row 1: install + VPN -->
+          <div class="codex-status-row">
+            <div class="codex-status-item">
+              <span class="codex-status-icon" :class="codexStatus.codexInstalled ? 'icon-ok' : 'icon-off'">
+                <span x-text="codexStatus.codexInstalled ? '✓' : '✕'"></span>
+              </span>
+              <div>
+                <div class="codex-status-label">Codex CLI</div>
+                <div class="codex-status-value" x-text="codexStatus.codexInstalled ? (codexStatus.codexVersion || '已安装') : '未安装'"></div>
+              </div>
+            </div>
+            <div class="codex-status-item">
+              <span class="codex-status-icon" :class="codexStatus.vpnConnected ? 'icon-ok' : 'icon-off'">
+                <span x-text="codexStatus.vpnConnected ? '✓' : '○'"></span>
+              </span>
+              <div>
+                <div class="codex-status-label">VPN</div>
+                <div class="codex-status-value">
+                  <span x-show="codexStatus.vpnConnected">
+                    <template x-for="iface in codexStatus.vpnInterfaces" :key="iface">
+                      <code class="iface-tag" x-text="iface"></code>
+                    </template>
+                  </span>
+                  <span x-show="!codexStatus.vpnConnected" class="muted">未检测到 VPN</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2: usage pills -->
+          <template x-if="codexStatus.hasUsageData">
+            <div>
+              <div class="codex-usage-row">
+                <div class="codex-usage-pill" :class="usagePill(codexStatus.primary.usedPercent)" x-show="codexStatus.primary.available">
+                  <span class="cup-window" x-text="codexStatus.primary.label"></span>
+                  <span class="cup-metric">
+                    <span class="cup-label">已用</span>
+                    <strong class="cup-pct" x-text="Math.round(codexStatus.primary.usedPercent) + '%'"></strong>
+                  </span>
+                  <span class="cup-metric cup-left">
+                    <span class="cup-label">剩余</span>
+                    <strong x-text="Math.round(codexStatus.primary.leftPercent) + '%'"></strong>
+                  </span>
+                  <span class="cup-bar">
+                    <span class="cup-fill" :style="'width:' + Math.min(codexStatus.primary.usedPercent, 100) + '%'"></span>
+                  </span>
+                  <span class="cup-reset" x-show="codexStatus.primary.resetIn">
+                    ↻ <span x-text="codexStatus.primary.resetIn"></span>
+                  </span>
+                </div>
+                <div class="codex-usage-pill" :class="usagePill(codexStatus.secondary.usedPercent)" x-show="codexStatus.secondary.available">
+                  <span class="cup-window" x-text="codexStatus.secondary.label"></span>
+                  <span class="cup-metric">
+                    <span class="cup-label">已用</span>
+                    <strong class="cup-pct" x-text="Math.round(codexStatus.secondary.usedPercent) + '%'"></strong>
+                  </span>
+                  <span class="cup-metric cup-left">
+                    <span class="cup-label">剩余</span>
+                    <strong x-text="Math.round(codexStatus.secondary.leftPercent) + '%'"></strong>
+                  </span>
+                  <span class="cup-bar">
+                    <span class="cup-fill" :style="'width:' + Math.min(codexStatus.secondary.usedPercent, 100) + '%'"></span>
+                  </span>
+                  <span class="cup-reset" x-show="codexStatus.secondary.resetIn">
+                    ↻ <span x-text="codexStatus.secondary.resetIn"></span>
+                  </span>
+                </div>
+              </div>
+              <p class="codex-usage-meta text-sm">
+                <span x-show="codexStatus.planType">计划：<strong x-text="codexStatus.planType"></strong></span>
+                <span x-show="codexStatus.limitReached">限制：<strong x-text="codexStatus.limitReached"></strong></span>
+                <span x-show="codexStatus.snapshotAt">快照：<strong x-text="codexStatus.snapshotAt"></strong></span>
+              </p>
+            </div>
+          </template>
+          <template x-if="!codexStatus.hasUsageData">
             <p class="muted text-sm" style="margin-top:10px">
-              未找到用量缓存。需要 claude CLI 活跃会话写入速率限制数据。
+              未找到 Codex 用量快照。需要本机 Codex 会话写入 rate limit 数据后才会显示。
             </p>
           </template>
         </div>
