@@ -5,7 +5,7 @@
 ```
 tab = 'scripts' | 'ai'   (settings removed — accordion on scripts home)
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'tools'
+aiSubTab = 'overview' | 'connect' | 'skills' | 'tools' | 'prompts' | 'data'
 
 scripts + !selectedDir  →  Directory cards + workspace-settings accordion
 scripts + selectedDir   →  Script list
@@ -38,6 +38,12 @@ editTarget != null      →  Edit drawer overlay
 | `wsShellOpen / wsDirsOpen / wsEnvOpen / wsZshrcOpen` | Workspace accordion states |
 | `success / successTimer` | Success toast (3s auto-dismiss) |
 | `error` | Error toast (6s auto-dismiss) |
+| `historyTarget / historyRecords / historyOpenId / historyLogText / historyLoading` | v1.1 run-history modal |
+| `editForm.envPairs / .notifyOnDone / .schedule / .requiresRaw / .healthUrl / .preScriptsRaw` | v1.1/v1.2/v1.3 edit-drawer fields |
+| `promptTemplates / promptDefaults / promptDefaultsOpen / promptOps / promptSaving` | v1.2 Prompt sub-tab |
+| `dataInventory / retention / retentionSaving` | v1.3 Data sub-tab |
+| `aiProviders / activeProviderID / quickAIOpen / quickAIActiveID / quickAITraceID` | Header quick-AI popover |
+| `skillAIInstruction / skillAIBusy` | v1.3 Skill ✦ AI optimize bar |
 
 ### Toast System
 
@@ -76,7 +82,7 @@ Warm off-white, charcoal text, muted clay accent. **No neon/cold-blue dark theme
 
 ## Layout Structure
 
-- Sticky header (52px, blur) — logo left · tab nav center · search+refresh right
+- Sticky header (52px, blur) — logo left · tab nav center · search + refresh + **`✦ 当前 provider ▼` quick-AI button** + autostart toggle right
 - Content: `max-width: 1080px`, centered, `padding: 24px 22px 44px`
 - `page-hero` band: eyebrow + h1 + subtitle + stat row
 - Responsive at 820px — cards/forms go single-column, drawer full-width
@@ -87,7 +93,7 @@ Warm off-white, charcoal text, muted clay accent. **No neon/cold-blue dark theme
 <main class="ai-main">
   <section class="page-hero ai-hero"> ... hero stats ... </section>
   <div class="ai-layout">
-    <nav class="ai-sidenav"> 4 sub-tab buttons </nav>
+    <nav class="ai-sidenav"> 6 sub-tab buttons (overview/connect/skills/tools/prompts/data) </nav>
     <div class="ai-content"> sub-tab content panels </div>
   </div>
 </main>
@@ -115,9 +121,9 @@ Regular cards show label (small caps, muted) + large value.
 
 ## Edit Drawer Flow
 
-1. `openEdit(s)` populates `editForm` from script meta
-2. User edits name/desc/tags/type/commands/pidFile/needsArgs/presets
-3. `saveEdit()` → `SaveScriptMeta()` → `scanDir()` → close
+1. `openEdit(s)` populates `editForm` from script meta — including `envPairs`, `notifyOnDone`, `schedule`, `requiresRaw`, `healthUrl`, `preScriptsRaw`
+2. User edits any field; the drawer is the **only** place to configure all per-script behavior
+3. `saveEdit()` packages everything (including `env` map and `preScripts` array) → `SaveScriptMeta()` → `scanDir()` → re-applies scheduler
 4. `resetEdit()` → `DeleteScriptMeta()` → auto-detection resumes
 5. `✦ 智能填写` → `SuggestScriptMeta()` → fills form → user saves manually
 
@@ -148,3 +154,49 @@ Sections (wsShellOpen / wsDirsOpen / wsEnvOpen / wsZshrcOpen):
 | `other` | `"other:N"` |
 
 Positional keys (`source:N`, `other:N`, `comment:N`) change when the file is edited.
+
+---
+
+## v1.1 – v1.3 UI Surfaces
+
+### Run-history modal (`historyTarget`)
+- Wide modal (900px) reusing `.se-modal` + `.history-modal-wide`
+- Each record: `.history-record` card with status mark, timestamp, args, expandable log `<pre>`
+- Actions: `▶ 重跑` (reuses `runScript` with archived args), `📋 日志` (toggle full log), `✕` delete
+- Backend: `ListRuns(path) / GetRunLog(path,id) / DeleteRun(path,id)` — dynamic bindings, not in wailsjs until rebuild
+
+### Prompt sub-tab (`aiSubTab='prompts'`)
+- `.prompt-card` per op (5 fixed ops in `promptOps`)
+- Header: title + op key + `● 已覆盖`/`○ 使用默认` badge + `查看默认` + `↓ 以默认为模板`
+- `.prompt-default-block` — read-only dark pre showing built-in default
+- Backend: `GetDefaultPrompts()` returns canonical defaults; UI must keep `promptOps` list in sync with backend keys (`SuggestScriptMeta / SuggestScriptContent / SuggestZshrcAnnotation / SuggestZshrcOrganization / TestAIConfig / SuggestSkillContent`)
+
+### Data sub-tab (`aiSubTab='data'`)
+- `.retention-form` 4-col grid: trace days / runs days / per-name cap / save
+- `.data-dir-card` per directory from `GetAppDataInventory()`
+- `📂` calls `OpenFile(path)` (macOS `open`); `🗑` calls `CleanupDataDir(key)` only when `d.cleanable`
+- `formatBytes(n)` / `formatTime(unix)` helpers in `main.js`
+
+### Skill editor `✦ AI` bar
+- `.se-ai-bar.skill-ai-bar` mirrors the script-editor AI bar
+- `optimizeSkillWithAI()` → `SuggestSkillContent(name, current, instruction)` — overwrites `skillEditContent`, user reviews then saves
+
+### Header quick-AI popover (`quickAIOpen`)
+- `.quick-ai-wrap` + absolute-positioned `.quick-ai-popover` (420px)
+- Outside-click closes via `@click.outside`
+- Model switcher binds to `aiProviders`; `switchQuickAIProvider()` calls `SaveAIProviders(providers, newActiveID)` and syncs `aiForm`
+- Trace list shows newest 8; click to expand inline `.quick-ai-trace-pre` (user prompt + raw response)
+
+---
+
+## CSS Class Conventions (v1.1+)
+
+All new feature CSS is appended to `style.css` under the `v1.1 – v1.3 additions` section. **Do not add inline `style=` for any new feature** — extract to a named class. Existing inline styles are pre-existing and left alone for now.
+
+Class prefixes by feature:
+- `history-*` — run history modal
+- `prompt-*` — Prompt sub-tab cards
+- `data-dir-*` / `retention-*` — Data sub-tab
+- `quick-ai-*` — header popover
+- `field-hint`, `ok-mark`, `err-mark` — shared small atoms
+

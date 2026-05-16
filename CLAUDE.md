@@ -8,7 +8,7 @@ Target: Apple Silicon, no App Store, no Apple Developer account.
 | Layer | Technology |
 |---|---|
 | Desktop shell | Wails v2 — embeds Go binary + WKWebView |
-| Backend | Go 1.21+ |
+| Backend | Go 1.23+ |
 | Frontend | Alpine.js + Pico.css v2 + Vite |
 | Styling | Custom CSS variables, Anthropic-inspired warm light theme |
 | Config | JSON at `~/Library/Application Support/Hatch/config.json` |
@@ -23,20 +23,31 @@ Make targets: `dev / test / build / build-clean / sign / dmg / release / install
 
 ```
 hatch/
-├── app.go                    # All Go methods bound to the frontend (the "API")
-├── main.go                   # Wails entry point
+├── app.go                  # App struct + startup; method set is split below.
+├── app_scripts.go          # Directory CRUD + scanning + SaveScriptMeta
+├── app_executor.go         # RunScript / ServiceAction / Run history / scriptEnv
+├── app_zshrc.go            # zshrc parse / annotate / AI organize
+├── app_ai.go               # AI providers / Suggest* / callAIOp / trace emit
+├── app_observability.go    # Claude/Codex status / trace persistence / macOS notify
+├── app_files.go            # Script files / AppDataPaths / AutoLaunch / DocLinks
+├── app_v12.go              # v1.2: scheduler / health-check / prompt templates / stream
+├── app_v13.go              # v1.3: PATH health / backup-restore / pre-script chain
+├── app_datadir.go          # Data-dir inventory + cleanup + retention + Skill AI
+├── skills.go               # SKILL.md store + claude/codex sync
+├── main.go                 # Wails entry
 ├── internal/
-│   ├── config/config.go      # Data types + JSON config load/save
-│   ├── scanner/              # scanner.go (ScanDir) + parser.go (annotations, language)
-│   ├── executor/             # oneshot.go / service.go / stream.go / cmd.go
-│   ├── autostart/            # macOS LaunchAgent install/remove
-│   ├── store/store.go        # JSON-backed script metadata cache
-│   └── zshrc/                # manager.go (block r/w) + parser.go (structured parse)
+│   ├── config/             # Config + ScriptMeta + Save/Load
+│   ├── scanner/            # ScanDir + @hatch.* annotation parser
+│   ├── executor/           # oneshot.go / service.go / stream.go / cmd.go / history.go
+│   ├── scheduler/          # tiny @every / @daily / @hourly scheduler (no deps)
+│   ├── autostart/          # macOS LaunchAgent
+│   ├── store/              # scripts.json cache
+│   └── zshrc/              # managed block + parser
 └── frontend/
-    ├── index.html            # All UI — Alpine.js declarative markup
+    ├── index.html          # Alpine.js declarative markup (all UI)
     └── src/
-        ├── main.js           # Alpine component: all state + methods
-        └── style.css         # Full custom CSS
+        ├── main.js         # Alpine component: state + methods
+        └── style.css       # Full custom CSS (sections per feature)
 ```
 
 ---
@@ -45,14 +56,20 @@ hatch/
 
 ```go
 type ScriptMeta struct {
-    Path      string; Name string; Desc string
-    Type      ScriptType      // "oneshot" | "service"
-    Language  string          // "shell" | "python" | "ruby" | "node" | "binary"
-    Commands  []string        // service sub-commands
-    PidFile   string          // default: /tmp/hatch/<name>.pid
-    Args      []ArgDef        // nil = show input; [] = hide input
-    Presets   []CommandPreset // {Name, Args} — rendered as 🔖 buttons
-    Tags      []string; LastRunAt int64; UpdatedAt int64
+    Path, Name, Desc, Language string
+    Type         ScriptType        // "oneshot" | "service"
+    Commands     []string          // service sub-commands
+    PidFile      string            // default /tmp/hatch/<name>.pid
+    Args         []ArgDef          // nil = show input; [] = hide input
+    Presets      []CommandPreset   // named arg invocations
+    Tags         []string
+    Env          map[string]string // v1.1 per-script env (merged over os.Environ)
+    NotifyOnDone bool              // v1.1 macOS osascript banner
+    Schedule     string            // v1.2 @every / @daily / @hourly
+    Requires     []string          // v1.2 required CLI commands
+    HealthURL    string            // v1.2 GET /healthz target
+    PreScripts   []string          // v1.3 sequential pre-script chain
+    LastRunAt, UpdatedAt int64
 }
 
 type Config struct {
@@ -60,19 +77,22 @@ type Config struct {
     Exports          []ExportVar
     OverrideMeta     map[string]ScriptMeta
     ZshrcAnnotations map[string]string
-    AI               AIConfig
-    TraceLogDir      string    // default: ~/Library/Application Support/Hatch/logs/
-    SkillsDir        string    // default: ~/.claude/skills/
+    AI               AIConfig         // legacy single-provider (kept in sync)
+    AIProviders      []AIProvider     // multi-provider list
+    ActiveProviderID string
     AutoLaunch       bool
+    TraceLogDir      string           // default <cfgDir>/Hatch/traces
+    SkillsDir        string           // default <cfgDir>/Hatch/skills
+    DocLinks         []DocLink
+    PromptTemplates  map[string]string // v1.2 op → override system prompt
+    Retention        DataRetention     // v1.3 cleanup policy
 }
 
-type AIConfig struct {
-    Enabled bool; BaseURL string; APIKey string; Model string
-}
+type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
+type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceRetainDays int }
 ```
 
-`Args nil` → show input box. `Args []ArgDef{}` → hide input box. These are different.
-`mergeOverride` only replaces non-zero fields — use `DeleteScriptMeta` to fully reset auto-detection.
+`Args nil` → show input; `Args []ArgDef{}` → hide. `mergeOverride` only replaces non-zero fields — use `DeleteScriptMeta` to fully reset auto-detection.
 
 ---
 
@@ -80,30 +100,37 @@ type AIConfig struct {
 
 | Method | Purpose |
 |---|---|
-| `GetConfig()` | Full config |
-| `ScanAll()` | Rescan all dirs → `[]ScriptMeta` |
-| `GetScriptsByDir(path)` | Scan single dir |
-| `AddDirectory / RemoveDirectory / UpdateDirectoryExport` | Dir management |
-| `SaveScriptMeta / DeleteScriptMeta` | Override CRUD |
-| `RunScript(id, path, args)` | Launch oneshot; events via EventsEmit |
-| `ServiceAction(path, action, args)` | start / stop / restart |
-| `GetAllServiceStatuses()` | `map[path]"running"\|"stopped"` |
-| `SaveExports / CheckZshrc / ParseZshrc` | Shell management |
-| `SaveZshrcAnnotation(key, note)` | Persist zshrc entry note |
-| `SuggestScriptMeta / SuggestZshrcAnnotation` | AI fill (no auto-save) |
-| `SuggestZshrcOrganization(mode)` | AI preview → `{summary, content}` |
-| `ApplyZshrcOrganization(content)` | Backup + write zshrc |
+| `GetConfig / ScanAll / GetScriptsByDir` | Config + scan |
+| `AddDirectory / RemoveDirectory / UpdateDirectoryExport` | Directory CRUD |
+| `SaveScriptMeta / DeleteScriptMeta` | Override CRUD (re-applies schedules) |
+| `RunScript(id, path, args)` | Oneshot launch (pre-scripts auto-chained if set) |
+| `ServiceAction(path, action, args)` | start / stop / restart with env |
+| `GetAllServiceStatuses()` | path → "running" \| "stopped" |
+| `ListRuns / GetRunLog / DeleteRun` | v1.1 run-history archive |
+| `SaveExports / CheckZshrc / ParseZshrc / SaveZshrcAnnotation` | Shell config |
+| `SuggestZshrcOrganization / ApplyZshrcOrganization` | AI zshrc rewrite preview + write |
 | `GetAutoLaunchEnabled / SetAutoLaunchEnabled` | Login autostart |
-| `GetClaudeCodeStatus()` | Claude CLI + VPN + usage from `~/.cache/will-statusline/last.json` |
-| `GetCodexStatus()` | Codex CLI + VPN + usage from `~/.codex/sessions/` JSONL |
-| `ListSkills() / SyncSkill / CreateSkill` | Skills management |
-| `GetAppDataPaths() / SaveAppDataPaths` | Trace log dir + skills dir config |
-| `GetTraceLog(date)` | Read trace JSONL for date |
+| `GetClaudeCodeStatus / GetCodexUsageStatus` | Status cards |
+| `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / GetSkillsStats` | Skill CRUD |
+| `SetSkillSync(name, target, enabled) / ImportSkillsFrom / CreateSkillTemplate` | Skill sync + import |
+| `SuggestSkillContent / SuggestSkillFromDescription` | v1.3 Skill AI optimize |
+| `GetAppDataPaths / SaveAppDataPaths` | Trace + Skills dir config |
+| `GetAITraces / ClearAITraces / GetAITraceStorageInfo` | AI trace inspect |
+| `SaveAIConfig / GetAIProviders / SaveAIProviders / TestAIConfig` | Provider mgmt |
+| `SuggestScriptMeta / SuggestZshrcAnnotation / SuggestScriptContent` | AI Suggest |
+| `SuggestScriptContentStream(id, ...)` | v1.2 streaming (emits `ai:stream`) |
+| `GetPromptTemplates / SavePromptTemplates / GetDefaultPrompts` | v1.2 prompt overrides |
+| `ApplyAllSchedules / ListSchedules / RemoveSchedule` | v1.2 scheduler control |
+| `CheckScriptHealth(path) / CheckCommandAvailable(name)` | v1.2 dep + health probe |
+| `CheckPathHealth / ListAliasInventory` | v1.3 PATH + alias inspection |
+| `ExportBackup(dir) / ImportBackup(zipPath)` | v1.3 zip backup |
+| `RunWithPreScripts(id, path, args, pre)` | v1.3 explicit chain runner |
+| `GetAppDataInventory / CleanupDataDir(key) / GetRetentionPolicy / SaveRetentionPolicy` | v1.3 data dashboard |
+| `ListRecentRunsSorted(limit)` | flat newest-first run list |
+| `GetClaudeSettings / SaveClaudeSettings / GetCodexConfig / SaveCodexConfig` | Edit ~/.claude / ~/.codex configs |
+| `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File I/O |
 
-**Not yet in wailsjs bindings** — call via `window['go']['main']['App']['Method']()`:
-`SuggestZshrcOrganization`, `ApplyZshrcOrganization`, `GetAutoLaunchEnabled`, `SetAutoLaunchEnabled`,
-`GetClaudeCodeStatus`, `GetCodexStatus`, `ListSkills`, `SyncSkill`, `CreateSkill`,
-`GetAppDataPaths`, `SaveAppDataPaths`, `GetTraceLog`.
+Methods added after the last `wails dev`/`wails build` must be called via `window['go']['main']['App']['Method']()` until bindings regenerate.
 
 ---
 
@@ -111,50 +138,47 @@ type AIConfig struct {
 
 | Event | Payload | When |
 |---|---|---|
-| `executor:log` | `{id, line, stream}` | Every output line |
+| `executor:log` | `{id, line, stream}` | Every stdout/stderr line |
 | `executor:done` | `{id, exitCode}` | Oneshot completed |
-| `executor:status` | `{id, status}` | Service state change |
+| `executor:status` | `{id, status}` | running / stopped / error |
+| `ai:trace` | `AICallTrace` | Each AI call recorded |
+| `ai:stream` | `{id, chunk, done, error}` | Streaming Suggest output |
 
-`id` = script's absolute `path`.
+`id` = script's absolute `path` for executor events.
 
 ---
 
 ## Tab Navigation
 
 ```
-tab = 'scripts' | 'settings' | 'ai'
+tab = 'scripts' | 'ai'
 
 scripts + !selectedDir  →  Directory card grid + workspace-settings accordion
 scripts + selectedDir   →  Script list for that dir
-settings               →  (removed — merged into scripts home as accordion)
-ai + aiSubTab          →  概览 | 连接 | Skills | 工具
-editTarget != null     →  Edit drawer overlay
+ai + aiSubTab           →  概览 | 连接 | Skills | 工具 | Prompt | 数据
+editTarget   != null    →  Edit drawer (env / notify / schedule / requires / health / preScripts)
+historyTarget != null   →  Run-history modal
+quickAIOpen             →  Header popover: model switch + recent traces
 ```
 
-**Settings is now an accordion on the scripts home page** (not a separate tab). Sections: ⚙ 环境与路径配置 · 📁 目录管理 · 🔑 环境变量 · 📄 Shell 配置解析.
+Workspace settings live on the scripts home page accordion: ⚙ 环境与路径配置 · 📁 目录管理 · 🔑 环境变量 · 📄 Shell 配置解析.
 
 ---
 
 ## AI Module
 
-Top-level `✦ AI` tab with left sidebar sub-navigation:
-
 | Sub-tab | Content |
 |---|---|
-| 📖 概览 | Capability summary, quick usage tips |
-| 🔌 连接 | OpenAI-compatible model config + trace log viewer |
-| 📚 Skills | List/sync/create Skills for Claude Code & Codex |
-| ⚡ 工具 | Claude Code status card + Codex status card |
+| 📖 概览 | Capability summary |
+| 🔌 连接 | Providers + trace log viewer |
+| 📚 Skills | List/edit/sync/create + ✦ AI optimize bar in editor |
+| ⚡ 工具 | Claude Code + Codex status cards |
+| 📝 Prompt | Per-op system-prompt override editor (shows defaults inline) |
+| 📦 数据 | Data-dir inventory + retention policy + per-dir 📂/🗑 |
 
-Hero stats: AI状态 · 模型 · Skills count card (purple, shows claude/codex breakdown).
+**Header quick-AI popover** (next to ⏻ 自启): badge shows active provider `✦ name · model`; click for model switcher + last 8 traces.
 
-**Claude Code status** (`GetClaudeCodeStatus`): reads `~/.cache/will-statusline/last.json` for rate limit pcts + plan type. Falls back to `zsh -l -c "command -v claude"` for CLI detection (GUI apps don't inherit user PATH).
-
-**Codex status** (`GetCodexStatus`): reads most-recent JSONL in `~/.codex/sessions/`.
-
-**Skills** (`ListSkills`): scans `SkillsDir` (default `~/.claude/skills/`) for `SKILL.md` files, returns name/description/provider info. `SyncSkill` copies a skill into the Codex skills dir. `CreateSkill` writes a new SKILL.md from AI suggestions.
-
-**Trace log**: every AI call appends a JSONL record to `TraceLogDir/<YYYY-MM-DD>.jsonl`.
+**Trace log**: every AI call appends a JSONL record to `TraceLogDir/<YYYY-MM-DD>.jsonl`. Pruned by `AI.TraceRetainDays`.
 
 ---
 
@@ -164,18 +188,24 @@ Hero stats: AI状态 · 模型 · Skills count card (purple, shows claude/codex 
 |---|---|
 | Config | `~/Library/Application Support/Hatch/config.json` |
 | Script cache | `~/Library/Application Support/Hatch/scripts.json` |
-| Trace logs | `~/Library/Application Support/Hatch/logs/<date>.jsonl` (configurable) |
+| AI trace logs | `~/Library/Application Support/Hatch/traces/<date>.jsonl` (configurable) |
+| Run history | `~/Library/Application Support/Hatch/runs/<script>/<id>.{log,json}` |
+| Skills master | `~/Library/Application Support/Hatch/skills/` (default; configurable) |
 | PID files | `/tmp/hatch/<name>.pid` |
 | Zshrc managed block | `~/.zshrc` (Hatch block only) |
 | Login autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
 | Claude usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
+| Backup exports | `~/Desktop/hatch-backup-<ts>.zip` (default) |
+
+Retention runs on startup + hourly ticker (`ApplyRetention`): trace days, runs days, runs-per-script cap.
 
 ---
 
 ## Detailed Reference
 
 - [Frontend architecture, Alpine state, UI design tokens, CSS rules](.claude/docs/frontend.md)
-- [Internals: scanner, executor, zshrc manager](.claude/docs/internals.md)
+- [Internals: scanner, executor, zshrc, scheduler, history](.claude/docs/internals.md)
 - [Known gotchas & Pico CSS integration notes](.claude/docs/gotchas.md)
 - [Frontend skill (component patterns, CSS classes)](.claude/skills/hatch-frontend/SKILL.md)
+- [Upgrade log (v1.1 → v1.3)](UPGRADE_LOG.md)

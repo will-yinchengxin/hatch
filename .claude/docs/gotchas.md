@@ -75,3 +75,31 @@ button.secondary[aria-busy="true"], button.btn-refresh[aria-busy="true"] {
   border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-card);
 }
 ```
+
+---
+
+## v1.1 – v1.3 Specific
+
+### Wails Binding Regeneration
+Methods added in `app_v12.go`, `app_v13.go`, `app_datadir.go`, `skills.go` (v1.3+) are **not** in `frontend/wailsjs/go/main/App.js` until you run `wails dev` or `wails build`. Frontend calls them via `window.go.main.App.MethodName(...)`. Don't try to import them at the top of `main.js` until bindings regenerate.
+
+### Default-prompt drift
+`GetDefaultPrompts()` in `app_datadir.go` is a **manual copy** of the system prompts hard-coded in the Suggest* methods inside `app_ai.go` (and `SuggestSkillContent` in `app_datadir.go`). When you change a default prompt, update **both places** or the UI will misrepresent what's running.
+
+### Scheduler reload after SaveScriptMeta
+`SaveScriptMeta` triggers `go a.ApplyAllSchedules()` so a saved `Schedule` field takes effect immediately. The 500ms startup delay before the first call is intentional — gives `ScanAll` time to populate `store` so the schedule loop sees current meta.
+
+### Retention ticker tied to App ctx
+`ApplyRetention` runs on a 1-hour `time.NewTicker` inside a goroutine started in `startup`. The goroutine watches `ctx.Done()` so closing the window stops it cleanly. **Do not** spawn the ticker from anywhere else — duplicate timers will double-prune.
+
+### Run-history scope by basename
+Run-history dirs use `filepath.Base(scriptPath)` as the grouping key. Two scripts named `deploy.sh` in different directories will share a single history bucket. Acceptable for v1.x; revisit if/when scripts collide for real.
+
+### Pre-scripts don't emit
+Pre-scripts in `RunWithPreScripts` execute with `nil` emitter — they only show as `[hatch] pre: <path>` lines in the **main** script's log stream, not as standalone runs. That's by design so the user sees one continuous log for the whole chain. Pre-scripts still archive to history individually.
+
+### Quick-AI popover provider sync
+`switchQuickAIProvider()` calls `SaveAIProviders(providers, newActiveID)` and **also** copies the new provider's `baseUrl/apiKey/model` into `aiForm` so the `🔌 连接` page reflects the switch. If you change provider config independently, update both stores together.
+
+### Inline-style rule for new features
+v1.1+ rule: no inline `style="..."` on new feature markup. Extract to a class in the bottom section of `style.css`. Pre-existing inline styles remain (cleanup batched for a future pass).

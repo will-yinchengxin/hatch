@@ -276,7 +276,7 @@ editTarget != null      → 右侧编辑抽屉叠加
 | `logTarget` | `string\|null` | 当前展开日志的脚本 path |
 | `editTarget` / `editForm` | — | 编辑抽屉 |
 | `aiForm` | `{enabled,baseUrl,apiKey,model}` | AI 连接配置 |
-| `aiSubTab` | `string` | AI 子页面（overview/connect/skills/tools） |
+| `aiSubTab` | `string` | AI 子页面（overview/connect/skills/tools/prompts/data） |
 | `claudeStatus` / `codexStatus` | `object\|null` | AI 工具状态卡片数据 |
 | `skills` | `array` | ListSkills() 结果 |
 | `skillsStats` | `{total,claude,codex}` | hero stat 用 |
@@ -287,6 +287,13 @@ editTarget != null      → 右侧编辑抽屉叠加
 | `wsShellOpen / wsDirsOpen / wsEnvOpen / wsZshrcOpen` | `bool` | workspace accordion 展开状态 |
 | `success / successTimer` | — | 成功 toast，3s 自动消失 |
 | `error` | `string` | 错误 toast，6s 自动消失 |
+| **v1.1 – v1.3** ||
+| `historyTarget / historyRecords / historyOpenId / historyLogText / historyLoading` | — | 运行历史 modal |
+| `editForm.envPairs / .notifyOnDone / .schedule / .requiresRaw / .healthUrl / .preScriptsRaw` | — | 编辑抽屉新字段 |
+| `promptTemplates / promptDefaults / promptDefaultsOpen / promptOps / promptSaving` | — | Prompt 模板编辑器 |
+| `dataInventory / retention / retentionSaving` | — | 数据目录面板 |
+| `aiProviders / activeProviderID / quickAIOpen / quickAIActiveID / quickAITraceID` | — | 顶栏快捷弹层 |
+| `skillAIInstruction / skillAIBusy` | — | Skill ✦ AI 优化栏 |
 
 ### 事件监听（setupEvents）
 
@@ -298,6 +305,9 @@ setupEvents() {
   EventsOn('executor:log',    (ev) => { /* 追加日志，滚到底 */ });
   EventsOn('executor:done',   (ev) => { /* 更新 runningSet + exitCode */ });
   EventsOn('executor:status', (ev) => { /* 更新 statuses */ });
+  // v1.2: AI streaming + trace fanout
+  EventsOn('ai:trace',  (t)  => { /* prepend to aiTraces */ });
+  EventsOn('ai:stream', (ev) => { /* {id, chunk, done, error} */ });
 }
 ```
 
@@ -338,6 +348,26 @@ window['go']['main']['App']['MethodName'](arg)
 | `.ws-section` | accordion 单区块 |
 | `.ws-section-header` | accordion 标题行（cursor pointer） |
 | `.ws-chevron` | 折叠箭头 |
+
+### v1.1 – v1.3 新增 CSS 类
+
+> 所有新功能 CSS 在 `style.css` 末尾 `v1.1 – v1.3 additions` 分区。**禁止给新功能写 inline `style=`** —— 一律抽到具名 class。
+
+| 前缀 / 类 | 用途 |
+|---|---|
+| `.history-record / .history-record-row / .history-record-actions / .history-record-args / .history-record-log` | 运行历史 modal 单条记录 |
+| `.history-modal-body / .history-modal-wide / .history-empty` | 历史 modal 容器 |
+| `.ok-mark / .err-mark` | ✓/✗ 颜色原子（绿 / 红） |
+| `.field-hint` | 输入框下小灰提示行 |
+| `.prompt-card / .prompt-card-header / .prompt-card-title / .prompt-card-op / .prompt-card-actions` | Prompt 模板卡 |
+| `.prompt-status-on / .prompt-status-off / .prompt-default-block / .prompt-actions-row` | Prompt 状态徽章 + 默认值预览 |
+| `.retention-form / .retention-note` | 数据 tab 顶部保留策略 4 列网格 |
+| `.data-dir-list / .data-dir-card / .data-dir-row / .data-dir-info / .data-dir-head` | 数据目录卡片 |
+| `.data-dir-key / .data-dir-missing / .data-dir-path / .data-dir-desc / .data-dir-stats / .data-dir-actions / .data-empty` | 卡片字段 |
+| `.quick-ai-wrap / .quick-ai-popover / .quick-ai-header` | 顶栏弹层容器（绝对定位，420px） |
+| `.quick-ai-section / .quick-ai-section-label / .quick-ai-section-title` | 弹层内部分块 |
+| `.quick-ai-traces-header / .quick-ai-trace + .is-open / .quick-ai-trace-row / .quick-ai-trace-err / .quick-ai-trace-pre / .quick-ai-empty / .quick-ai-actions / .quick-ai-manage-row / .quick-ai-toggle-arrow` | trace 列表细节 |
+| `.skill-ai-bar` | Skill 编辑器 ✦ AI bar 间距（继承 `.se-ai-bar`） |
 
 ---
 
