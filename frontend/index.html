@@ -1077,14 +1077,30 @@
               覆盖每个 AI 操作的 system prompt。留空则用 Hatch 内置的默认提示。改完点保存即生效（无需重启）。
             </p>
             <template x-for="op in promptOps" :key="op.key">
-              <div class="form-field" style="margin-bottom: 16px;">
-                <label class="field-label">
-                  <span x-text="op.label"></span>
-                  <span class="muted" style="margin-left:8px; font-size:12px;" x-text="'(' + op.key + ')'"></span>
+              <div class="form-field" style="margin-bottom: 20px; padding: 12px; border:1px solid var(--card-border,#e0d9cc); border-radius:8px; background:var(--card-bg,#fafaf7);">
+                <label class="field-label" style="display:flex; align-items:center; justify-content:space-between;">
+                  <span>
+                    <span x-text="op.label"></span>
+                    <span class="muted" style="margin-left:8px; font-size:12px;" x-text="'(' + op.key + ')'"></span>
+                  </span>
+                  <span style="display:flex; gap:6px; align-items:center;">
+                    <span x-show="(promptTemplates[op.key]||'').trim()" style="font-size:12px; color:#b06d1a;">● 已覆盖</span>
+                    <span x-show="!(promptTemplates[op.key]||'').trim()" class="muted" style="font-size:12px;">○ 使用默认</span>
+                    <button class="btn-edit" type="button" @click="togglePromptDefault(op.key)" x-text="promptDefaultsOpen[op.key] ? '收起默认' : '查看默认'"></button>
+                    <button class="btn-edit" type="button" @click="useDefaultAsTemplate(op.key)" title="把默认 Prompt 复制到下面，方便基于它修改">↓ 以默认为模板</button>
+                  </span>
                 </label>
+
+                <!-- 当前内置默认 prompt，只读展示 -->
+                <pre
+                  x-show="promptDefaultsOpen[op.key]"
+                  x-text="promptDefaults[op.key] || '(加载中…)'"
+                  style="white-space: pre-wrap; background:#1f1f1f; color:#e6e6e6; padding:10px; border-radius:6px; font-size:11px; max-height:240px; overflow:auto; margin:8px 0;"
+                ></pre>
+
                 <textarea
                   x-model="promptTemplates[op.key]"
-                  :placeholder="op.placeholder"
+                  placeholder="留空 = 使用上方默认；填入内容则完全替换。"
                   class="field-textarea"
                   rows="4"
                 ></textarea>

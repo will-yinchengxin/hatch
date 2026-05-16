@@ -109,13 +109,15 @@ window.hatchApp = function () {
 
     // v1.2: prompt templates
     promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '' },
+    promptDefaults: {},
+    promptDefaultsOpen: {},
     promptSaving: false,
     promptOps: [
-      { key: 'SuggestScriptMeta',         label: '脚本元信息分析',  placeholder: '默认：你是 macOS 脚本管理工具 Hatch 的脚本分析助手……' },
-      { key: 'SuggestScriptContent',      label: '脚本内容生成',    placeholder: '默认：你是 macOS shell 脚本编写助手……' },
-      { key: 'SuggestZshrcAnnotation',    label: 'zshrc 条目备注',  placeholder: '默认：你是 shell 配置解释助手……（限 60 字符以内）' },
-      { key: 'SuggestZshrcOrganization',  label: 'zshrc 整理重排',  placeholder: '默认：你是谨慎的 zsh 配置整理助手……' },
-      { key: 'TestAIConfig',              label: '配置连通性测试',  placeholder: '默认：你是 Hatch 的配置检测助手。请只回复 pong。' },
+      { key: 'SuggestScriptMeta',         label: '脚本元信息分析' },
+      { key: 'SuggestScriptContent',      label: '脚本内容生成' },
+      { key: 'SuggestZshrcAnnotation',    label: 'zshrc 条目备注' },
+      { key: 'SuggestZshrcOrganization',  label: 'zshrc 整理重排' },
+      { key: 'TestAIConfig',              label: '配置连通性测试' },
     ],
 
     // v1.1: run history
@@ -646,9 +648,13 @@ window.hatchApp = function () {
     // v1.2: Prompt templates (uses dynamic bindings).
     async loadPromptTemplates() {
       try {
-        const fn = window?.go?.main?.App?.GetPromptTemplates;
-        if (typeof fn !== 'function') return;
-        const current = (await fn()) || {};
+        const getOverrides = window?.go?.main?.App?.GetPromptTemplates;
+        const getDefaults = window?.go?.main?.App?.GetDefaultPrompts;
+        if (typeof getDefaults === 'function') {
+          this.promptDefaults = (await getDefaults()) || {};
+        }
+        if (typeof getOverrides !== 'function') return;
+        const current = (await getOverrides()) || {};
         const next = { ...this.promptTemplates };
         for (const op of this.promptOps) {
           next[op.key] = current[op.key] || '';
@@ -657,6 +663,12 @@ window.hatchApp = function () {
       } catch (e) {
         this.showError(`加载 Prompt 模板失败: ${e}`);
       }
+    },
+    togglePromptDefault(key) {
+      this.promptDefaultsOpen = { ...this.promptDefaultsOpen, [key]: !this.promptDefaultsOpen[key] };
+    },
+    useDefaultAsTemplate(key) {
+      this.promptTemplates = { ...this.promptTemplates, [key]: this.promptDefaults[key] || '' };
     },
     async savePromptTemplates() {
       this.promptSaving = true;
