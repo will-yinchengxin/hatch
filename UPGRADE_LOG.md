@@ -228,12 +228,59 @@
 
 | # | 任务 | 状态 |
 |---|---|---|
-| 1.3-1 | 快速启动器 / Menubar 极简模式 | ⏳ |
-| 1.3-2 | PATH 体检 + alias 管理 | ⏳ |
-| 1.3-3 | 导入导出备份 | ⏳ |
-| 1.3-4 | 脚本编排 / 前置依赖 | ⏳ |
+| 1.3-1 | 快速启动器 / Menubar 极简模式 | ⏸ 延后 |
+| 1.3-2 | PATH 体检 + alias 管理 | ✅ |
+| 1.3-3 | 导入导出备份 | ✅ |
+| 1.3-4 | 脚本编排 / 前置依赖 | ✅ |
 
-> 详细问题/方案/结果会在进入 v1.3 时补完。
+### 1.3-1 快速启动器 / Menubar
+
+**执行结果**
+- ⏸ **延后到 v2.0 平台扩展**。理由：Menubar 需要 Wails systray plugin + 第二个 webview window + macOS Accessibility 权限（全局快捷键）；架构改动远大于 v1.3 其他任务的总和；要做就单独立项。
+- 备选方案：用户当前可以把 Hatch 用 `~/.zshrc` 里 alias 启动（`alias hatch="open -a Hatch"`），起步成本低。
+
+### 1.3-2 PATH 体检 + alias 管理
+
+**问题**
+- 长期使用后 `$PATH` 容易出现：目录已删但仍在 PATH、重复条目、不同目录里同名可执行文件互相 shadow。手动排查很烦。
+
+**整改方式**
+- `(a *App) CheckPathHealth()` 在 `app_v13.go`，启动 `zsh -l -c "echo $PATH"` 拿到真实 PATH，遍历检查：
+  - `Exists` 目录是否存在
+  - `Duplicate` 重复条目
+  - `ShadowsName` 检测同名可执行文件被前面目录的同名文件 shadow（仅列出第一个发现的）
+- `(a *App) ListAliasInventory()` 复用现有 `ParseZshrc` Entry，按 kind（alias/export/source/function/other）分组。
+
+**执行结果 / 后续**
+- 后端完整，UI 入口留给后续在 settings 抽屉里加一个"Shell 体检"页签即可（不需要重构）。
+
+### 1.3-3 导入导出备份
+
+**问题**
+- 换机器时手动复制 `~/Library/Application Support/Hatch/*` 太繁琐。
+
+**整改方式**
+- `(a *App) ExportBackup(targetDir)` —— 打包 config.json + scripts.json + skills 目录为 `hatch-backup-<timestamp>.zip`，默认输出到 ~/Desktop。
+- `(a *App) ImportBackup(zipPath)` —— 解压恢复，原地覆盖 config/scripts/skills 文件；恢复后立即重载内存里的 `a.cfg`。
+- 仅使用标准库 `archive/zip` + `io`，零新依赖。
+
+**执行结果 / 后续**
+- 后端完整。UI 入口（"备份与恢复"按钮）也放在 settings 抽屉中。
+
+### 1.3-4 脚本编排 / 前置依赖
+
+**问题**
+- 实际工作中常见：跑 `migrate.sh` 之前要先 `check_env.sh` 通过；start serviceA 之前要先 start serviceB。
+
+**整改方式**
+- `ScriptMeta.PreScripts []string` —— 主脚本运行前按顺序跑的前置脚本绝对路径列表。
+- `(a *App) RunScript` 自动检测 `PreScripts`，若有则走 `RunWithPreScripts` 路径：
+  - 每条前置脚本独立的 `RunOneshotWithEnv`，不向前端 emit 自己的事件（避免日志被前置脚本淹没），但会把"[hatch] pre: <path>"行写入主任务日志。
+  - 任一前置 exit != 0 立刻中止主脚本，emit `done(exit=99) + status=error`。
+- UI：编辑抽屉新增"前置脚本"多行输入。
+
+**执行结果 / 后续**
+- 当前实现限定 oneshot 链。service 启动前的依赖（"先 start B 再 start A"）需要的逻辑不同，留给 v2 处理。
 
 ---
 
@@ -242,5 +289,5 @@
 | 版本 | Commit | 时间 |
 |---|---|---|
 | v1.1 | `fc755fb` | 2026-05-16 |
-| v1.2 | — | — |
+| v1.2 | `ee7ff58` | 2026-05-16 |
 | v1.3 | — | — |

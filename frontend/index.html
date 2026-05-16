@@ -1204,6 +1204,13 @@
           <input type="text" x-model="editForm.healthUrl" placeholder="http://localhost:8080/healthz" class="field-input" />
         </div>
 
+        <!-- v1.3: pre-script chain -->
+        <div class="form-field">
+          <label class="field-label">前置脚本 (每行一个绝对路径)</label>
+          <textarea x-model="editForm.preScriptsRaw" placeholder="/Users/you/tools/check_env.sh&#10;/Users/you/tools/warmup.sh" class="field-textarea" rows="3"></textarea>
+          <div class="muted" style="font-size:12px; margin-top:4px;">按顺序执行；任一失败则中止主脚本（exit 99）。</div>
+        </div>
+
       </div>
 
       <div class="drawer-footer">

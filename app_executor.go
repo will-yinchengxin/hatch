@@ -10,12 +10,40 @@ import (
 
 // RunScript launches a oneshot script in a goroutine.
 // Progress and result arrive via executor:log / executor:done / executor:status events.
-// In v1.1 the executor also archives the run output to disk (see internal/executor/history).
+// v1.3: if the script has PreScripts configured, they run sequentially first.
 func (a *App) RunScript(id, path string, args []string) {
+	pre := a.scriptPreScripts(path)
+	if len(pre) > 0 {
+		a.RunWithPreScripts(id, path, args, pre)
+		return
+	}
 	em := executor.NewEmitter(a.ctx)
 	go func() {
 		_, _ = executor.RunOneshotWithEnv(id, path, args, a.scriptEnv(path), em, a.notifyHook(path))
 	}()
+}
+
+// scriptPreScripts returns the configured pre-script chain for a path.
+func (a *App) scriptPreScripts(path string) []string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.cfg.OverrideMeta != nil {
+		if m, ok := a.cfg.OverrideMeta[path]; ok && len(m.PreScripts) > 0 {
+			out := make([]string, len(m.PreScripts))
+			copy(out, m.PreScripts)
+			return out
+		}
+	}
+	if a.store != nil {
+		for _, s := range a.store.All() {
+			if s.Path == path && len(s.PreScripts) > 0 {
+				out := make([]string, len(s.PreScripts))
+				copy(out, s.PreScripts)
+				return out
+			}
+		}
+	}
+	return nil
 }
 
 // ServiceAction executes start / stop / restart on a service script.

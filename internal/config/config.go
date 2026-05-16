@@ -42,6 +42,7 @@ type ScriptMeta struct {
 	Schedule     string            `json:"schedule,omitempty"`     // v1.2: scheduler spec (@every 30s / @daily HH:MM / @hourly :MM)
 	Requires     []string          `json:"requires,omitempty"`     // v1.2: required CLI commands
 	HealthURL    string            `json:"healthUrl,omitempty"`    // v1.2: health-check URL for service scripts
+	PreScripts   []string          `json:"preScripts,omitempty"`   // v1.3: scripts to run (in order) before this one; failure aborts
 	LastRunAt    int64             `json:"lastRunAt"`
 	UpdatedAt    int64             `json:"updatedAt"`
 }
