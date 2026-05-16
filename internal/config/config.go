@@ -39,6 +39,9 @@ type ScriptMeta struct {
 	Tags         []string          `json:"tags"`
 	Env          map[string]string `json:"env,omitempty"`          // v1.1: per-script env overrides
 	NotifyOnDone bool              `json:"notifyOnDone,omitempty"` // v1.1: send macOS notification when oneshot completes
+	Schedule     string            `json:"schedule,omitempty"`     // v1.2: scheduler spec (@every 30s / @daily HH:MM / @hourly :MM)
+	Requires     []string          `json:"requires,omitempty"`     // v1.2: required CLI commands
+	HealthURL    string            `json:"healthUrl,omitempty"`    // v1.2: health-check URL for service scripts
 	LastRunAt    int64             `json:"lastRunAt"`
 	UpdatedAt    int64             `json:"updatedAt"`
 }
@@ -89,6 +92,7 @@ type Config struct {
 	DocLinks         []DocLink             `json:"docLinks,omitempty"`
 	AIProviders      []AIProvider          `json:"aiProviders,omitempty"`
 	ActiveProviderID string                `json:"activeProviderId,omitempty"`
+	PromptTemplates  map[string]string     `json:"promptTemplates,omitempty"` // v1.2: op -> override system prompt
 }
 
 func defaultPath() (string, error) {

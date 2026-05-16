@@ -204,12 +204,18 @@ func (a *App) GetScriptsByDir(dirPath string) ([]config.ScriptMeta, error) {
 // SaveScriptMeta stores user-edited metadata into config.OverrideMeta.
 func (a *App) SaveScriptMeta(meta config.ScriptMeta) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if a.cfg.OverrideMeta == nil {
 		a.cfg.OverrideMeta = make(map[string]config.ScriptMeta)
 	}
 	a.cfg.OverrideMeta[meta.Path] = meta
-	return a.cfg.Save()
+	err := a.cfg.Save()
+	a.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	// v1.2: re-apply schedules whenever meta is saved (Schedule may have changed)
+	go a.ApplyAllSchedules()
+	return nil
 }
 
 // DeleteScriptMeta removes a user override so auto-detection resumes.

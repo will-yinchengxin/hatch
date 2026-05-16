@@ -157,13 +157,70 @@
 
 | # | 任务 | 状态 |
 |---|---|---|
-| 1.2-1 | 内置 cron 定时执行 | ⏳ |
-| 1.2-2 | 依赖检查 + 健康检查 | ⏳ |
-| 1.2-3 | AI 流式输出 + Prompt 模板可编 | ⏳ |
-| 1.2-4 | 脚本上下文 AI 对话 | ⏳ |
-| 1.2-5 | Trace 调试台升级 | ⏳ |
+| 1.2-1 | 内置 cron 定时执行 | ✅ |
+| 1.2-2 | 依赖检查 + 健康检查 | ✅ |
+| 1.2-3 | AI 流式输出 + Prompt 模板可编 | ◐ 后端就绪 |
+| 1.2-4 | 脚本上下文 AI 对话 | ⏸ 延后 |
+| 1.2-5 | Trace 调试台升级 | ⏸ 延后 |
 
-> 详细问题/方案/结果会在进入 v1.2 时补完。
+### 1.2-1 内置 cron 定时执行
+
+**问题**
+- 日常想跑备份、健康检查、定时清理脚本，每个都注册 LaunchAgent 太重。
+
+**整改方式**
+- 新增 `internal/scheduler` 包，零外部依赖。支持三种简单 spec：
+  - `@every 30s` / `@every 5m` / `@every 1h`
+  - `@daily HH:MM` —— 每天某时
+  - `@hourly :MM` —— 每小时第 MM 分钟
+  - 故意不引入 robfig/cron，避免 `go mod tidy` 触发网络访问；后续如需 cron 表达式可平滑替换。
+- `ScriptMeta.Schedule` 字段 + 注释解析 `@hatch.schedule`。
+- `app_v12.go` 的 `ApplyAllSchedules` 在启动 + SaveScriptMeta 后调用，全量重建。
+- UI：编辑抽屉新增 "定时执行 schedule" 输入框，含提示语。
+
+**执行结果**
+- `internal/scheduler/scheduler_test.go` 5 个测试通过（解析、间隔、当日/隔日触发、错误用例、实际触发）。
+- 计划任务通过 `executor.RunOneshotWithEnv` 复用现有归档 + 通知链路，自动出现在历史里。
+
+### 1.2-2 依赖检查 + 健康检查
+
+**问题**
+- 依赖 `kubectl/jq` 之类命令的脚本，启动后才报错；service 类只看 PID 不知道实际是否健康。
+
+**整改方式**
+- `ScriptMeta.Requires []string` + `@hatch.requires: kubectl, jq` 注释解析。
+- `ScriptMeta.HealthURL` + `@hatch.health: http://localhost:8080/healthz` 注释解析。
+- `(a *App) CheckScriptHealth(path)` —— 同步检查 PATH 上的命令存在性 + HTTP 2s 超时 GET，返回 `HealthCheckResult{MissingDeps, HealthOK, HealthStatus, HealthLatency, HealthError}`。
+- `(a *App) CheckCommandAvailable(name)` —— 单命令探测。
+- UI：编辑抽屉新增 requires / healthUrl 字段。前端调用 `window.go.main.App.CheckScriptHealth(path)` 渲染状态徽章（留给 v1.3 进一步整合到列表里）。
+
+**执行结果 / 后续**
+- 后端 + 编辑表单可写入。脚本列表上的可视化"健康灯"留到 v1.3 settings 重构时一并加。
+
+### 1.2-3 AI 流式输出 + Prompt 模板可编
+
+**问题**
+- 现有 Suggest 系列是阻塞调用，体验差；prompt 写死在 Go 里，用户无法按自己脚本风格调教。
+
+**整改方式（部分）**
+- `Config.PromptTemplates map[string]string` 持久化；`GetPromptTemplates/SavePromptTemplates`。
+- `(a *App) effectivePrompt(op, default)` 返回用户覆盖 prompt 或默认 prompt。
+- `(a *App) SuggestScriptContentStream(id, ...)` —— 走异步路径，通过 `ai:stream` 事件 emit `{id, chunk, done, error}`。当前实现仍调用阻塞 endpoint 后一次性 emit，为前端保留稳定接口；真正的 SSE 改造放在后续小版本。
+
+**执行结果 / 后续**
+- 后端接口和事件协议固定（`ai:stream`），前端可以先按事件流写 UI。
+- 真正 SSE（分行解码 OpenAI `data: ` chunk）会作为 v1.3.1 增量优化。
+- Prompt 模板的 UI 编辑器留到 v1.3 settings 抽屉一起做。
+
+### 1.2-4 脚本上下文 AI 对话
+
+**执行结果 / 问题**
+- ⏸ **延后到 v1.3 之后**。理由：完整的多轮 chat 需要后端状态机 + 前端聊天 UI + history token 限制策略，规模 ≈ 一个独立小版本。当前 `SuggestScriptContent` 已经把脚本路径和现有内容塞给 AI，单轮版"针对脚本提建议"已经能用。
+
+### 1.2-5 Trace 调试台升级
+
+**执行结果 / 问题**
+- ⏸ **延后到 v1.3 settings 重构时一并做**。理由：filter/聚合 UI 要在 settings 抽屉里有合适落位；当前 trace 列表仍可用。
 
 ---
 
@@ -184,6 +241,6 @@
 
 | 版本 | Commit | 时间 |
 |---|---|---|
-| v1.1 | — | — |
+| v1.1 | `fc755fb` | 2026-05-16 |
 | v1.2 | — | — |
 | v1.3 | — | — |

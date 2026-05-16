@@ -625,6 +625,9 @@ window.hatchApp = function () {
         presets: this.normalizedPresets(script),
         envPairs: Object.entries(script.env || {}).map(([k, v]) => ({ key: k, value: v })),
         notifyOnDone: !!script.notifyOnDone,
+        schedule: script.schedule || '',
+        requiresRaw: (script.requires || []).join(', '),
+        healthUrl: script.healthUrl || '',
       };
     },
 
@@ -726,6 +729,9 @@ window.hatchApp = function () {
             return acc;
           }, {}),
           notifyOnDone: !!this.editForm.notifyOnDone,
+          schedule: (this.editForm.schedule || '').trim(),
+          requires: (this.editForm.requiresRaw || '').split(',').map(s => s.trim()).filter(Boolean),
+          healthUrl: (this.editForm.healthUrl || '').trim(),
         };
         await SaveScriptMeta(meta);
         if (this.selectedDir) await this.scanDir(this.selectedDir);

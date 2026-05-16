@@ -1187,6 +1187,23 @@
           </label>
         </div>
 
+        <!-- v1.2: schedule -->
+        <div class="form-field">
+          <label class="field-label">定时执行 schedule</label>
+          <input type="text" x-model="editForm.schedule" placeholder="@every 30m / @daily 09:00 / @hourly :15" class="field-input" />
+          <div class="muted" style="font-size:12px; margin-top:4px;">留空 = 不自动执行。仅 oneshot 类型生效。</div>
+        </div>
+
+        <!-- v1.2: requires + health -->
+        <div class="form-field">
+          <label class="field-label">依赖命令 requires</label>
+          <input type="text" x-model="editForm.requiresRaw" placeholder="kubectl, jq, curl" class="field-input" />
+        </div>
+        <div class="form-field">
+          <label class="field-label">健康检查 URL</label>
+          <input type="text" x-model="editForm.healthUrl" placeholder="http://localhost:8080/healthz" class="field-input" />
+        </div>
+
       </div>
 
       <div class="drawer-footer">

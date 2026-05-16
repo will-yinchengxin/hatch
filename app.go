@@ -8,8 +8,16 @@ import (
 
 	"hatch/internal/config"
 	"hatch/internal/executor"
+	"hatch/internal/scheduler"
 	"hatch/internal/store"
+
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+// wailsEmitStream emits an AI stream chunk event to the frontend.
+func wailsEmitStream(ctx context.Context, payload map[string]any) {
+	wailsRuntime.EventsEmit(ctx, "ai:stream", payload)
+}
 
 // App is the Wails-bound root object. Methods are split across multiple
 // files by responsibility (see app_scripts.go, app_executor.go, app_ai.go,
@@ -25,6 +33,8 @@ type App struct {
 	tracesMu sync.Mutex
 	traces   []AICallTrace
 	traceSeq int64
+
+	sched *scheduler.Scheduler // v1.2
 }
 
 func NewApp() *App {
@@ -59,6 +69,13 @@ func (a *App) startup(ctx context.Context) {
 
 	// v1.1: prune stale run-history records on startup
 	go executor.PruneAllHistory(50)
+
+	// v1.2: apply persisted schedules
+	go func() {
+		// run after a short delay so ScanAll has populated the store on first launch
+		time.Sleep(500 * time.Millisecond)
+		a.ApplyAllSchedules()
+	}()
 }
 
 // migrateAIProviders creates a provider entry from the legacy AI config if none exist yet.

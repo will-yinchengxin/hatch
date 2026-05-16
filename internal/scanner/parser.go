@@ -81,6 +81,16 @@ func parseHatchAnnotations(path string) (config.ScriptMeta, bool) {
 					meta.Tags = append(meta.Tags, t)
 				}
 			}
+		case "@hatch.schedule":
+			meta.Schedule = val
+		case "@hatch.requires":
+			for _, r := range strings.Split(val, ",") {
+				if c := strings.TrimSpace(r); c != "" {
+					meta.Requires = append(meta.Requires, c)
+				}
+			}
+		case "@hatch.health":
+			meta.HealthURL = val
 		}
 	}
 
