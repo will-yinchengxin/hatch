@@ -39,12 +39,20 @@ func NewServiceManager(scriptPath, pidFile string, em *Emitter) *ServiceManager 
 // Start launches the service in the background.
 // Returns an error if the service is already running.
 func (s *ServiceManager) Start(args []string) error {
+	return s.StartWithEnv(args, nil)
+}
+
+// StartWithEnv launches the service with optional env overrides.
+func (s *ServiceManager) StartWithEnv(args []string, env map[string]string) error {
 	if st, _ := s.Status(); st == StatusRunning {
 		return fmt.Errorf("service already running (pid %s)", s.readPid())
 	}
 
 	cmdArgs := buildZshArgs(s.scriptPath, args)
 	cmd := newBackgroundCmd("/bin/zsh", cmdArgs...)
+	if len(env) > 0 {
+		cmd.Env = mergeEnv(env)
+	}
 	if s.em != nil {
 		s.em.Log(s.scriptPath, "[hatch] command: "+buildScriptCommandForLog(s.scriptPath, args), "stdout")
 	}
@@ -102,8 +110,13 @@ func (s *ServiceManager) Stop() error {
 
 // Restart stops then starts the service.
 func (s *ServiceManager) Restart(args []string) error {
-	_ = s.Stop() // ignore error if not running
-	return s.Start(args)
+	return s.RestartWithEnv(args, nil)
+}
+
+// RestartWithEnv stops then starts the service with env overrides.
+func (s *ServiceManager) RestartWithEnv(args []string, env map[string]string) error {
+	_ = s.Stop()
+	return s.StartWithEnv(args, env)
 }
 
 // Status returns the current runtime status by probing the PID file.

@@ -344,6 +344,7 @@
               >✦ 智能填写</button>
               <button class="btn-edit" @click.stop="openEdit(s)" title="编辑元信息">✏ 编辑</button>
               <button class="btn-edit" @click.stop="openScriptEditor(s)" title="查看/编辑脚本内容">📄 内容</button>
+              <button class="btn-edit" @click.stop="openHistory(s)" title="查看历史运行记录">📜 历史</button>
               <button
                 class="log-toggle"
                 @click="logTarget = logTarget===s.path ? null : s.path"
@@ -1158,6 +1159,34 @@
           </div>
         </div>
 
+        <!-- v1.1: per-script Env -->
+        <div class="form-field">
+          <label class="field-label">
+            环境变量
+            <button class="icon-btn" @click="addEnvPair()" title="新增 env">+ 新增</button>
+          </label>
+          <template x-if="(editForm.envPairs||[]).length === 0">
+            <div class="empty-presets-tip">未配置脚本级 env。这些变量会在执行时叠加到子进程，优先级高于全局 export。</div>
+          </template>
+          <div class="preset-edit-list" x-show="(editForm.envPairs||[]).length > 0">
+            <template x-for="(p,i) in editForm.envPairs" :key="i">
+              <div class="preset-edit-row">
+                <input type="text" x-model="p.key" placeholder="KEY" class="preset-name-input" />
+                <input type="text" x-model="p.value" placeholder="value" class="preset-args-input" />
+                <button class="icon-btn danger" @click="removeEnvPair(i)">✕</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- v1.1: notify on done -->
+        <div class="form-field">
+          <label class="form-checkbox">
+            <input type="checkbox" x-model="editForm.notifyOnDone" />
+            <span>脚本运行完成后弹出 macOS 通知（成功 / 失败 + 耗时）</span>
+          </label>
+        </div>
+
       </div>
 
       <div class="drawer-footer">
@@ -1332,6 +1361,50 @@
       </div>
       <div class="search-bar-hint muted" x-show="!searchActiveEl && searchOpen">
         <span>请先点击一个文本编辑区域，再使用 Cmd+F</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       RUN HISTORY MODAL (v1.1)
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="se-backdrop" x-show="historyTarget" x-transition.opacity @click.self="closeHistory()">
+    <div class="se-modal" x-show="historyTarget" x-transition style="max-width: 900px;">
+      <div class="se-header">
+        <div class="se-header-left">
+          <span class="se-icon">📜</span>
+          <div>
+            <div class="se-title">运行历史</div>
+            <div class="se-path" x-text="historyTarget?.path"></div>
+          </div>
+        </div>
+        <button class="se-close" @click="closeHistory()">✕</button>
+      </div>
+      <div class="se-body" style="padding: 16px; max-height: 60vh; overflow:auto;">
+        <template x-if="historyRecords.length === 0">
+          <div class="muted" style="text-align:center; padding: 40px 0;">
+            <div x-show="!historyLoading">暂无历史记录。执行脚本后会自动归档到 ~/Library/Application Support/Hatch/runs/</div>
+            <div x-show="historyLoading">加载中…</div>
+          </div>
+        </template>
+        <template x-for="r in historyRecords" :key="r.id">
+          <div class="preset-edit-row" style="flex-direction:column; align-items:stretch; gap:4px; padding:8px; border-radius:8px; background:var(--card-bg,#f6f3ee); margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span>
+                <span x-text="r.exitCode === 0 ? '✓' : '✗'" :style="r.exitCode===0 ? 'color:#3aa55a' : 'color:#c04444'"></span>
+                <span x-text="new Date(r.startedAt).toLocaleString()"></span>
+                <span class="muted" style="margin-left:8px;" x-text="`${r.durationMs}ms · exit ${r.exitCode}`"></span>
+              </span>
+              <span style="display:flex; gap:6px;">
+                <button class="btn-edit" @click="rerunFromHistory(r)" title="使用相同参数重跑">▶ 重跑</button>
+                <button class="btn-edit" @click="viewHistoryLog(r)" title="查看完整日志">📋 日志</button>
+                <button class="icon-btn danger" @click="deleteHistory(r)">✕</button>
+              </span>
+            </div>
+            <div class="muted" x-show="r.args && r.args.length" x-text="'参数: ' + (r.args||[]).join(' ')" style="font-size:12px;"></div>
+            <pre x-show="historyOpenId===r.id" x-text="historyLogText" style="white-space:pre-wrap; background:#1a1a1a; color:#e6e6e6; padding:8px; border-radius:6px; max-height:40vh; overflow:auto; font-size:11px;"></pre>
+          </div>
+        </template>
       </div>
     </div>
   </div>

@@ -107,6 +107,13 @@ window.hatchApp = function () {
     editForm: {},
     editSaving: false,
 
+    // v1.1: run history
+    historyTarget: null,
+    historyRecords: [],
+    historyLoading: false,
+    historyOpenId: null,
+    historyLogText: '',
+
     autoLaunchEnabled: false,
     autoLaunchSaving: false,
 
@@ -616,7 +623,78 @@ window.hatchApp = function () {
         tagsRaw: (script.tags || []).join(', '),
         needsArgs: script.args === null || (Array.isArray(script.args) && script.args.length > 0),
         presets: this.normalizedPresets(script),
+        envPairs: Object.entries(script.env || {}).map(([k, v]) => ({ key: k, value: v })),
+        notifyOnDone: !!script.notifyOnDone,
       };
+    },
+
+    // v1.1: Run history (uses dynamic bindings — not in wailsjs until rebuild).
+    async openHistory(script) {
+      this.historyTarget = script;
+      this.historyRecords = [];
+      this.historyOpenId = null;
+      this.historyLogText = '';
+      this.historyLoading = true;
+      try {
+        const fn = window?.go?.main?.App?.ListRuns;
+        if (typeof fn === 'function') {
+          const runs = await fn(script.path);
+          this.historyRecords = runs || [];
+        }
+      } catch (e) {
+        this.showError(`加载历史失败: ${e}`);
+      } finally {
+        this.historyLoading = false;
+      }
+    },
+    closeHistory() {
+      this.historyTarget = null;
+      this.historyRecords = [];
+      this.historyOpenId = null;
+      this.historyLogText = '';
+    },
+    async viewHistoryLog(r) {
+      if (this.historyOpenId === r.id) {
+        this.historyOpenId = null;
+        return;
+      }
+      this.historyOpenId = r.id;
+      this.historyLogText = '加载日志中…';
+      try {
+        const fn = window?.go?.main?.App?.GetRunLog;
+        if (typeof fn === 'function') {
+          this.historyLogText = await fn(this.historyTarget.path, r.id);
+        }
+      } catch (e) {
+        this.historyLogText = `读取失败: ${e}`;
+      }
+    },
+    async deleteHistory(r) {
+      try {
+        const fn = window?.go?.main?.App?.DeleteRun;
+        if (typeof fn === 'function') {
+          await fn(this.historyTarget.path, r.id);
+        }
+        this.historyRecords = this.historyRecords.filter(x => x.id !== r.id);
+      } catch (e) {
+        this.showError(`删除失败: ${e}`);
+      }
+    },
+    rerunFromHistory(r) {
+      const path = this.historyTarget.path;
+      this.scriptArgs[path] = (r.args || []).join(' ');
+      this.closeHistory();
+      // Trigger the normal run path so logs and UI update.
+      const script = (this.scripts || []).find(s => s.path === path) || { path };
+      this.runScript(script);
+    },
+
+    addEnvPair() {
+      if (!this.editForm.envPairs) this.editForm.envPairs = [];
+      this.editForm.envPairs = [...this.editForm.envPairs, { key: '', value: '' }];
+    },
+    removeEnvPair(i) {
+      this.editForm.envPairs = this.editForm.envPairs.filter((_, idx) => idx !== i);
     },
 
     cancelEdit() {
@@ -642,6 +720,12 @@ window.hatchApp = function () {
             ? (this.editForm.needsArgs ? null : [])
             : null,
           presets: this.normalizedEditPresets(),
+          env: (this.editForm.envPairs || []).reduce((acc, p) => {
+            const k = (p.key || '').trim();
+            if (k) acc[k] = p.value || '';
+            return acc;
+          }, {}),
+          notifyOnDone: !!this.editForm.notifyOnDone,
         };
         await SaveScriptMeta(meta);
         if (this.selectedDir) await this.scanDir(this.selectedDir);

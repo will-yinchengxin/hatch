@@ -3,6 +3,7 @@ package executor
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 )
@@ -14,17 +15,33 @@ type OneshotResult struct {
 	Stderr   string
 }
 
-// RunOneshot executes scriptPath with args in a login zsh so ~/.zshrc is sourced.
-// Each stdout/stderr line is forwarded via emitter in real time.
-// id is an opaque caller-supplied correlation token (e.g. script path or UUID).
+// NotifyHook is invoked after a oneshot completes (used for OS notifications).
+type NotifyHook func(exitCode int, durationMs int64)
+
+// RunOneshot executes scriptPath with args in a login zsh.
+// Backwards-compatible wrapper around RunOneshotWithEnv.
 func RunOneshot(id, scriptPath string, args []string, em *Emitter) (*OneshotResult, error) {
+	return RunOneshotWithEnv(id, scriptPath, args, nil, em, nil)
+}
+
+// RunOneshotWithEnv adds env injection, run-history archiving, and a completion hook.
+func RunOneshotWithEnv(id, scriptPath string, args []string, env map[string]string, em *Emitter, hook NotifyHook) (*OneshotResult, error) {
 	var logFn func(line, stream string)
 	var doneFn func(code int)
 
+	rec, _ := newRunRecorder(scriptPath, args) // best-effort archive
+
 	if em != nil {
 		em.Status(id, "running")
-		logFn = func(line, stream string) { em.Log(id, line, stream) }
-		doneFn = func(code int) {
+	}
+	logFn = func(line, stream string) {
+		if em != nil {
+			em.Log(id, line, stream)
+		}
+		rec.write(line, stream)
+	}
+	doneFn = func(code int) {
+		if em != nil {
 			em.Done(id, code)
 			if code == 0 {
 				em.Status(id, "stopped")
@@ -32,24 +49,39 @@ func RunOneshot(id, scriptPath string, args []string, em *Emitter) (*OneshotResu
 				em.Status(id, "error")
 			}
 		}
+		var durMs int64
+		if rec != nil {
+			rec.finalize(code)
+			durMs = rec.record.DurationMs
+		}
+		if hook != nil {
+			hook(code, durMs)
+		}
 	}
 
-	return runOneshotInternal(id, scriptPath, args, logFn, doneFn)
+	return runOneshotInternal(id, scriptPath, args, env, logFn, doneFn)
 }
 
-// runOneshotInternal is the testable core: it accepts plain callbacks instead
-// of a Wails-context-bound Emitter.
 func runOneshotInternal(
 	_ string,
 	scriptPath string,
 	args []string,
+	env map[string]string,
 	logFn func(line, stream string),
 	doneFn func(code int),
 ) (*OneshotResult, error) {
 	cmdArgs := buildZshArgs(scriptPath, args)
 	cmd := exec.Command("/bin/zsh", cmdArgs...)
+	if len(env) > 0 {
+		cmd.Env = mergeEnv(env)
+	}
 	if logFn != nil {
 		logFn("[hatch] command: "+buildScriptCommandForLog(scriptPath, args), "stdout")
+		if len(env) > 0 {
+			for k, v := range env {
+				logFn("[hatch] env: "+k+"="+v, "stdout")
+			}
+		}
 	}
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -109,10 +141,16 @@ func runOneshotInternal(
 	}, nil
 }
 
-// buildZshArgs constructs the argv for a login zsh command that explicitly
-// sources ~/.zshrc before executing the script. Wails apps launched from Finder
-// do not inherit an interactive terminal environment, and zsh -l -c does not
-// read ~/.zshrc by itself.
+// mergeEnv combines os.Environ() with override map (override wins).
+func mergeEnv(override map[string]string) []string {
+	out := os.Environ()
+	for k, v := range override {
+		out = append(out, k+"="+v)
+	}
+	return out
+}
+
+// buildZshArgs constructs the argv for a login zsh that sources ~/.zshrc.
 func buildZshArgs(scriptPath string, args []string) []string {
 	cmd := `if [[ -r "${ZDOTDIR:-$HOME}/.zshrc" ]]; then source "${ZDOTDIR:-$HOME}/.zshrc"; fi; exec ` + shellQuote(scriptPath)
 	for _, a := range args {
@@ -129,7 +167,6 @@ func buildScriptCommandForLog(scriptPath string, args []string) string {
 	return cmd
 }
 
-// shellQuote wraps s in single quotes, escaping any embedded single quotes.
 func shellQuote(s string) string {
 	result := "'"
 	for _, c := range s {

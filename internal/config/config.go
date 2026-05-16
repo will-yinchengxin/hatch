@@ -27,18 +27,20 @@ type CommandPreset struct {
 }
 
 type ScriptMeta struct {
-	Path      string          `json:"path"`
-	Name      string          `json:"name"`
-	Desc      string          `json:"desc"`
-	Type      ScriptType      `json:"type"`
-	Language  string          `json:"language"`
-	Commands  []string        `json:"commands"`
-	PidFile   string          `json:"pidFile"`
-	Args      []ArgDef        `json:"args"`
-	Presets   []CommandPreset `json:"presets,omitempty"`
-	Tags      []string        `json:"tags"`
-	LastRunAt int64           `json:"lastRunAt"`
-	UpdatedAt int64           `json:"updatedAt"`
+	Path         string            `json:"path"`
+	Name         string            `json:"name"`
+	Desc         string            `json:"desc"`
+	Type         ScriptType        `json:"type"`
+	Language     string            `json:"language"`
+	Commands     []string          `json:"commands"`
+	PidFile      string            `json:"pidFile"`
+	Args         []ArgDef          `json:"args"`
+	Presets      []CommandPreset   `json:"presets,omitempty"`
+	Tags         []string          `json:"tags"`
+	Env          map[string]string `json:"env,omitempty"`          // v1.1: per-script env overrides
+	NotifyOnDone bool              `json:"notifyOnDone,omitempty"` // v1.1: send macOS notification when oneshot completes
+	LastRunAt    int64             `json:"lastRunAt"`
+	UpdatedAt    int64             `json:"updatedAt"`
 }
 
 type Directory struct {

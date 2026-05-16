@@ -245,7 +245,7 @@ type testEmitter struct {
 func runOneshotWithTestEmitter(id, scriptPath string, args []string, em *testEmitter) (*OneshotResult, error) {
 	// Delegate to RunOneshot with nil Emitter, then re-emit via testEmitter.
 	// To actually test emission we wire a thin shim.
-	return runOneshotInternal(id, scriptPath, args, func(line, stream string) {
+	return runOneshotInternal(id, scriptPath, args, nil, func(line, stream string) {
 		if em != nil && em.onLog != nil {
 			em.onLog(LogEvent{ID: id, Line: line, Stream: stream})
 		}
