@@ -97,6 +97,12 @@ export namespace config {
 	    args: ArgDef[];
 	    presets?: CommandPreset[];
 	    tags: string[];
+	    env?: Record<string, string>;
+	    notifyOnDone?: boolean;
+	    schedule?: string;
+	    requires?: string[];
+	    healthUrl?: string;
+	    preScripts?: string[];
 	    lastRunAt: number;
 	    updatedAt: number;
 	
@@ -116,6 +122,12 @@ export namespace config {
 	        this.args = this.convertValues(source["args"], ArgDef);
 	        this.presets = this.convertValues(source["presets"], CommandPreset);
 	        this.tags = source["tags"];
+	        this.env = source["env"];
+	        this.notifyOnDone = source["notifyOnDone"];
+	        this.schedule = source["schedule"];
+	        this.requires = source["requires"];
+	        this.healthUrl = source["healthUrl"];
+	        this.preScripts = source["preScripts"];
 	        this.lastRunAt = source["lastRunAt"];
 	        this.updatedAt = source["updatedAt"];
 	    }
@@ -180,6 +192,7 @@ export namespace config {
 	    docLinks?: DocLink[];
 	    aiProviders?: AIProvider[];
 	    activeProviderId?: string;
+	    promptTemplates?: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -198,6 +211,7 @@ export namespace config {
 	        this.docLinks = this.convertValues(source["docLinks"], DocLink);
 	        this.aiProviders = this.convertValues(source["aiProviders"], AIProvider);
 	        this.activeProviderId = source["activeProviderId"];
+	        this.promptTemplates = source["promptTemplates"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -221,6 +235,61 @@ export namespace config {
 	
 	
 	
+
+}
+
+export namespace executor {
+	
+	export class RunRecord {
+	    id: string;
+	    script: string;
+	    name: string;
+	    args: string[];
+	    // Go type: time
+	    startedAt: any;
+	    // Go type: time
+	    endedAt: any;
+	    exitCode: number;
+	    durationMs: number;
+	    stdoutTail: string;
+	    logPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.script = source["script"];
+	        this.name = source["name"];
+	        this.args = source["args"];
+	        this.startedAt = this.convertValues(source["startedAt"], null);
+	        this.endedAt = this.convertValues(source["endedAt"], null);
+	        this.exitCode = source["exitCode"];
+	        this.durationMs = source["durationMs"];
+	        this.stdoutTail = source["stdoutTail"];
+	        this.logPath = source["logPath"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 
@@ -386,6 +455,20 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class AliasGroup {
+	    kind: string;
+	    entries: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AliasGroup(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.entries = source["entries"];
+	    }
+	}
 	export class AppDataPaths {
 	    traceLogDir: string;
 	    traceLogDirIsSet: boolean;
@@ -406,6 +489,22 @@ export namespace main {
 	        this.skillsDirIsSet = source["skillsDirIsSet"];
 	        this.defaultTraceDir = source["defaultTraceDir"];
 	        this.defaultSkillsDir = source["defaultSkillsDir"];
+	    }
+	}
+	export class BackupResult {
+	    path: string;
+	    size: number;
+	    numFiles: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new BackupResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.size = source["size"];
+	        this.numFiles = source["numFiles"];
 	    }
 	}
 	export class ClaudeCodeStatus {
@@ -511,6 +610,100 @@ export namespace main {
 		}
 	}
 	
+	export class HealthCheckResult {
+	    script: string;
+	    missingDeps: string[];
+	    healthUrl: string;
+	    healthOk: boolean;
+	    healthStatus: number;
+	    healthLatencyMs: number;
+	    healthError: string;
+	    hasAnnotations: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HealthCheckResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.script = source["script"];
+	        this.missingDeps = source["missingDeps"];
+	        this.healthUrl = source["healthUrl"];
+	        this.healthOk = source["healthOk"];
+	        this.healthStatus = source["healthStatus"];
+	        this.healthLatencyMs = source["healthLatencyMs"];
+	        this.healthError = source["healthError"];
+	        this.hasAnnotations = source["hasAnnotations"];
+	    }
+	}
+	export class PathEntry {
+	    path: string;
+	    exists: boolean;
+	    duplicate: boolean;
+	    shadowsName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PathEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.exists = source["exists"];
+	        this.duplicate = source["duplicate"];
+	        this.shadowsName = source["shadowsName"];
+	    }
+	}
+	export class PathHealth {
+	    entries: PathEntry[];
+	    missingCount: number;
+	    duplicateCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PathHealth(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entries = this.convertValues(source["entries"], PathEntry);
+	        this.missingCount = source["missingCount"];
+	        this.duplicateCount = source["duplicateCount"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ScheduleInfo {
+	    path: string;
+	    schedule: string;
+	    nextRun: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScheduleInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.schedule = source["schedule"];
+	        this.nextRun = source["nextRun"];
+	    }
+	}
 	export class SkillEntry {
 	    name: string;
 	    description: string;

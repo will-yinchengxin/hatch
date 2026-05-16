@@ -545,6 +545,11 @@
           <span class="ai-sidenav-icon">⚡</span>
           <span>工具</span>
         </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='prompts' ? 'active' : ''"
+          @click="aiSubTab='prompts'; loadPromptTemplates()">
+          <span class="ai-sidenav-icon">📝</span>
+          <span>Prompt</span>
+        </button>
       </nav>
 
       <!-- Right content -->
@@ -1060,6 +1065,34 @@
               <button class="btn-sm btn-primary" @click="addDocLink()" :disabled="!docLinkForm.path.trim()" :aria-busy="docLinksSaving">
                 + 添加
               </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ Prompt 模板（v1.2） ════════════════════════════════════ -->
+        <div x-show="aiSubTab==='prompts'">
+          <section class="ai-section">
+            <h3 class="ai-section-title">📝 自定义 Prompt 模板</h3>
+            <p class="ai-section-desc">
+              覆盖每个 AI 操作的 system prompt。留空则用 Hatch 内置的默认提示。改完点保存即生效（无需重启）。
+            </p>
+            <template x-for="op in promptOps" :key="op.key">
+              <div class="form-field" style="margin-bottom: 16px;">
+                <label class="field-label">
+                  <span x-text="op.label"></span>
+                  <span class="muted" style="margin-left:8px; font-size:12px;" x-text="'(' + op.key + ')'"></span>
+                </label>
+                <textarea
+                  x-model="promptTemplates[op.key]"
+                  :placeholder="op.placeholder"
+                  class="field-textarea"
+                  rows="4"
+                ></textarea>
+              </div>
+            </template>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <button @click="savePromptTemplates()" :aria-busy="promptSaving">💾 保存模板</button>
+              <button class="secondary" @click="resetPromptTemplate()">↺ 全部清空（恢复默认）</button>
             </div>
           </section>
         </div>

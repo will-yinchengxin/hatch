@@ -225,6 +225,8 @@ func (a *App) callAIOp(op string, ai config.AIConfig, systemPrompt, userPrompt s
 	if err := validateAIConfig(ai); err != nil {
 		return "", err
 	}
+	// v1.2: if the user configured a prompt template for this op, use it.
+	systemPrompt = a.effectivePrompt(op, systemPrompt)
 	baseURL := strings.TrimRight(strings.TrimSpace(ai.BaseURL), "/")
 	apiURL := baseURL
 	if !strings.HasSuffix(apiURL, "/chat/completions") {

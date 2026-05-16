@@ -107,6 +107,17 @@ window.hatchApp = function () {
     editForm: {},
     editSaving: false,
 
+    // v1.2: prompt templates
+    promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '' },
+    promptSaving: false,
+    promptOps: [
+      { key: 'SuggestScriptMeta',         label: '脚本元信息分析',  placeholder: '默认：你是 macOS 脚本管理工具 Hatch 的脚本分析助手……' },
+      { key: 'SuggestScriptContent',      label: '脚本内容生成',    placeholder: '默认：你是 macOS shell 脚本编写助手……' },
+      { key: 'SuggestZshrcAnnotation',    label: 'zshrc 条目备注',  placeholder: '默认：你是 shell 配置解释助手……（限 60 字符以内）' },
+      { key: 'SuggestZshrcOrganization',  label: 'zshrc 整理重排',  placeholder: '默认：你是谨慎的 zsh 配置整理助手……' },
+      { key: 'TestAIConfig',              label: '配置连通性测试',  placeholder: '默认：你是 Hatch 的配置检测助手。请只回复 pong。' },
+    ],
+
     // v1.1: run history
     historyTarget: null,
     historyRecords: [],
@@ -630,6 +641,47 @@ window.hatchApp = function () {
         healthUrl: script.healthUrl || '',
         preScriptsRaw: (script.preScripts || []).join('\n'),
       };
+    },
+
+    // v1.2: Prompt templates (uses dynamic bindings).
+    async loadPromptTemplates() {
+      try {
+        const fn = window?.go?.main?.App?.GetPromptTemplates;
+        if (typeof fn !== 'function') return;
+        const current = (await fn()) || {};
+        const next = { ...this.promptTemplates };
+        for (const op of this.promptOps) {
+          next[op.key] = current[op.key] || '';
+        }
+        this.promptTemplates = next;
+      } catch (e) {
+        this.showError(`加载 Prompt 模板失败: ${e}`);
+      }
+    },
+    async savePromptTemplates() {
+      this.promptSaving = true;
+      try {
+        const fn = window?.go?.main?.App?.SavePromptTemplates;
+        if (typeof fn !== 'function') throw new Error('binding 未生成，请运行 wails dev 或 wails build 重新生成');
+        const payload = {};
+        for (const op of this.promptOps) {
+          const v = (this.promptTemplates[op.key] || '').trim();
+          if (v) payload[op.key] = v;
+        }
+        await fn(payload);
+        this.showSuccess('Prompt 模板已保存（立即对后续 AI 调用生效）');
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.promptSaving = false;
+      }
+    },
+    async resetPromptTemplate() {
+      if (!confirm('确认清空所有自定义 Prompt 模板，恢复内置默认？')) return;
+      const blank = {};
+      for (const op of this.promptOps) blank[op.key] = '';
+      this.promptTemplates = blank;
+      await this.savePromptTemplates();
     },
 
     // v1.1: Run history (uses dynamic bindings — not in wailsjs until rebuild).

@@ -6,8 +6,24 @@ export function AddDirectory(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddDirectory'](arg1, arg2, arg3);
 }
 
+export function ApplyAllSchedules() {
+  return window['go']['main']['App']['ApplyAllSchedules']();
+}
+
 export function ApplyZshrcOrganization(arg1) {
   return window['go']['main']['App']['ApplyZshrcOrganization'](arg1);
+}
+
+export function CheckCommandAvailable(arg1) {
+  return window['go']['main']['App']['CheckCommandAvailable'](arg1);
+}
+
+export function CheckPathHealth() {
+  return window['go']['main']['App']['CheckPathHealth']();
+}
+
+export function CheckScriptHealth(arg1) {
+  return window['go']['main']['App']['CheckScriptHealth'](arg1);
 }
 
 export function CheckZshrc() {
@@ -26,12 +42,20 @@ export function CreateSkillTemplate(arg1) {
   return window['go']['main']['App']['CreateSkillTemplate'](arg1);
 }
 
+export function DeleteRun(arg1, arg2) {
+  return window['go']['main']['App']['DeleteRun'](arg1, arg2);
+}
+
 export function DeleteScriptMeta(arg1) {
   return window['go']['main']['App']['DeleteScriptMeta'](arg1);
 }
 
 export function DeleteSkill(arg1) {
   return window['go']['main']['App']['DeleteSkill'](arg1);
+}
+
+export function ExportBackup(arg1) {
+  return window['go']['main']['App']['ExportBackup'](arg1);
 }
 
 export function GetAIProviders() {
@@ -82,6 +106,14 @@ export function GetDocLinks() {
   return window['go']['main']['App']['GetDocLinks']();
 }
 
+export function GetPromptTemplates() {
+  return window['go']['main']['App']['GetPromptTemplates']();
+}
+
+export function GetRunLog(arg1, arg2) {
+  return window['go']['main']['App']['GetRunLog'](arg1, arg2);
+}
+
 export function GetScriptsByDir(arg1) {
   return window['go']['main']['App']['GetScriptsByDir'](arg1);
 }
@@ -98,8 +130,24 @@ export function GetSkillsStats() {
   return window['go']['main']['App']['GetSkillsStats']();
 }
 
+export function ImportBackup(arg1) {
+  return window['go']['main']['App']['ImportBackup'](arg1);
+}
+
 export function ImportSkillsFrom(arg1) {
   return window['go']['main']['App']['ImportSkillsFrom'](arg1);
+}
+
+export function ListAliasInventory() {
+  return window['go']['main']['App']['ListAliasInventory']();
+}
+
+export function ListRuns(arg1) {
+  return window['go']['main']['App']['ListRuns'](arg1);
+}
+
+export function ListSchedules() {
+  return window['go']['main']['App']['ListSchedules']();
 }
 
 export function OpenFile(arg1) {
@@ -118,8 +166,16 @@ export function RemoveDirectory(arg1) {
   return window['go']['main']['App']['RemoveDirectory'](arg1);
 }
 
+export function RemoveSchedule(arg1) {
+  return window['go']['main']['App']['RemoveSchedule'](arg1);
+}
+
 export function RunScript(arg1, arg2, arg3) {
   return window['go']['main']['App']['RunScript'](arg1, arg2, arg3);
+}
+
+export function RunWithPreScripts(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RunWithPreScripts'](arg1, arg2, arg3, arg4);
 }
 
 export function SaveAIConfig(arg1) {
@@ -148,6 +204,10 @@ export function SaveDocLinks(arg1) {
 
 export function SaveExports(arg1) {
   return window['go']['main']['App']['SaveExports'](arg1);
+}
+
+export function SavePromptTemplates(arg1) {
+  return window['go']['main']['App']['SavePromptTemplates'](arg1);
 }
 
 export function SaveScriptMeta(arg1) {
@@ -180,6 +240,10 @@ export function SetSkillSync(arg1, arg2, arg3) {
 
 export function SuggestScriptContent(arg1, arg2, arg3) {
   return window['go']['main']['App']['SuggestScriptContent'](arg1, arg2, arg3);
+}
+
+export function SuggestScriptContentStream(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SuggestScriptContentStream'](arg1, arg2, arg3, arg4);
 }
 
 export function SuggestScriptMeta(arg1) {
