@@ -34,6 +34,10 @@ export function DeleteSkill(arg1) {
   return window['go']['main']['App']['DeleteSkill'](arg1);
 }
 
+export function GetAIProviders() {
+  return window['go']['main']['App']['GetAIProviders']();
+}
+
 export function GetAITraceStorageInfo() {
   return window['go']['main']['App']['GetAITraceStorageInfo']();
 }
@@ -58,12 +62,24 @@ export function GetClaudeCodeStatus() {
   return window['go']['main']['App']['GetClaudeCodeStatus']();
 }
 
+export function GetClaudeSettings() {
+  return window['go']['main']['App']['GetClaudeSettings']();
+}
+
+export function GetCodexConfig() {
+  return window['go']['main']['App']['GetCodexConfig']();
+}
+
 export function GetCodexUsageStatus() {
   return window['go']['main']['App']['GetCodexUsageStatus']();
 }
 
 export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
+}
+
+export function GetDocLinks() {
+  return window['go']['main']['App']['GetDocLinks']();
 }
 
 export function GetScriptsByDir(arg1) {
@@ -86,6 +102,10 @@ export function ImportSkillsFrom(arg1) {
   return window['go']['main']['App']['ImportSkillsFrom'](arg1);
 }
 
+export function OpenFile(arg1) {
+  return window['go']['main']['App']['OpenFile'](arg1);
+}
+
 export function ParseZshrc() {
   return window['go']['main']['App']['ParseZshrc']();
 }
@@ -106,8 +126,24 @@ export function SaveAIConfig(arg1) {
   return window['go']['main']['App']['SaveAIConfig'](arg1);
 }
 
+export function SaveAIProviders(arg1, arg2) {
+  return window['go']['main']['App']['SaveAIProviders'](arg1, arg2);
+}
+
 export function SaveAppDataPaths(arg1, arg2) {
   return window['go']['main']['App']['SaveAppDataPaths'](arg1, arg2);
+}
+
+export function SaveClaudeSettings(arg1) {
+  return window['go']['main']['App']['SaveClaudeSettings'](arg1);
+}
+
+export function SaveCodexConfig(arg1) {
+  return window['go']['main']['App']['SaveCodexConfig'](arg1);
+}
+
+export function SaveDocLinks(arg1) {
+  return window['go']['main']['App']['SaveDocLinks'](arg1);
 }
 
 export function SaveExports(arg1) {

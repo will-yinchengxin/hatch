@@ -20,14 +20,9 @@ import {
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
 
 // New methods added to Go but not yet in wailsjs/App.js (regenerated on next build).
-const ParseZshrc          = ()        => window['go']['main']['App']['ParseZshrc']();
-const SaveZshrcAnnotation = (key, note) => window['go']['main']['App']['SaveZshrcAnnotation'](key, note);
 const SaveAIConfig        = (ai)      => window['go']['main']['App']['SaveAIConfig'](ai);
 const TestAIConfig        = (ai)      => window['go']['main']['App']['TestAIConfig'](ai);
 const SuggestScriptMeta   = (meta)    => window['go']['main']['App']['SuggestScriptMeta'](meta);
-const SuggestZshrcAnnotation = (entry) => window['go']['main']['App']['SuggestZshrcAnnotation'](entry);
-const SuggestZshrcOrganization = (mode) => window['go']['main']['App']['SuggestZshrcOrganization'](mode);
-const ApplyZshrcOrganization = (content) => window['go']['main']['App']['ApplyZshrcOrganization'](content);
 const GetAutoLaunchEnabled = () => window['go']['main']['App']['GetAutoLaunchEnabled']();
 const SetAutoLaunchEnabled = (enabled) => window['go']['main']['App']['SetAutoLaunchEnabled'](enabled);
 const GetClaudeCodeStatus   = ()                            => window['go']['main']['App']['GetClaudeCodeStatus']();
@@ -49,6 +44,15 @@ const ImportSkillsFrom      = (source)                      => window['go']['mai
 const CreateSkillTemplate   = (name)                        => window['go']['main']['App']['CreateSkillTemplate'](name);
 const GetAppDataPaths       = ()                            => window['go']['main']['App']['GetAppDataPaths']();
 const SaveAppDataPaths      = (traceDir, skillsDir)         => window['go']['main']['App']['SaveAppDataPaths'](traceDir, skillsDir);
+const GetAIProviders        = ()                            => window['go']['main']['App']['GetAIProviders']();
+const SaveAIProviders       = (providers, activeID)         => window['go']['main']['App']['SaveAIProviders'](providers, activeID);
+const GetDocLinks           = ()                            => window['go']['main']['App']['GetDocLinks']();
+const SaveDocLinks          = (links)                       => window['go']['main']['App']['SaveDocLinks'](links);
+const OpenFile              = (path)                        => window['go']['main']['App']['OpenFile'](path);
+const GetClaudeSettings     = ()                            => window['go']['main']['App']['GetClaudeSettings']();
+const SaveClaudeSettings    = (content)                     => window['go']['main']['App']['SaveClaudeSettings'](content);
+const GetCodexConfig        = ()                            => window['go']['main']['App']['GetCodexConfig']();
+const SaveCodexConfig       = (content)                     => window['go']['main']['App']['SaveCodexConfig'](content);
 
 window.hatchApp = function () {
   return {
@@ -80,42 +84,28 @@ window.hatchApp = function () {
     aiSaving: false,
     aiTesting: false,
     aiTestResult: '',
+
+    // Multi-provider state
+    aiProviders: [],
+    activeProviderID: '',
+    providerForm: null,   // null = closed; object = editing/creating
+    providerTesting: false,
+    providerTestResult: '',
+
     aiBusyScript: null,
-    aiBusyEntry: null,
     zshrcInfo: null,
-    newDir: { path: '', exportName: '', isScriptDir: true },
+    newDir: { path: '' },
     savingExports: false,
 
-    quickExportDir: null,
-    quickExportName: '',
+    inlineExportDir: null,
+    inlineExportName: '',
+
+    exportsDirty: false,
 
     // Edit drawer
     editTarget: null,
     editForm: {},
     editSaving: false,
-
-    // zshrc analysis
-    zshrcEntries: [],
-    zshrcFilter: 'all',
-    zshrcLoading: false,
-    zshrcOrganizing: false,
-    zshrcApplying: false,
-    zshrcOrganizationMode: '按功能模块优先分组，同时把 export/PATH、alias、函数、source 初始化分别归类。',
-    zshrcOrganization: null,
-    zshrcApplyResult: null,
-    annotationTarget: null,
-    annotationText: '',
-    expandedFns: {},
-
-    zshrcFilterOptions: [
-      { key: 'all',      label: '全部' },
-      { key: 'function', label: '函数' },
-      { key: 'alias',    label: '别名' },
-      { key: 'export',   label: '导出' },
-      { key: 'path',     label: 'PATH' },
-      { key: 'source',   label: 'Source' },
-      { key: 'other',    label: '其他' },
-    ],
 
     autoLaunchEnabled: false,
     autoLaunchSaving: false,
@@ -127,6 +117,14 @@ window.hatchApp = function () {
     // Codex usage status
     codexStatus: null,
     codexStatusLoading: false,
+
+    // Config file editors
+    claudeSettingsOpen: false,
+    claudeSettingsContent: '',
+    claudeSettingsSaving: false,
+    codexConfigOpen: false,
+    codexConfigContent: '',
+    codexConfigSaving: false,
 
     // Script content editor
     scriptEditorTarget: null,   // ScriptMeta of the script being edited
@@ -167,13 +165,26 @@ window.hatchApp = function () {
     // Workspace-settings accordion state
     wsShellOpen: false,
     wsDirsOpen: true,
-    wsEnvOpen: false,
-    wsZshrcOpen: false,
+    wsEnvOpen: true,
 
     // App data paths config
     dataPaths: {},           // AppDataPaths from Go
     dataPathsForm: { traceLogDir: '', skillsDir: '' },
     dataPathsSaving: false,
+
+    // Doc links (AI > Tools quick-open documents)
+    docLinks: [],
+    docLinkForm: { path: '', label: '' },
+    docLinksSaving: false,
+
+    // Global search / replace overlay
+    searchOpen: false,
+    searchReplaceMode: false,
+    searchQuery: '',
+    searchReplaceText: '',
+    searchMatches: [],
+    searchCurrentIdx: -1,
+    searchActiveEl: null,
 
     // ── Computed ───────────────────────────────────────────────────────
     get scriptDirs() {
@@ -234,13 +245,16 @@ window.hatchApp = function () {
     },
 
     get aiReady() {
-      return !!(this.aiForm.enabled && this.aiForm.baseUrl && this.aiForm.apiKey && this.aiForm.model);
+      if (!this.aiForm.enabled) return false;
+      if (this.aiProviders.length > 0 && this.activeProviderID) {
+        const p = this.aiProviders.find(p => p.id === this.activeProviderID);
+        return !!(p && p.baseUrl && p.apiKey && p.model);
+      }
+      return !!(this.aiForm.baseUrl && this.aiForm.apiKey && this.aiForm.model);
     },
 
-    get filteredZshrcEntries() {
-      if (this.zshrcFilter === 'all') return this.zshrcEntries;
-      // 'section' is shown in 'all' only
-      return this.zshrcEntries.filter(e => e.type === this.zshrcFilter);
+    get activeProvider() {
+      return this.aiProviders.find(p => p.id === this.activeProviderID) || null;
     },
 
     // ── Lifecycle ──────────────────────────────────────────────────────
@@ -248,7 +262,10 @@ window.hatchApp = function () {
       await this.loadConfig();
       await this.scanAll();
       this.loadDataPaths();
+      this.loadDocLinks();
+      this.loadAIProviders();
       this.setupEvents();
+      this.setupSearchShortcuts();
       setInterval(() => this.refreshStatuses(), 3000);
     },
 
@@ -421,10 +438,10 @@ window.hatchApp = function () {
     async addDirectory() {
       if (!this.newDir.path) return;
       try {
-        await AddDirectory(this.newDir.path, this.newDir.exportName || '', this.newDir.isScriptDir);
+        await AddDirectory(this.newDir.path, '', true);
         await this.loadConfig();
         await this.scanAll();
-        this.newDir = { path: '', exportName: '', isScriptDir: true };
+        this.newDir = { path: '' };
         this.showSuccess('目录已添加');
       } catch (e) { this.showError(`添加目录失败: ${e}`);   }
     },
@@ -438,20 +455,29 @@ window.hatchApp = function () {
       } catch (e) { this.showError(`移除目录失败: ${e}`);   }
     },
 
-    quickExport(dir) {
-      this.quickExportDir = dir;
+    startInlineExport(dir) {
       const seg = dir.path.split('/').filter(Boolean).pop() || '';
-      this.quickExportName = seg.replace(/[^a-zA-Z0-9_]/g, '_').toUpperCase();
+      this.inlineExportName = dir.exportName || seg.replace(/[^a-zA-Z0-9_]/g, '_').toUpperCase();
+      this.inlineExportDir = dir.path;
+      this.$nextTick(() => {
+        const el = document.querySelector('.inline-export-input');
+        if (el) { el.focus(); el.select(); }
+      });
     },
 
-    async confirmQuickExport() {
-      if (!this.quickExportDir || !this.quickExportName) return;
+    cancelInlineExport() {
+      this.inlineExportDir = null;
+      this.inlineExportName = '';
+    },
+
+    async confirmInlineExport() {
+      if (!this.inlineExportDir || !this.inlineExportName) return;
       try {
-        await UpdateDirectoryExport(this.quickExportDir.path, this.quickExportName);
+        await UpdateDirectoryExport(this.inlineExportDir, this.inlineExportName);
         await this.loadConfig();
-        const name = this.quickExportName;
-        this.quickExportDir = null;
-        this.quickExportName = '';
+        const name = this.inlineExportName;
+        this.inlineExportDir = null;
+        this.inlineExportName = '';
         this.showSuccess(`$${name} 已写入 ~/.zshrc`);
       } catch (e) { this.showError(`设置导出失败: ${e}`);   }
     },
@@ -469,6 +495,7 @@ window.hatchApp = function () {
       try {
         await SaveExports(this.cfg.exports || []);
         await this.loadConfig();
+        this.exportsDirty = false;
         this.showSuccess('环境变量已写入 ~/.zshrc');
       } catch (e) { this.showError(`保存失败: ${e}`);   }
       finally { this.savingExports = false; }
@@ -477,10 +504,17 @@ window.hatchApp = function () {
     addExportRow() {
       if (!this.cfg.exports) this.cfg.exports = [];
       this.cfg.exports = [...this.cfg.exports, { name: '', value: '' }];
+      this.exportsDirty = true;
+      this.$nextTick(() => {
+        const inputs = document.querySelectorAll('.export-row .var-name');
+        const last = inputs[inputs.length - 1];
+        if (last) last.focus();
+      });
     },
 
     removeExportRow(i) {
       this.cfg.exports = this.cfg.exports.filter((_, idx) => idx !== i);
+      this.exportsDirty = true;
     },
 
     exportsPreview(extra = null) {
@@ -503,13 +537,6 @@ window.hatchApp = function () {
       }
       lines.push('# <<< Hatch managed block <<<');
       return lines.join('\n');
-    },
-
-    quickExportPreview() {
-      return this.exportsPreview({
-        name: this.quickExportName,
-        value: this.quickExportDir?.path || '',
-      });
     },
 
     shellValue(value) {
@@ -689,112 +716,6 @@ window.hatchApp = function () {
       }
     },
 
-    // ── zshrc analysis ────────────────────────────────────────────────
-    async loadZshrcAnalysis() {
-      this.zshrcLoading = true;
-      try {
-        this.zshrcEntries = await ParseZshrc() || [];
-      } catch (e) { this.showError(`解析 zshrc 失败: ${e}`);   }
-      finally { this.zshrcLoading = false; }
-    },
-
-    async organizeZshrcWithAI() {
-      if (!this.aiReady) {
-        this.selectedDir = null;
-        this.tab = 'ai';
-        this.showError('请先完成并启用 AI 配置');  
-        return;
-      }
-      this.zshrcOrganizing = true;
-      this.zshrcApplyResult = null;
-      try {
-        this.zshrcOrganization = await SuggestZshrcOrganization(this.zshrcOrganizationMode || '');
-      } catch (e) {
-        this.showError(`AI 整理 zshrc 失败: ${e}`);  
-      } finally {
-        this.zshrcOrganizing = false;
-      }
-    },
-
-    async applyZshrcOrganization() {
-      const content = this.zshrcOrganization?.content || '';
-      if (!content.trim()) return;
-      this.zshrcApplying = true;
-      try {
-        this.zshrcApplyResult = await ApplyZshrcOrganization(content);
-        await this.loadZshrcAnalysis();
-        await this.loadConfig();
-        this.showSuccess(`~/.zshrc 已更新，备份于 ${this.zshrcApplyResult?.backupPath?.split('/').pop()}`);
-      } catch (e) {
-        this.showError(`写入 zshrc 失败: ${e}`);  
-      } finally {
-        this.zshrcApplying = false;
-      }
-    },
-
-    clearZshrcOrganization() {
-      this.zshrcOrganization = null;
-      this.zshrcApplyResult = null;
-    },
-
-    zshrcCount(filter) {
-      if (filter === 'all') return this.zshrcEntries.length;
-      return this.zshrcEntries.filter(e => e.type === filter).length;
-    },
-
-    startAnnotate(entry) {
-      this.annotationTarget = entry.key;
-      this.annotationText = entry.note || '';
-    },
-
-    cancelAnnotate() {
-      this.annotationTarget = null;
-      this.annotationText = '';
-    },
-
-    async saveAnnotation(key) {
-      try {
-        await SaveZshrcAnnotation(key, this.annotationText);
-        const e = this.zshrcEntries.find(x => x.key === key);
-        if (e) e.note = this.annotationText;
-        this.cancelAnnotate();
-        this.showSuccess('备注已保存');
-      } catch (e) { this.showError(`保存备注失败: ${e}`);   }
-    },
-
-    async deleteAnnotation(key) {
-      try {
-        await SaveZshrcAnnotation(key, '');
-        const e = this.zshrcEntries.find(x => x.key === key);
-        if (e) e.note = '';
-        this.cancelAnnotate();
-        this.showSuccess('备注已删除');
-      } catch (e) { this.showError(`删除备注失败: ${e}`);   }
-    },
-
-    async fillAnnotationWithAI(entry) {
-      if (!this.aiReady) {
-        this.selectedDir = null;
-        this.tab = 'ai';
-        this.showError('请先完成并启用 AI 配置');  
-        return;
-      }
-      this.aiBusyEntry = entry.key;
-      try {
-        const note = await SuggestZshrcAnnotation(entry);
-        this.annotationTarget = entry.key;
-        this.annotationText = note;
-      } catch (e) {
-        this.showError(`AI 生成备注失败: ${e}`);  
-      } finally {
-        this.aiBusyEntry = null;
-      }
-    },
-
-    toggleFn(key) {
-      this.expandedFns = { ...this.expandedFns, [key]: !this.expandedFns[key] };
-    },
-
     // ── Skills management ─────────────────────────────────────────────
     async loadSkills() {
       this.skillsLoading = true;
@@ -843,7 +764,6 @@ window.hatchApp = function () {
     },
 
     async deleteSkill(name) {
-      if (!confirm(`确认删除 Skill「${name}」？此操作不会删除 Claude/Codex 中已同步的版本。`)) return;
       try {
         await DeleteSkill(name);
         if (this.skillEditTarget === name) this.closeSkillEditor();
@@ -888,6 +808,121 @@ window.hatchApp = function () {
         else this.showSuccess('无新 Skill 可导入（已全部存在）');
       } catch (e) { this.showError(`导入失败: ${e}`); }
       finally { this.skillImporting = null; }
+    },
+
+    // ── AI providers ──────────────────────────────────────────────────
+    async loadAIProviders() {
+      try {
+        const r = await GetAIProviders();
+        this.aiProviders = r.providers || [];
+        this.activeProviderID = r.activeProviderId || '';
+      } catch (_) {}
+    },
+
+    openProviderEditor(provider) {
+      if (provider) {
+        this.providerForm = { ...provider, _isNew: false };
+      } else {
+        this.providerForm = { id: '', name: '', baseUrl: '', apiKey: '', model: '', _isNew: true };
+      }
+      this.providerTestResult = '';
+    },
+
+    closeProviderEditor() {
+      this.providerForm = null;
+      this.providerTestResult = '';
+    },
+
+    fillProviderPreset(preset) {
+      if (!this.providerForm) this.openProviderEditor(null);
+      const presets = {
+        deepseek: { name: 'DeepSeek',  baseUrl: 'https://api.deepseek.com/v1',               model: 'deepseek-chat' },
+        glm:      { name: 'GLM',       baseUrl: 'https://open.bigmodel.cn/api/paas/v4',       model: 'glm-4-plus' },
+        openai:   { name: 'OpenAI',    baseUrl: 'https://api.openai.com/v1',                  model: 'gpt-4o-mini' },
+        claude:   { name: 'Claude',    baseUrl: 'https://api.anthropic.com/v1',               model: 'claude-sonnet-4-6' },
+        kimi:     { name: 'Kimi',      baseUrl: 'https://api.moonshot.cn/v1',                 model: 'moonshot-v1-8k' },
+        qwen:     { name: 'Qwen',      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+      };
+      const p = presets[preset];
+      if (!p) return;
+      this.providerForm.name    = this.providerForm.name    || p.name;
+      this.providerForm.baseUrl = p.baseUrl;
+      this.providerForm.model   = this.providerForm.model   || p.model;
+    },
+
+    async saveProviderForm() {
+      if (!this.providerForm) return;
+      const f = this.providerForm;
+      if (!f.name || !f.baseUrl || !f.apiKey || !f.model) {
+        this.showError('请填写名称、URL、Key 和模型名');
+        return;
+      }
+      const provider = {
+        id:      f.id || `p-${Date.now()}`,
+        name:    f.name.trim(),
+        baseUrl: f.baseUrl.trim(),
+        apiKey:  f.apiKey.trim(),
+        model:   f.model.trim(),
+      };
+      const existing = this.aiProviders.findIndex(p => p.id === provider.id);
+      let updated;
+      if (existing >= 0) {
+        updated = this.aiProviders.map((p, i) => i === existing ? provider : p);
+      } else {
+        updated = [...this.aiProviders, provider];
+      }
+      const activeID = this.activeProviderID || provider.id;
+      try {
+        await SaveAIProviders(updated, activeID);
+        this.aiProviders = updated;
+        this.activeProviderID = activeID;
+        this.closeProviderEditor();
+        this.showSuccess(`提供商「${provider.name}」已保存`);
+      } catch (e) { this.showError(`保存失败: ${e}`); }
+    },
+
+    async setActiveProvider(id) {
+      try {
+        await SaveAIProviders(this.aiProviders, id);
+        this.activeProviderID = id;
+        const p = this.aiProviders.find(p => p.id === id);
+        this.showSuccess(`已切换到「${p?.name || id}」`);
+      } catch (e) { this.showError(`切换失败: ${e}`); }
+    },
+
+    async deleteProvider(id) {
+      const p = this.aiProviders.find(p => p.id === id);
+      const updated = this.aiProviders.filter(p => p.id !== id);
+      const newActive = this.activeProviderID === id
+        ? (updated[0]?.id || '')
+        : this.activeProviderID;
+      try {
+        await SaveAIProviders(updated, newActive);
+        this.aiProviders = updated;
+        this.activeProviderID = newActive;
+        if (this.providerForm?.id === id) this.closeProviderEditor();
+        this.showSuccess(`已删除「${p?.name || id}」`);
+      } catch (e) { this.showError(`删除失败: ${e}`); }
+    },
+
+    async testProviderForm() {
+      if (!this.providerForm) return;
+      const f = this.providerForm;
+      this.providerTesting = true;
+      this.providerTestResult = '';
+      try {
+        const result = await TestAIConfig({
+          enabled: true,
+          baseUrl: f.baseUrl.trim(),
+          apiKey:  f.apiKey.trim(),
+          model:   f.model.trim(),
+        });
+        this.providerTestResult = `✓ ${result}`;
+      } catch (e) {
+        this.providerTestResult = `✗ ${e}`;
+      } finally {
+        this.providerTesting = false;
+      }
     },
 
     // ── App data paths ────────────────────────────────────────────────
@@ -970,18 +1005,6 @@ window.hatchApp = function () {
       return (b / 1024 / 1024).toFixed(1) + ' MB';
     },
 
-    zshrcTypeIcon(type) {
-      return {
-        function: 'ƒ',
-        alias:    '≡',
-        export:   '$',
-        path:     '⊕',
-        source:   '↯',
-        section:  '#',
-        other:    '…',
-      }[type] || '?';
-    },
-
     // ── Claude Code / Codex usage status ──────────────────────────────
     async loadAIUsageStatuses() {
       if (!this.claudeStatus) this.loadClaudeStatus();
@@ -1015,6 +1038,49 @@ window.hatchApp = function () {
       if (pct >= 80) return 'usage-high';
       if (pct >= 50) return 'usage-mid';
       return 'usage-low';
+    },
+
+    // ── Config file editors ────────────────────────────────────────────
+    async openClaudeSettings() {
+      this.claudeSettingsOpen = true;
+      try {
+        this.claudeSettingsContent = await GetClaudeSettings();
+      } catch (e) {
+        this.showError(`读取 Claude settings 失败: ${e}`);
+      }
+    },
+
+    async saveClaudeSettings() {
+      this.claudeSettingsSaving = true;
+      try {
+        await SaveClaudeSettings(this.claudeSettingsContent);
+        this.showSuccess('Claude Code 配置已保存');
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.claudeSettingsSaving = false;
+      }
+    },
+
+    async openCodexConfig() {
+      this.codexConfigOpen = true;
+      try {
+        this.codexConfigContent = await GetCodexConfig();
+      } catch (e) {
+        this.showError(`读取 Codex 配置失败: ${e}`);
+      }
+    },
+
+    async saveCodexConfig() {
+      this.codexConfigSaving = true;
+      try {
+        await SaveCodexConfig(this.codexConfigContent);
+        this.showSuccess('Codex 配置已保存');
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.codexConfigSaving = false;
+      }
     },
 
     // ── Script content editor ──────────────────────────────────────────
@@ -1205,6 +1271,163 @@ window.hatchApp = function () {
       if (svcCount > 0)     parts.push(`${svcCount} service`);
       if (oneshotCount > 0) parts.push(`${oneshotCount} oneshot`);
       return parts.join(' · ');
+    },
+
+    // ── Doc links ──────────────────────────────────────────────────────────
+    async loadDocLinks() {
+      try {
+        this.docLinks = await GetDocLinks() || [];
+      } catch (_) {}
+    },
+
+    async saveDocLinks() {
+      this.docLinksSaving = true;
+      try {
+        await SaveDocLinks(this.docLinks);
+        this.showSuccess('文档链接已保存');
+      } catch (e) {
+        this.showError(`保存文档链接失败: ${e}`);
+      } finally {
+        this.docLinksSaving = false;
+      }
+    },
+
+    async addDocLink() {
+      const path = (this.docLinkForm.path || '').trim();
+      if (!path) return;
+      const label = (this.docLinkForm.label || '').trim() || path.split('/').pop();
+      this.docLinks = [...this.docLinks, { path, label }];
+      this.docLinkForm = { path: '', label: '' };
+      await this.saveDocLinks();
+    },
+
+    async removeDocLink(idx) {
+      this.docLinks = this.docLinks.filter((_, i) => i !== idx);
+      await this.saveDocLinks();
+    },
+
+    async openDocFile(path) {
+      try {
+        await OpenFile(path);
+      } catch (e) {
+        this.showError(`打开文件失败: ${e}`);
+      }
+    },
+
+    docLinkIcon(path) {
+      const ext = (path || '').split('.').pop().toLowerCase();
+      if (ext === 'pdf') return '📕';
+      if (['html', 'htm'].includes(ext)) return '🌐';
+      if (['md', 'markdown'].includes(ext)) return '📝';
+      if (['txt'].includes(ext)) return '📄';
+      return '📎';
+    },
+
+    // ── Global search / replace ────────────────────────────────────────────
+    setupSearchShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        if (e.metaKey && e.key === 'f') {
+          e.preventDefault();
+          this.openSearchBar(false);
+        } else if (e.metaKey && e.key === 'r') {
+          // Only intercept if a textarea/input is focused (avoid interfering with other Cmd+R uses)
+          const el = document.activeElement;
+          if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) {
+            e.preventDefault();
+            this.openSearchBar(true);
+          }
+        }
+      }, true);
+    },
+
+    openSearchBar(replaceMode) {
+      const el = document.activeElement;
+      if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) {
+        this.searchActiveEl = el;
+      }
+      this.searchReplaceMode = replaceMode;
+      this.searchOpen = true;
+      this.$nextTick(() => {
+        document.getElementById('search-bar-input')?.focus();
+      });
+    },
+
+    closeSearchBar() {
+      this.searchOpen = false;
+      this.searchQuery = '';
+      this.searchReplaceText = '';
+      this.searchMatches = [];
+      this.searchCurrentIdx = -1;
+      if (this.searchActiveEl) {
+        this.searchActiveEl.focus();
+        this.searchActiveEl = null;
+      }
+    },
+
+    updateSearchMatches() {
+      if (!this.searchActiveEl || !this.searchQuery) {
+        this.searchMatches = [];
+        this.searchCurrentIdx = -1;
+        return;
+      }
+      const text = this.searchActiveEl.value;
+      const query = this.searchQuery;
+      const matches = [];
+      let idx = 0;
+      while (idx < text.length) {
+        const pos = text.indexOf(query, idx);
+        if (pos === -1) break;
+        matches.push({ start: pos, end: pos + query.length });
+        idx = pos + 1;
+      }
+      this.searchMatches = matches;
+      if (matches.length > 0) {
+        this.searchCurrentIdx = 0;
+        this._highlightMatch(0);
+      } else {
+        this.searchCurrentIdx = -1;
+      }
+    },
+
+    _highlightMatch(idx) {
+      if (!this.searchActiveEl || idx < 0 || idx >= this.searchMatches.length) return;
+      const m = this.searchMatches[idx];
+      this.searchActiveEl.focus();
+      this.searchActiveEl.setSelectionRange(m.start, m.end);
+      const ratio = m.start / Math.max(1, this.searchActiveEl.value.length);
+      this.searchActiveEl.scrollTop = this.searchActiveEl.scrollHeight * ratio;
+    },
+
+    searchNext() {
+      if (!this.searchMatches.length) return;
+      this.searchCurrentIdx = (this.searchCurrentIdx + 1) % this.searchMatches.length;
+      this._highlightMatch(this.searchCurrentIdx);
+    },
+
+    searchPrev() {
+      if (!this.searchMatches.length) return;
+      this.searchCurrentIdx = (this.searchCurrentIdx - 1 + this.searchMatches.length) % this.searchMatches.length;
+      this._highlightMatch(this.searchCurrentIdx);
+    },
+
+    searchReplaceOne() {
+      if (!this.searchActiveEl || this.searchCurrentIdx < 0 || !this.searchMatches.length) return;
+      const m = this.searchMatches[this.searchCurrentIdx];
+      const val = this.searchActiveEl.value;
+      const newVal = val.slice(0, m.start) + this.searchReplaceText + val.slice(m.end);
+      this.searchActiveEl.value = newVal;
+      this.searchActiveEl.dispatchEvent(new Event('input', { bubbles: true }));
+      this.updateSearchMatches();
+    },
+
+    searchReplaceAll() {
+      if (!this.searchActiveEl || !this.searchQuery) return;
+      const count = this.searchMatches.length;
+      const newVal = this.searchActiveEl.value.split(this.searchQuery).join(this.searchReplaceText);
+      this.searchActiveEl.value = newVal;
+      this.searchActiveEl.dispatchEvent(new Event('input', { bubbles: true }));
+      this.updateSearchMatches();
+      this.showSuccess(`已替换 ${count} 处`);
     },
   };
 };

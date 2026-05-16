@@ -119,36 +119,34 @@
       </template>
     </div>
 
-    <!-- ══ 工作台设置区（折叠式） ══════════════════════════════════════ -->
+    <!-- ══ 工作台设置区 ═══════════════════════════════════════════════ -->
     <div class="workspace-settings">
 
-      <!-- ── Shell 状态 + 路径配置 ─────────────────────────────────── -->
+      <!-- ── Shell 状态信息条（始终显示） ──────────────────────────── -->
+      <div class="ws-shell-bar" x-show="zshrcInfo">
+        <span class="ws-shell-chip">
+          <span class="ws-shell-label">Shell</span>
+          <code x-text="zshrcInfo?.shell||'-'"></code>
+          <span class="badge badge-sm" :class="zshrcInfo?.isZsh?'badge-ok':'badge-warn'"
+            x-text="zshrcInfo?.isZsh?'✓':'⚠'"></span>
+        </span>
+        <span class="ws-shell-chip" x-show="zshrcInfo?.zshrcPath">
+          <span class="ws-shell-label">zshrc</span>
+          <code x-text="zshrcInfo?.zshrcPath||'-'"></code>
+        </span>
+        <span class="ws-shell-chip" x-show="(zshrcInfo?.hatchLines||[]).length>0">
+          <span class="ws-shell-label">managed</span>
+          <code x-text="(zshrcInfo?.hatchLines?.length||0)+' 行'"></code>
+        </span>
+      </div>
+
+      <!-- ── 数据目录配置 ───────────────────────────────────────────── -->
       <section class="settings-section ws-section">
         <div class="ws-section-header" @click="wsShellOpen=!wsShellOpen">
-          <h3>⚙ 环境与路径配置</h3>
+          <h3>⚙ 数据目录</h3>
           <span class="ws-chevron" x-text="wsShellOpen ? '▲' : '▼'"></span>
         </div>
         <div x-show="wsShellOpen" x-transition>
-          <!-- Shell status -->
-          <div class="zshrc-info" x-show="zshrcInfo" style="margin-bottom:16px">
-            <div class="info-row">
-              <span class="info-label">当前 Shell</span>
-              <code x-text="zshrcInfo?.shell||'-'"></code>
-              <span class="badge" :class="zshrcInfo?.isZsh?'badge-ok':'badge-warn'"
-                x-text="zshrcInfo?.isZsh?'✓ zsh':'⚠ 非 zsh'"></span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">zshrc 路径</span>
-              <code x-text="zshrcInfo?.zshrcPath||'-'"></code>
-            </div>
-            <div class="info-row" x-show="(zshrcInfo?.hatchLines||[]).length>0">
-              <span class="info-label">Managed block</span>
-              <code x-text="(zshrcInfo?.hatchLines?.length||0)+' 行'"></code>
-            </div>
-          </div>
-
-          <!-- App data paths -->
-          <h4 style="margin:0 0 10px;font-size:13px;color:var(--text-muted)">数据目录</h4>
           <div class="data-paths-grid">
             <div class="data-path-row">
               <div class="data-path-info">
@@ -174,7 +172,7 @@
             </div>
           </div>
           <div class="export-actions" style="margin-top:10px">
-            <button @click="saveDataPaths()" :aria-busy="dataPathsSaving">💾 保存路径配置</button>
+            <button @click="saveDataPaths()" :aria-busy="dataPathsSaving">💾 保存</button>
             <button class="secondary" @click="resetDataPaths()">恢复默认</button>
           </div>
         </div>
@@ -190,31 +188,64 @@
           </div>
         </div>
         <div x-show="wsDirsOpen" x-transition>
+
           <div class="dir-setting-list" x-show="(cfg.directories||[]).length>0">
             <template x-for="d in (cfg.directories||[])" :key="d.path">
               <div class="dir-setting-row">
                 <div class="dir-setting-info">
                   <code x-text="d.path" class="dir-setting-path"></code>
-                  <span class="badge badge-export" x-show="d.exportName" x-text="'$'+d.exportName"></span>
-                  <span class="muted text-xs" x-show="!d.isScriptDir">仅路径导出</span>
                 </div>
-                <div class="dir-setting-actions">
-                  <template x-if="!d.exportName">
-                    <button class="btn-quick-export" @click="quickExport(d)">📤 导出路径</button>
+
+                <!-- Inline export name editor -->
+                <div class="dir-export-cell">
+                  <!-- Viewing state: has export name -->
+                  <template x-if="inlineExportDir !== d.path && d.exportName">
+                    <div class="dir-export-active">
+                      <span class="badge badge-export" x-text="'$'+d.exportName"
+                        @click="startInlineExport(d)" style="cursor:pointer" title="点击编辑变量名"></span>
+                      <button class="icon-btn-xs danger-text" @click="clearExport(d)" title="取消路径导出">✕</button>
+                    </div>
                   </template>
-                  <template x-if="d.exportName">
-                    <button class="secondary text-sm" @click="clearExport(d)">✕ 取消导出</button>
+                  <!-- Viewing state: no export name -->
+                  <template x-if="inlineExportDir !== d.path && !d.exportName">
+                    <button class="btn-add-export" @click="startInlineExport(d)" title="将此目录路径导出为环境变量">
+                      + 导出路径
+                    </button>
                   </template>
-                  <button class="icon-btn danger" @click="removeDirectory(d.path)">✕</button>
+                  <!-- Editing state -->
+                  <template x-if="inlineExportDir === d.path">
+                    <div class="dir-export-edit">
+                      <span class="mono-eq">$</span>
+                      <input
+                        type="text"
+                        x-model="inlineExportName"
+                        class="inline-export-input"
+                        placeholder="MY_SCRIPTS"
+                        @keyup.enter="confirmInlineExport()"
+                        @keyup.escape="cancelInlineExport()"
+                        x-init="$el.focus(); $el.select()"
+                      />
+                      <button class="btn-sm" @click="confirmInlineExport()" :disabled="!inlineExportName.trim()">✓</button>
+                      <button class="btn-sm secondary" @click="cancelInlineExport()">✕</button>
+                    </div>
+                  </template>
                 </div>
+
+                <button class="icon-btn danger" @click="removeDirectory(d.path)" title="移除目录">✕</button>
               </div>
             </template>
           </div>
-          <div class="add-dir-form" style="margin-top:12px">
-            <input type="text" x-model="newDir.path" placeholder="/path/to/scripts" class="path-input" @keyup.enter="addDirectory()" />
-            <input type="text" x-model="newDir.exportName" placeholder="导出变量名（可选）" class="export-name-input" />
-            <label class="checkbox-label"><input type="checkbox" x-model="newDir.isScriptDir" />脚本目录</label>
-            <button @click="addDirectory()" :disabled="!newDir.path">+ 添加</button>
+
+          <!-- Add directory -->
+          <div class="add-dir-form">
+            <input
+              type="text"
+              x-model="newDir.path"
+              placeholder="粘贴或输入目录路径，回车添加"
+              class="path-input"
+              @keyup.enter="addDirectory()"
+            />
+            <button @click="addDirectory()" :disabled="!newDir.path.trim()">+ 添加</button>
           </div>
         </div>
       </section>
@@ -224,139 +255,45 @@
         <div class="ws-section-header" @click="wsEnvOpen=!wsEnvOpen">
           <h3>🔑 环境变量</h3>
           <div class="ws-section-meta">
-            <span class="badge" x-text="exportCount + ' 个变量'"></span>
+            <span class="badge" x-text="exportCount + ' 个'"></span>
+            <span class="badge badge-dirty" x-show="exportsDirty">● 未保存</span>
             <span class="ws-chevron" x-text="wsEnvOpen ? '▲' : '▼'"></span>
           </div>
         </div>
         <div x-show="wsEnvOpen" x-transition>
           <p class="hint">写入 <code>~/.zshrc</code> Hatch managed block，保存后新终端生效。</p>
-          <div class="zshrc-preview" x-show="(cfg.exports||[]).some(e=>e.name)">
-            <div class="preview-label">写入 ~/.zshrc 预览：</div>
-            <pre class="preview-pre" x-text="exportsPreview()"></pre>
-          </div>
+
           <div class="export-list">
             <template x-for="(e,i) in (cfg.exports||[])" :key="i">
               <div class="export-row">
-                <input type="text" x-model="e.name"  placeholder="VARIABLE_NAME" class="var-name"  />
+                <input type="text" x-model="e.name"  @input="exportsDirty=true" placeholder="VARIABLE_NAME" class="var-name"  />
                 <span class="eq">=</span>
-                <input type="text" x-model="e.value" placeholder="/path/or/value" class="var-value" />
-                <button class="icon-btn danger" @click="removeExportRow(i)">✕</button>
+                <input type="text" x-model="e.value" @input="exportsDirty=true" placeholder="/path/or/value" class="var-value" />
+                <button class="icon-btn danger" @click="removeExportRow(i)" title="删除此变量">✕</button>
               </div>
             </template>
-            <div x-show="(cfg.exports||[]).length===0" class="muted text-sm">暂无变量。</div>
+            <div x-show="(cfg.exports||[]).length===0" class="muted text-sm empty-exports">
+              暂无变量。点击「+ 添加」后写入 <code>~/.zshrc</code>，新终端中生效。
+            </div>
           </div>
+
           <div class="export-actions">
-            <button class="secondary" @click="addExportRow()">+ 添加变量</button>
-            <button @click="saveExports()" :aria-busy="savingExports">💾 保存到 zshrc</button>
+            <button class="secondary" @click="addExportRow()">+ 添加</button>
+            <button
+              @click="saveExports()"
+              :aria-busy="savingExports"
+              :class="exportsDirty ? 'btn-save-dirty' : ''"
+            >💾 保存到 zshrc</button>
           </div>
+
+          <!-- zshrc preview (collapsible) -->
+          <details class="export-preview-details" x-show="(cfg.exports||[]).some(e=>e.name)">
+            <summary class="export-preview-toggle muted text-sm">预览写入内容</summary>
+            <pre class="preview-pre export-preview-pre" x-text="exportsPreview()"></pre>
+          </details>
         </div>
       </section>
 
-      <!-- ── Shell 配置解析 ──────────────────────────────────────────── -->
-      <section class="settings-section ws-section">
-        <div class="ws-section-header" @click="wsZshrcOpen=!wsZshrcOpen">
-          <h3>📄 Shell 配置解析</h3>
-          <div class="ws-section-meta">
-            <span class="badge" x-show="zshrcEntries.length" x-text="zshrcEntries.length + ' 条'"></span>
-            <button class="btn-sm" @click.stop="loadZshrcAnalysis()" :aria-busy="zshrcLoading">↻ 解析</button>
-            <span class="ws-chevron" x-text="wsZshrcOpen ? '▲' : '▼'"></span>
-          </div>
-        </div>
-        <div x-show="wsZshrcOpen" x-transition>
-          <div class="zshrc-organizer">
-            <div class="organizer-controls">
-              <input type="text" x-model="zshrcOrganizationMode" class="field-input" placeholder="整理偏好：按功能模块、按类型、按工具链等" />
-              <button @click="organizeZshrcWithAI()" :aria-busy="zshrcOrganizing" :disabled="!aiReady">✦ AI 智能排版</button>
-            </div>
-            <p class="hint">AI 只生成预览，不会自动写入。点击「备份并应用」时会先生成 <code>.zshrc.hatch-backup-*</code> 备份。</p>
-            <div class="zshrc-preview organization-preview" x-show="zshrcOrganization">
-              <div class="preview-label">整理摘要</div>
-              <div class="organizer-summary">
-                <template x-for="(item,i) in (zshrcOrganization?.summary||[])" :key="i">
-                  <span x-text="item"></span>
-                </template>
-              </div>
-              <div class="preview-label">新 ~/.zshrc 预览</div>
-              <textarea class="organization-textarea" x-model="zshrcOrganization.content" spellcheck="false"></textarea>
-              <div class="export-actions organizer-actions">
-                <button @click="applyZshrcOrganization()" :aria-busy="zshrcApplying">备份并应用</button>
-                <button class="secondary" @click="clearZshrcOrganization()">取消预览</button>
-                <span class="muted text-sm" x-show="zshrcApplyResult" x-text="'已备份到 ' + zshrcApplyResult?.backupPath"></span>
-              </div>
-            </div>
-          </div>
-          <template x-if="zshrcEntries.length === 0 && !zshrcLoading">
-            <p class="muted text-sm">点击「↻ 解析」，识别函数、别名、环境变量等，可为每项添加备注说明。</p>
-          </template>
-          <template x-if="zshrcEntries.length > 0">
-            <div>
-              <div class="zshrc-filter-tabs">
-                <template x-for="f in zshrcFilterOptions" :key="f.key">
-                  <button class="filter-tab" :class="zshrcFilter === f.key ? 'active' : ''"
-                    @click="zshrcFilter = f.key" x-text="f.label + ' (' + zshrcCount(f.key) + ')'"></button>
-                </template>
-              </div>
-              <div class="zshrc-entry-list">
-                <template x-for="e in filteredZshrcEntries" :key="e.key">
-                  <div class="zshrc-entry" :class="'zshrc-'+e.type">
-                    <div class="zshrc-entry-header">
-                      <span class="zshrc-type-badge" x-text="zshrcTypeIcon(e.type)"></span>
-                      <strong class="zshrc-key"
-                        x-text="e.key.startsWith('comment:') || e.key.startsWith('other:') || e.key.startsWith('source:') ? '' : e.key"></strong>
-                      <span class="zshrc-value-preview muted" :title="e.value"
-                        x-text="e.type==='function' ? e.value.split('\\n')[0] : e.value"></span>
-                      <button class="btn-annotate" @click="startAnnotate(e)">
-                        <span x-show="!e.note" class="muted">+ 备注</span>
-                        <span x-show="e.note" class="annotation-text" x-text="e.note"></span>
-                      </button>
-                      <button class="btn-annotate ai-note-btn" @click="fillAnnotationWithAI(e)"
-                        :aria-busy="aiBusyEntry===e.key" title="使用 AI 生成备注">✦ AI</button>
-                    </div>
-                    <div class="annotation-editor" x-show="annotationTarget === e.key">
-                      <input type="text" x-model="annotationText" placeholder="添加备注说明…" class="annotation-input"
-                        @keyup.enter="saveAnnotation(e.key)" @keyup.escape="cancelAnnotate()" />
-                      <button @click="saveAnnotation(e.key)">保存</button>
-                      <button class="secondary" @click="cancelAnnotate()">取消</button>
-                      <button class="secondary danger-text" x-show="e.note" @click="deleteAnnotation(e.key)">删除</button>
-                    </div>
-                    <template x-if="e.type === 'function'">
-                      <div>
-                        <button class="btn-expand-fn" @click="toggleFn(e.key)">
-                          <span x-text="expandedFns[e.key] ? '▲ 收起' : '▼ 展开函数体'"></span>
-                        </button>
-                        <pre class="fn-body" x-show="expandedFns[e.key]" x-text="e.value"></pre>
-                      </div>
-                    </template>
-                  </div>
-                </template>
-              </div>
-            </div>
-          </template>
-        </div>
-      </section>
-
-      <!-- Quick export modal (shared) -->
-      <div class="overlay" x-show="quickExportDir" x-transition @click.self="quickExportDir=null">
-        <div class="modal">
-          <h4>📤 导出为环境变量</h4>
-          <p class="muted text-sm">将目录路径写入 <code>~/.zshrc</code>，新终端中可用 <code>$变量名</code> 引用。</p>
-          <div class="modal-row">
-            <span class="mono-label">export</span>
-            <input type="text" x-model="quickExportName" placeholder="MY_TOOLS" class="var-name"
-              @keyup.enter="confirmQuickExport()" x-ref="exportNameInput" />
-            <span class="mono-label">=</span>
-            <code x-text="quickExportDir?.path" class="preview-val"></code>
-          </div>
-          <div class="zshrc-preview quick-export-preview" x-show="quickExportName">
-            <div class="preview-label">将写入 Hatch managed block</div>
-            <pre class="preview-pre" x-text="quickExportPreview()"></pre>
-          </div>
-          <div class="modal-actions">
-            <button @click="confirmQuickExport()" :disabled="!quickExportName">✓ 写入 zshrc</button>
-            <button class="secondary" @click="quickExportDir=null;quickExportName=''">取消</button>
-          </div>
-        </div>
-      </div>
     </div><!-- /workspace-settings -->
   </main>
 
@@ -558,13 +495,16 @@
             <span class="hero-stat-value" x-text="aiForm.enabled ? 'ON' : 'OFF'" :style="aiForm.enabled ? 'color:var(--green)' : 'color:var(--text-muted)'"></span>
           </div>
         </div>
-        <div class="hero-stat-card" x-show="aiForm.model">
-          <div class="hero-stat-label">模型</div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">
+            <span x-text="activeProvider ? activeProvider.name : '模型'"></span>
+          </div>
           <div class="hero-stat-body">
-            <span class="hero-stat-value hero-stat-value--sm" x-text="(aiForm.model || '—').split('/').pop()"></span>
+            <span class="hero-stat-value hero-stat-value--sm"
+              x-text="activeProvider ? (activeProvider.model||'—').split('/').pop() : (aiForm.model ? (aiForm.model||'—').split('/').pop() : '—')"></span>
           </div>
         </div>
-        <div class="hero-stat-card hero-stat-card--skills">
+        <div class="hero-stat-card">
           <div class="hero-stat-label">Skills</div>
           <div class="hero-stat-body">
             <span class="hero-stat-total" x-text="skillsStats.total || 0"></span>
@@ -619,10 +559,6 @@
                 <span>脚本卡片点击「✦ 智能填写」，AI 读取内容填充元信息，进入编辑抽屉后手动保存。</span>
               </div>
               <div class="ai-capability">
-                <strong>✦ Shell 备注生成</strong>
-                <span>Shell 解析列表点击「✦ AI」，AI 为函数/alias/export 生成一句说明，进入输入框后手动保存。</span>
-              </div>
-              <div class="ai-capability">
                 <strong>📄 脚本内容编辑</strong>
                 <span>脚本卡片点击「📄 内容」，输入 AI 指令后点「生成」，AI 按指令修改脚本，确认后保存写入。</span>
               </div>
@@ -645,41 +581,90 @@
 
         <!-- ══ 连接 ══════════════════════════════════════════════════ -->
         <div x-show="aiSubTab==='connect'">
-          <!-- Model config -->
+          <!-- Global enable toggle -->
           <section class="settings-section ai-config-section">
             <div class="section-header-row">
               <h3>✦ 模型连接</h3>
               <span class="badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '可用' : '未完成'"></span>
             </div>
 
-            <label class="checkbox-label ai-enable" style="margin-bottom:12px">
-              <input type="checkbox" x-model="aiForm.enabled" />
+            <label class="checkbox-label ai-enable">
+              <input type="checkbox" x-model="aiForm.enabled" @change="saveAIConfig()" />
               启用 AI 智能功能
             </label>
 
-            <label class="field-stack">
-              <span>API Base URL</span>
-              <input type="text" x-model="aiForm.baseUrl" placeholder="https://api.deepseek.com/v1" class="field-input" />
-            </label>
-            <label class="field-stack">
-              <span>API Key</span>
-              <input type="password" x-model="aiForm.apiKey" placeholder="sk-..." class="field-input" autocomplete="off" />
-            </label>
-            <label class="field-stack">
-              <span>模型名</span>
-              <input type="text" x-model="aiForm.model" placeholder="deepseek-chat / glm-4-plus / gpt-4o-mini" class="field-input" />
-            </label>
-
-            <div class="ai-provider-hints" style="margin-top:10px">
-              <button class="preset-btn" @click="aiForm.baseUrl='https://api.deepseek.com/v1'; aiForm.model=aiForm.model||'deepseek-chat'">DeepSeek</button>
-              <button class="preset-btn" @click="aiForm.baseUrl='https://open.bigmodel.cn/api/paas/v4'; aiForm.model=aiForm.model||'glm-4-plus'">GLM</button>
-              <button class="preset-btn" @click="aiForm.baseUrl='https://api.openai.com/v1'; aiForm.model=aiForm.model||'gpt-4o-mini'">OpenAI</button>
+            <!-- Provider list -->
+            <div class="provider-list" x-show="aiProviders.length > 0">
+              <template x-for="p in aiProviders" :key="p.id">
+                <div class="provider-row" :class="activeProviderID === p.id ? 'provider-active' : ''">
+                  <div class="provider-active-dot">
+                    <span x-show="activeProviderID === p.id" class="dot-active" title="当前活跃">●</span>
+                    <span x-show="activeProviderID !== p.id" class="dot-inactive">○</span>
+                  </div>
+                  <div class="provider-info" @click="setActiveProvider(p.id)" style="cursor:pointer" title="点击切换为活跃提供商">
+                    <span class="provider-name" x-text="p.name"></span>
+                    <span class="provider-model muted text-xs" x-text="p.model"></span>
+                  </div>
+                  <div class="provider-actions">
+                    <button class="btn-sm" x-show="activeProviderID !== p.id"
+                      @click="setActiveProvider(p.id)">切换</button>
+                    <span class="badge badge-ok provider-badge-active" x-show="activeProviderID === p.id">活跃</span>
+                    <button class="btn-sm" @click="openProviderEditor(p)">编辑</button>
+                    <button class="btn-sm btn-danger-sm" @click="deleteProvider(p.id)">✕</button>
+                  </div>
+                </div>
+              </template>
             </div>
 
-            <div class="export-actions" style="margin-top:14px">
-              <button @click="saveAIConfig()" :aria-busy="aiSaving">💾 保存</button>
-              <button class="secondary" @click="testAIConfig()" :disabled="!aiForm.baseUrl || !aiForm.apiKey || !aiForm.model" :aria-busy="aiTesting">测试连接</button>
-              <span class="muted text-sm" x-show="aiTestResult" x-text="aiTestResult"></span>
+            <!-- Add / quick presets -->
+            <div class="provider-add-row">
+              <button class="btn-sm btn-primary" @click="openProviderEditor(null)">+ 新增提供商</button>
+              <span class="muted text-xs">快速填充：</span>
+              <button class="preset-btn text-xs" @click="fillProviderPreset('deepseek')">DeepSeek</button>
+              <button class="preset-btn text-xs" @click="fillProviderPreset('glm')">GLM</button>
+              <button class="preset-btn text-xs" @click="fillProviderPreset('kimi')">Kimi</button>
+              <button class="preset-btn text-xs" @click="fillProviderPreset('claude')">Claude</button>
+              <button class="preset-btn text-xs" @click="fillProviderPreset('openai')">OpenAI</button>
+              <button class="preset-btn text-xs" @click="fillProviderPreset('qwen')">Qwen</button>
+            </div>
+
+            <!-- Provider editor form -->
+            <div class="provider-editor" x-show="providerForm !== null" x-transition>
+              <div class="provider-editor-header">
+                <strong x-text="providerForm?._isNew ? '新增提供商' : '编辑提供商'"></strong>
+                <button class="icon-btn" @click="closeProviderEditor()">✕</button>
+              </div>
+              <div class="provider-editor-body">
+                <div class="provider-field-row">
+                  <label class="field-stack" style="flex:1">
+                    <span>名称</span>
+                    <input type="text" x-model="providerForm.name" placeholder="DeepSeek" class="field-input" />
+                  </label>
+                  <label class="field-stack" style="flex:2">
+                    <span>API Base URL</span>
+                    <input type="text" x-model="providerForm.baseUrl" placeholder="https://api.deepseek.com/v1" class="field-input" />
+                  </label>
+                </div>
+                <label class="field-stack">
+                  <span>API Key</span>
+                  <input type="password" x-model="providerForm.apiKey" placeholder="sk-..." class="field-input" autocomplete="off" />
+                </label>
+                <label class="field-stack">
+                  <span>模型名</span>
+                  <input type="text" x-model="providerForm.model" placeholder="deepseek-chat" class="field-input" />
+                </label>
+                <div class="provider-editor-footer">
+                  <button @click="saveProviderForm()">💾 保存</button>
+                  <button class="secondary" @click="testProviderForm()" :aria-busy="providerTesting"
+                    :disabled="!providerForm?.baseUrl || !providerForm?.apiKey || !providerForm?.model">
+                    测试连接
+                  </button>
+                  <span class="text-sm" x-show="providerTestResult"
+                    :class="providerTestResult.startsWith('✓') ? 'text-ok' : 'text-err'"
+                    x-text="providerTestResult"></span>
+                  <button class="secondary" @click="closeProviderEditor()" style="margin-left:auto">取消</button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -928,6 +913,20 @@
                   </template>
                 </div>
               </template>
+              <!-- Config editor -->
+              <div class="cfg-editor-block">
+                <button class="cfg-editor-toggle" @click="claudeSettingsOpen ? (claudeSettingsOpen=false) : openClaudeSettings()">
+                  <span class="cfg-file-path">~/.claude/settings.json</span>
+                  <span class="cfg-chevron" :class="claudeSettingsOpen ? 'open' : ''">›</span>
+                </button>
+                <div x-show="claudeSettingsOpen" x-transition class="cfg-editor-body">
+                  <textarea class="cfg-textarea" x-model="claudeSettingsContent" spellcheck="false" rows="16"></textarea>
+                  <div class="cfg-editor-footer">
+                    <span class="text-sm muted">JSON · 保存前自动校验格式</span>
+                    <button class="btn-sm active" @click="saveClaudeSettings()" :aria-busy="claudeSettingsSaving">💾 保存</button>
+                  </div>
+                </div>
+              </div>
             </section>
 
             <!-- Codex -->
@@ -997,8 +996,71 @@
                   </template>
                 </div>
               </template>
+              <!-- Config editor -->
+              <div class="cfg-editor-block">
+                <button class="cfg-editor-toggle" @click="codexConfigOpen ? (codexConfigOpen=false) : openCodexConfig()">
+                  <span class="cfg-file-path">~/.codex/config.toml</span>
+                  <span class="cfg-chevron" :class="codexConfigOpen ? 'open' : ''">›</span>
+                </button>
+                <div x-show="codexConfigOpen" x-transition class="cfg-editor-body">
+                  <textarea class="cfg-textarea" x-model="codexConfigContent" spellcheck="false" rows="16"></textarea>
+                  <div class="cfg-editor-footer">
+                    <span class="text-sm muted">TOML · 保存前自动备份</span>
+                    <button class="btn-sm active" @click="saveCodexConfig()" :aria-busy="codexConfigSaving">💾 保存</button>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
+
+          <!-- ── 文档快链 ──────────────────────────────────────────────── -->
+          <section class="settings-section doc-links-section">
+            <div class="section-header-row">
+              <h3>📎 文档快链</h3>
+              <span class="muted text-sm">链接本地文档，一键用系统默认程序打开</span>
+            </div>
+
+            <div class="doc-links-list" x-show="docLinks.length > 0">
+              <template x-for="(link, idx) in docLinks" :key="idx">
+                <div class="doc-link-row">
+                  <span class="doc-link-icon" x-text="docLinkIcon(link.path)"></span>
+                  <div class="doc-link-info">
+                    <span class="doc-link-label" x-text="link.label || link.path.split('/').pop()"></span>
+                    <span class="doc-link-path muted text-xs" x-text="link.path"></span>
+                  </div>
+                  <div class="doc-link-actions">
+                    <button class="btn-sm btn-primary doc-link-open" @click="openDocFile(link.path)" title="用默认程序打开">
+                      ↗ 打开
+                    </button>
+                    <button class="icon-btn danger" @click="removeDocLink(idx)" title="移除">✕</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div x-show="docLinks.length === 0" class="muted text-sm doc-links-empty">
+              暂无文档链接。添加后可在此快速打开 PDF、HTML、Markdown 等本地文件。
+            </div>
+
+            <div class="doc-link-add-form">
+              <input type="text"
+                x-model="docLinkForm.path"
+                placeholder="/path/to/doc.pdf 或 /path/to/page.html"
+                class="field-input doc-link-path-input"
+                @keyup.enter="docLinkForm.label ? addDocLink() : $refs.docLinkLabelInput.focus()"
+              />
+              <input type="text"
+                x-ref="docLinkLabelInput"
+                x-model="docLinkForm.label"
+                placeholder="显示名称（可选）"
+                class="field-input doc-link-label-input"
+                @keyup.enter="addDocLink()"
+              />
+              <button class="btn-sm btn-primary" @click="addDocLink()" :disabled="!docLinkForm.path.trim()" :aria-busy="docLinksSaving">
+                + 添加
+              </button>
+            </div>
+          </section>
         </div>
 
       </div><!-- /ai-content -->
@@ -1227,6 +1289,49 @@
         >💾 创建文件</button>
         <button class="se-btn-secondary" @click="closeNewScript()">取消</button>
         <span class="se-footer-hint">创建后自动 chmod +x 并 source ~/.zshrc</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       GLOBAL SEARCH / REPLACE OVERLAY  (Cmd+F / Cmd+R)
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="search-bar-overlay" x-show="searchOpen" x-transition.opacity.duration.100ms
+    @keydown.escape.window="if(searchOpen) closeSearchBar()">
+    <div class="search-bar-panel">
+      <div class="search-bar-row">
+        <input
+          id="search-bar-input"
+          type="text"
+          class="search-bar-input"
+          x-model="searchQuery"
+          @input="updateSearchMatches()"
+          @keydown.enter="searchNext()"
+          @keydown.shift.enter.prevent="searchPrev()"
+          placeholder="搜索…"
+        />
+        <span class="search-bar-count" x-show="searchQuery"
+          x-text="searchMatches.length ? (searchCurrentIdx+1)+'/'+searchMatches.length : '无匹配'"
+          :class="!searchMatches.length && searchQuery ? 'search-no-match' : ''"></span>
+        <button class="search-bar-btn" @click="searchPrev()" title="上一个 (Shift+Enter)" :disabled="!searchMatches.length">↑</button>
+        <button class="search-bar-btn" @click="searchNext()" title="下一个 (Enter)" :disabled="!searchMatches.length">↓</button>
+        <button class="search-bar-btn search-bar-mode" @click="searchReplaceMode=!searchReplaceMode"
+          :class="searchReplaceMode ? 'active' : ''" title="切换替换模式 (Cmd+R)">↔</button>
+        <button class="search-bar-close" @click="closeSearchBar()">✕</button>
+      </div>
+      <div class="search-bar-replace-row" x-show="searchReplaceMode" x-transition>
+        <input
+          type="text"
+          class="search-bar-input"
+          x-model="searchReplaceText"
+          placeholder="替换为…"
+          @keydown.enter="searchReplaceOne()"
+        />
+        <button class="search-bar-btn" @click="searchReplaceOne()" :disabled="!searchMatches.length">替换</button>
+        <button class="search-bar-btn" @click="searchReplaceAll()" :disabled="!searchMatches.length">全部</button>
+      </div>
+      <div class="search-bar-hint muted" x-show="!searchActiveEl && searchOpen">
+        <span>请先点击一个文本编辑区域，再使用 Cmd+F</span>
       </div>
     </div>
   </div>

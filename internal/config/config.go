@@ -60,6 +60,21 @@ type AIConfig struct {
 	TraceRetainDays int    `json:"traceRetainDays,omitempty"` // 0 → default (3)
 }
 
+// AIProvider represents one named AI backend connection.
+type AIProvider struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey"`
+	Model   string `json:"model"`
+}
+
+// DocLink is a quick-access reference to a local document file.
+type DocLink struct {
+	Path  string `json:"path"`
+	Label string `json:"label"`
+}
+
 type Config struct {
 	Directories      []Directory           `json:"directories"`
 	Exports          []ExportVar           `json:"exports"`
@@ -69,6 +84,9 @@ type Config struct {
 	AutoLaunch       bool                  `json:"autoLaunch,omitempty"`
 	TraceLogDir      string                `json:"traceLogDir,omitempty"`  // AI call log dir, default: <configDir>/Hatch/traces
 	SkillsDir        string                `json:"skillsDir,omitempty"`    // skills master dir, default: <configDir>/Hatch/skills
+	DocLinks         []DocLink             `json:"docLinks,omitempty"`
+	AIProviders      []AIProvider          `json:"aiProviders,omitempty"`
+	ActiveProviderID string                `json:"activeProviderId,omitempty"`
 }
 
 func defaultPath() (string, error) {

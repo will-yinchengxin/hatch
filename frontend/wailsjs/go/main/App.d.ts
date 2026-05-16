@@ -20,6 +20,8 @@ export function DeleteScriptMeta(arg1:string):Promise<void>;
 
 export function DeleteSkill(arg1:string):Promise<void>;
 
+export function GetAIProviders():Promise<main.AIProvidersResult>;
+
 export function GetAITraceStorageInfo():Promise<main.AITraceStorageInfo>;
 
 export function GetAITraces():Promise<Array<main.AICallTrace>>;
@@ -32,9 +34,15 @@ export function GetAutoLaunchEnabled():Promise<boolean>;
 
 export function GetClaudeCodeStatus():Promise<main.ClaudeCodeStatus>;
 
+export function GetClaudeSettings():Promise<string>;
+
+export function GetCodexConfig():Promise<string>;
+
 export function GetCodexUsageStatus():Promise<main.CodexUsageStatus>;
 
 export function GetConfig():Promise<config.Config>;
+
+export function GetDocLinks():Promise<Array<config.DocLink>>;
 
 export function GetScriptsByDir(arg1:string):Promise<Array<config.ScriptMeta>>;
 
@@ -46,6 +54,8 @@ export function GetSkillsStats():Promise<main.SkillsStats>;
 
 export function ImportSkillsFrom(arg1:string):Promise<main.SkillImportResult>;
 
+export function OpenFile(arg1:string):Promise<void>;
+
 export function ParseZshrc():Promise<Array<zshrc.Entry>>;
 
 export function ReadScriptFile(arg1:string):Promise<string>;
@@ -56,7 +66,15 @@ export function RunScript(arg1:string,arg2:string,arg3:Array<string>):Promise<vo
 
 export function SaveAIConfig(arg1:config.AIConfig):Promise<void>;
 
+export function SaveAIProviders(arg1:Array<config.AIProvider>,arg2:string):Promise<void>;
+
 export function SaveAppDataPaths(arg1:string,arg2:string):Promise<void>;
+
+export function SaveClaudeSettings(arg1:string):Promise<void>;
+
+export function SaveCodexConfig(arg1:string):Promise<void>;
+
+export function SaveDocLinks(arg1:Array<config.DocLink>):Promise<void>;
 
 export function SaveExports(arg1:Array<config.ExportVar>):Promise<void>;
 

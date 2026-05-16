@@ -139,6 +139,7 @@ func (a *App) startup(ctx context.Context) {
 	a.store = st
 
 	a.restoreServices()
+	a.migrateAIProviders()
 
 	// Prune old trace files on startup
 	go func() {
@@ -146,6 +147,40 @@ func (a *App) startup(ctx context.Context) {
 			pruneTraceFiles(dir, a.traceRetainDays())
 		}
 	}()
+}
+
+// migrateAIProviders creates a provider entry from the legacy AI config if none exist yet.
+func (a *App) migrateAIProviders() {
+	if len(a.cfg.AIProviders) == 0 && a.cfg.AI.BaseURL != "" {
+		id := fmt.Sprintf("p-%d", time.Now().UnixNano())
+		a.cfg.AIProviders = []config.AIProvider{{
+			ID:      id,
+			Name:    "默认",
+			BaseURL: a.cfg.AI.BaseURL,
+			APIKey:  a.cfg.AI.APIKey,
+			Model:   a.cfg.AI.Model,
+		}}
+		a.cfg.ActiveProviderID = id
+		_ = a.cfg.Save()
+	}
+}
+
+// activeAIConfig returns the AIConfig for the currently active provider.
+func (a *App) activeAIConfig() config.AIConfig {
+	if a.cfg.ActiveProviderID != "" {
+		for _, p := range a.cfg.AIProviders {
+			if p.ID == a.cfg.ActiveProviderID {
+				return config.AIConfig{
+					Enabled:         a.cfg.AI.Enabled,
+					BaseURL:         p.BaseURL,
+					APIKey:          p.APIKey,
+					Model:           p.Model,
+					TraceRetainDays: a.cfg.AI.TraceRetainDays,
+				}
+			}
+		}
+	}
+	return a.cfg.AI
 }
 
 // restoreServices rebuilds ServiceManager instances for service-type scripts
@@ -499,7 +534,7 @@ func (a *App) SaveZshrcAnnotation(key, note string) error {
 // It does not write any files; ApplyZshrcOrganization performs backup + write.
 func (a *App) SuggestZshrcOrganization(mode string) (ZshrcOrganizationSuggestion, error) {
 	a.mu.RLock()
-	ai := a.cfg.AI
+	ai := a.activeAIConfig()
 	a.mu.RUnlock()
 	if err := validateAIConfig(ai); err != nil {
 		return ZshrcOrganizationSuggestion{}, err
@@ -639,6 +674,38 @@ func (a *App) SaveAIConfig(ai config.AIConfig) error {
 	return a.cfg.Save()
 }
 
+// ── AI provider management ────────────────────────────────────────────────
+
+type AIProvidersResult struct {
+	Providers        []config.AIProvider `json:"providers"`
+	ActiveProviderID string              `json:"activeProviderId"`
+}
+
+func (a *App) GetAIProviders() AIProvidersResult {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	providers := make([]config.AIProvider, len(a.cfg.AIProviders))
+	copy(providers, a.cfg.AIProviders)
+	return AIProvidersResult{Providers: providers, ActiveProviderID: a.cfg.ActiveProviderID}
+}
+
+func (a *App) SaveAIProviders(providers []config.AIProvider, activeID string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.AIProviders = providers
+	a.cfg.ActiveProviderID = activeID
+	// Keep legacy AI in sync with the active provider for backwards compat.
+	for _, p := range providers {
+		if p.ID == activeID {
+			a.cfg.AI.BaseURL = p.BaseURL
+			a.cfg.AI.APIKey = p.APIKey
+			a.cfg.AI.Model = p.Model
+			break
+		}
+	}
+	return a.cfg.Save()
+}
+
 // TestAIConfig sends a tiny request to the configured OpenAI-compatible API.
 func (a *App) TestAIConfig(ai config.AIConfig) (string, error) {
 	if !ai.Enabled {
@@ -650,7 +717,7 @@ func (a *App) TestAIConfig(ai config.AIConfig) (string, error) {
 // SuggestScriptMeta reads a script and asks the configured model for metadata.
 func (a *App) SuggestScriptMeta(meta config.ScriptMeta) (AIScriptSuggestion, error) {
 	a.mu.RLock()
-	ai := a.cfg.AI
+	ai := a.activeAIConfig()
 	a.mu.RUnlock()
 	if err := validateAIConfig(ai); err != nil {
 		return AIScriptSuggestion{}, err
@@ -705,7 +772,7 @@ presets: 常用命令预设数组，元素为 {"name":"", "args":""}，没有可
 // SuggestZshrcAnnotation asks the configured model for a short note for one zshrc entry.
 func (a *App) SuggestZshrcAnnotation(entry zshrc.Entry) (string, error) {
 	a.mu.RLock()
-	ai := a.cfg.AI
+	ai := a.activeAIConfig()
 	a.mu.RUnlock()
 	if err := validateAIConfig(ai); err != nil {
 		return "", err
@@ -912,7 +979,7 @@ func (a *App) CreateScriptFile(dirPath, filename, content string) (string, error
 // It returns the raw script text (no Markdown fences).
 func (a *App) SuggestScriptContent(path, currentContent, instruction string) (string, error) {
 	a.mu.RLock()
-	ai := a.cfg.AI
+	ai := a.activeAIConfig()
 	a.mu.RUnlock()
 	if err := validateAIConfig(ai); err != nil {
 		return "", err
@@ -1401,6 +1468,77 @@ func (a *App) GetAITraceStorageInfo() AITraceStorageInfo {
 		info.TotalTraces += count
 	}
 	return info
+}
+
+// ─── Config file management ───────────────────────────────────────────────────
+
+func (a *App) GetClaudeSettings() string {
+	home, _ := os.UserHomeDir()
+	data, err := os.ReadFile(home + "/.claude/settings.json")
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func (a *App) SaveClaudeSettings(content string) error {
+	if !json.Valid([]byte(content)) {
+		return fmt.Errorf("invalid JSON")
+	}
+	home, _ := os.UserHomeDir()
+	path := home + "/.claude/settings.json"
+	if err := backupIfExists(path); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(content), 0644)
+}
+
+func (a *App) GetCodexConfig() string {
+	home, _ := os.UserHomeDir()
+	data, err := os.ReadFile(home + "/.codex/config.toml")
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func (a *App) SaveCodexConfig(content string) error {
+	home, _ := os.UserHomeDir()
+	path := home + "/.codex/config.toml"
+	if err := backupIfExists(path); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(content), 0644)
+}
+
+func backupIfExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+	_, err := zshrc.Backup(path)
+	return err
+}
+
+// ── Doc links ──────────────────────────────────────────────────────────────
+
+func (a *App) GetDocLinks() []config.DocLink {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	out := make([]config.DocLink, len(a.cfg.DocLinks))
+	copy(out, a.cfg.DocLinks)
+	return out
+}
+
+func (a *App) SaveDocLinks(links []config.DocLink) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.DocLinks = links
+	return a.cfg.Save()
+}
+
+// OpenFile opens a file with the system default application (macOS `open`).
+func (a *App) OpenFile(path string) error {
+	return exec.Command("open", path).Start()
 }
 
 // syncZshrc rebuilds the managed block from cfg.Exports. Caller must hold mu.
