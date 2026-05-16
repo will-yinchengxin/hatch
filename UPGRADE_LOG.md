@@ -284,6 +284,33 @@
 
 ---
 
+## 补充：Skills AI 优化 + 数据目录管理
+
+**问题**
+- Skills 现在只能手写 SKILL.md，没有 AI 协助。
+- 用户不清楚 Hatch 在磁盘上写了哪些文件、累积多少、能否清理。
+
+**整改方式**
+- 后端
+  - `SuggestSkillContent(name, currentContent, instruction)` + `SuggestSkillFromDescription(name, description)`（app_datadir.go），新增 op key `SuggestSkillContent`，Prompt 编辑器自动可见。
+  - `GetAppDataInventory()` → 列出 7 类目录/文件：主配置、脚本元信息缓存、AI 调用日志、运行历史、Skills 仓库、Service PID、备份导出。每条返回 path/exists/size/fileCount/oldest+newest mtime/cleanable/description。
+  - `CleanupDataDir(key)` → 一键清理 traces / runs / pids（PID 清理只删 stale）。
+  - `Config.Retention{RunsRetainDays, RunsKeepPerName}` + `GetRetentionPolicy() / SaveRetentionPolicy(traceDays, runsDays, keepPerName)`。
+  - `ApplyRetention()` 启动时跑一次 + 每小时跑一次（goroutine ticker，App ctx 取消时退出）。
+  - 新增 `executor.PruneHistoryOlderThan(days)` + `executor.HistoryRoot()` 导出。
+- 前端
+  - Skill 编辑器内顶部新增 `✦ AI 优化` bar（指令输入 + 生成按钮），结果直接覆盖编辑区，保存前可二次修改。
+  - AI tab 增加第六个子页 `📦 数据`：
+    - 顶部保留策略表单（AI 日志天数、运行历史天数、每脚本上限），保存即时应用。
+    - 每个目录一张卡：路径、文件数、占用大小、最早/最新 mtime、📂 打开、🗑 清空（仅 cleanable 项可用）。
+    - confirm 前要求用户输入式确认；OpenFile 用现有的 `open` 命令。
+
+**执行结果**
+- `go build ./...` 通过，零回归。
+- 启动 + 每小时自动 prune。
+
+---
+
 ## 提交记录
 
 | 版本 | Commit | 时间 |

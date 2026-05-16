@@ -550,6 +550,11 @@
           <span class="ai-sidenav-icon">📝</span>
           <span>Prompt</span>
         </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='data' ? 'active' : ''"
+          @click="aiSubTab='data'; loadDataInventory()">
+          <span class="ai-sidenav-icon">📦</span>
+          <span>数据</span>
+        </button>
       </nav>
 
       <!-- Right content -->
@@ -820,6 +825,16 @@
                     </div>
                   </div>
                   <div x-show="skillEditTarget === s.name" class="skill-editor-panel">
+                    <div class="se-ai-bar" style="margin-bottom: 8px;">
+                      <span class="se-ai-label">✦ AI</span>
+                      <textarea
+                        x-model="skillAIInstruction"
+                        placeholder="优化指令：如「补全 frontmatter 触发词」「加 ## 工作流程 / ## 注意事项 章节」「重写为更精简的描述」"
+                        class="se-ai-input se-ai-textarea"
+                        rows="2"
+                      ></textarea>
+                      <button class="se-ai-btn" @click="optimizeSkillWithAI()" :aria-busy="skillAIBusy" :disabled="!skillAIInstruction.trim()">✦ AI 优化</button>
+                    </div>
                     <textarea class="skill-editor-textarea" x-model="skillEditContent" rows="16" spellcheck="false"></textarea>
                     <div class="skill-editor-footer">
                       <button @click="saveSkillContent()" :aria-busy="skillEditSaving">💾 保存</button>
@@ -838,6 +853,16 @@
                     </div>
                   </div>
                   <div class="skill-editor-panel">
+                    <div class="se-ai-bar" style="margin-bottom: 8px;">
+                      <span class="se-ai-label">✦ AI</span>
+                      <textarea
+                        x-model="skillAIInstruction"
+                        placeholder="优化指令：如「补全 frontmatter 触发词」「加 ## 工作流程 / ## 注意事项 章节」「重写为更精简的描述」"
+                        class="se-ai-input se-ai-textarea"
+                        rows="2"
+                      ></textarea>
+                      <button class="se-ai-btn" @click="optimizeSkillWithAI()" :aria-busy="skillAIBusy" :disabled="!skillAIInstruction.trim()">✦ AI 优化</button>
+                    </div>
                     <textarea class="skill-editor-textarea" x-model="skillEditContent" rows="16" spellcheck="false"></textarea>
                     <div class="skill-editor-footer">
                       <button @click="saveSkillContent()" :aria-busy="skillEditSaving">💾 保存</button>
@@ -1109,6 +1134,70 @@
             <div style="display:flex; gap:8px; margin-top:12px;">
               <button @click="savePromptTemplates()" :aria-busy="promptSaving">💾 保存模板</button>
               <button class="secondary" @click="resetPromptTemplate()">↺ 全部清空（恢复默认）</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ 数据目录 / 清理 ══════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='data'">
+          <section class="ai-section">
+            <h3 class="ai-section-title">📦 Hatch 数据目录</h3>
+            <p class="ai-section-desc">
+              Hatch 写入的所有文件、它们各自的大小和最早 / 最新修改时间。可一键清理可累积的目录，并设置自动保留天数。
+            </p>
+
+            <!-- 保留策略 -->
+            <div class="form-field" style="display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:12px; align-items:end; padding:12px; border:1px solid var(--card-border,#e0d9cc); border-radius:8px; background:var(--card-bg,#fafaf7); margin-bottom: 16px;">
+              <div>
+                <label class="field-label">AI 日志保留天数</label>
+                <input type="number" min="1" max="365" x-model.number="retention.traceRetainDays" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">运行历史保留天数</label>
+                <input type="number" min="1" max="365" x-model.number="retention.runsRetainDays" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">每脚本保留次数上限</label>
+                <input type="number" min="1" max="1000" x-model.number="retention.runsKeepPerName" class="field-input" />
+              </div>
+              <button @click="saveRetention()" :aria-busy="retentionSaving">💾 保存策略</button>
+            </div>
+            <div class="muted" style="font-size:12px; margin-bottom:16px;">
+              策略保存后立即应用一次；之后每小时自动执行；App 启动时也会自动应用。
+            </div>
+
+            <!-- 数据目录列表 -->
+            <div class="data-dir-list">
+              <template x-for="d in dataInventory" :key="d.key">
+                <div style="padding:12px; border:1px solid var(--card-border,#e0d9cc); border-radius:8px; background:var(--card-bg,#fafaf7); margin-bottom: 10px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                    <div style="flex:1;">
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <strong x-text="d.label"></strong>
+                        <span class="muted" style="font-size:11px;" x-text="'(' + d.key + ')'"></span>
+                        <span x-show="!d.exists" style="color:#c04444; font-size:12px;">未创建</span>
+                      </div>
+                      <div class="muted" style="font-size:12px; margin-top:2px; word-break: break-all;" x-text="d.path"></div>
+                      <div class="muted" style="font-size:12px; margin-top:4px;" x-text="d.description"></div>
+                      <div style="margin-top:6px; font-size:12px; display:flex; gap:14px; flex-wrap:wrap;">
+                        <span><strong x-text="d.fileCount"></strong> 个文件</span>
+                        <span><strong x-text="formatBytes(d.totalBytes)"></strong></span>
+                        <span x-show="d.oldestUnix>0" class="muted">最早: <span x-text="formatTime(d.oldestUnix)"></span></span>
+                        <span x-show="d.newestUnix>0" class="muted">最新: <span x-text="formatTime(d.newestUnix)"></span></span>
+                      </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:6px; min-width:120px;">
+                      <button class="btn-edit" @click="openDataDir(d.path)" title="在 Finder 中打开">📂 打开</button>
+                      <button class="btn-edit" @click="cleanupDataDir(d)" :disabled="!d.cleanable" :class="d.cleanable ? 'danger-text' : ''" x-show="d.cleanable" title="一键清理目录">🗑 清空</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!dataInventory.length" class="muted" style="text-align:center; padding:40px;">加载中…</div>
+            </div>
+
+            <div style="margin-top:12px;">
+              <button class="secondary" @click="loadDataInventory()">↻ 刷新</button>
             </div>
           </section>
         </div>

@@ -67,8 +67,21 @@ func (a *App) startup(ctx context.Context) {
 		}
 	}()
 
-	// v1.1: prune stale run-history records on startup
-	go executor.PruneAllHistory(50)
+	// v1.1+v1.3: apply retention policy on startup (covers traces + runs)
+	go a.ApplyRetention()
+	// Also schedule periodic cleanup once an hour.
+	go func() {
+		t := time.NewTicker(1 * time.Hour)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				a.ApplyRetention()
+			}
+		}
+	}()
 
 	// v1.2: apply persisted schedules
 	go func() {

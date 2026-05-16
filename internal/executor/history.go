@@ -159,6 +159,50 @@ func DeleteRun(scriptPath, runID string) error {
 	return nil
 }
 
+// PruneHistoryOlderThan removes records older than retainDays across all scripts.
+// retainDays <= 0 means "no time-based pruning". Returns number of records removed.
+func PruneHistoryOlderThan(retainDays int) int {
+	if retainDays <= 0 {
+		return 0
+	}
+	cutoff := time.Now().AddDate(0, 0, -retainDays)
+	root := historyRoot()
+	subs, err := os.ReadDir(root)
+	if err != nil {
+		return 0
+	}
+	removed := 0
+	for _, s := range subs {
+		if !s.IsDir() {
+			continue
+		}
+		full := filepath.Join(root, s.Name())
+		entries, err := os.ReadDir(full)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+				continue
+			}
+			fi, err := e.Info()
+			if err != nil {
+				continue
+			}
+			if fi.ModTime().Before(cutoff) {
+				id := strings.TrimSuffix(e.Name(), ".json")
+				_ = os.Remove(filepath.Join(full, id+".json"))
+				_ = os.Remove(filepath.Join(full, id+".log"))
+				removed++
+			}
+		}
+	}
+	return removed
+}
+
+// HistoryRoot exposes the on-disk root for the data-dir dashboard.
+func HistoryRoot() string { return historyRoot() }
+
 // PruneAllHistory removes oldest records per script when over keepPerScript.
 func PruneAllHistory(keepPerScript int) {
 	root := historyRoot()

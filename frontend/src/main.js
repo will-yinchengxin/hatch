@@ -107,6 +107,11 @@ window.hatchApp = function () {
     editForm: {},
     editSaving: false,
 
+    // v1.3+: data dir inventory & retention
+    dataInventory: [],
+    retention: { traceRetainDays: 3, runsRetainDays: 14, runsKeepPerName: 50 },
+    retentionSaving: false,
+
     // v1.2: prompt templates
     promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '' },
     promptDefaults: {},
@@ -645,6 +650,64 @@ window.hatchApp = function () {
       };
     },
 
+    // v1.3+: data dir inventory + retention
+    async loadDataInventory() {
+      try {
+        const getInv = window?.go?.main?.App?.GetAppDataInventory;
+        const getRet = window?.go?.main?.App?.GetRetentionPolicy;
+        if (typeof getInv === 'function') {
+          this.dataInventory = (await getInv()) || [];
+        }
+        if (typeof getRet === 'function') {
+          const r = await getRet();
+          this.retention = {
+            traceRetainDays: r.traceRetainDays || 3,
+            runsRetainDays:  r.runsRetainDays || 14,
+            runsKeepPerName: r.runsKeepPerName || 50,
+          };
+        }
+      } catch (e) { this.showError(`加载数据目录失败: ${e}`); }
+    },
+    async saveRetention() {
+      this.retentionSaving = true;
+      try {
+        const fn = window?.go?.main?.App?.SaveRetentionPolicy;
+        if (typeof fn !== 'function') throw new Error('binding 未生成');
+        await fn(this.retention.traceRetainDays|0, this.retention.runsRetainDays|0, this.retention.runsKeepPerName|0);
+        this.showSuccess('保留策略已保存并立即应用。');
+        await this.loadDataInventory();
+      } catch (e) { this.showError(`保存失败: ${e}`); }
+      finally { this.retentionSaving = false; }
+    },
+    async cleanupDataDir(d) {
+      if (!d.cleanable) return;
+      if (!confirm(`确认清空「${d.label}」(${d.fileCount} 个文件, ${this.formatBytes(d.totalBytes)})？此操作不可撤销。`)) return;
+      try {
+        const fn = window?.go?.main?.App?.CleanupDataDir;
+        if (typeof fn !== 'function') throw new Error('binding 未生成');
+        const msg = await fn(d.key);
+        this.showSuccess(msg || '已清理');
+        await this.loadDataInventory();
+      } catch (e) { this.showError(`清理失败: ${e}`); }
+    },
+    async openDataDir(path) {
+      try {
+        const fn = window?.go?.main?.App?.OpenFile;
+        if (typeof fn === 'function') await fn(path);
+      } catch (_) {}
+    },
+    formatBytes(n) {
+      if (!n) return '0 B';
+      const u = ['B','KB','MB','GB'];
+      let i = 0;
+      while (n >= 1024 && i < u.length-1) { n /= 1024; i++; }
+      return n.toFixed(i === 0 ? 0 : 1) + ' ' + u[i];
+    },
+    formatTime(unix) {
+      if (!unix) return '';
+      return new Date(unix * 1000).toLocaleString();
+    },
+
     // v1.2: Prompt templates (uses dynamic bindings).
     async loadPromptTemplates() {
       try {
@@ -904,6 +967,32 @@ window.hatchApp = function () {
       this.skillEditTarget = null;
       this.skillEditContent = '';
       this.skillEditIsNew = false;
+    },
+
+    // v1.3+: Skill AI optimization
+    skillAIInstruction: '',
+    skillAIBusy: false,
+    async optimizeSkillWithAI() {
+      if (!this.skillEditTarget) return;
+      const instruction = (this.skillAIInstruction || '').trim();
+      if (!instruction) {
+        this.showError('请先填写优化指令，例如"补全 frontmatter / 加触发词 / 重写工作流程"');
+        return;
+      }
+      this.skillAIBusy = true;
+      try {
+        const fn = window?.go?.main?.App?.SuggestSkillContent;
+        if (typeof fn !== 'function') throw new Error('binding 未生成，请重新 wails build');
+        const out = await fn(this.skillEditTarget, this.skillEditContent || '', instruction);
+        if (out) {
+          this.skillEditContent = out;
+          this.showSuccess('已用 AI 生成新内容，确认后点保存。');
+        }
+      } catch (e) {
+        this.showError(`AI 优化失败: ${e}`);
+      } finally {
+        this.skillAIBusy = false;
+      }
     },
 
     async saveSkillContent() {

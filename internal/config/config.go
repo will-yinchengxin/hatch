@@ -66,6 +66,12 @@ type AIConfig struct {
 	TraceRetainDays int    `json:"traceRetainDays,omitempty"` // 0 → default (3)
 }
 
+// DataRetention controls automatic cleanup of generated data.
+type DataRetention struct {
+	RunsRetainDays   int `json:"runsRetainDays,omitempty"`   // 0 → default (14)
+	RunsKeepPerName  int `json:"runsKeepPerName,omitempty"`  // 0 → default (50)
+}
+
 // AIProvider represents one named AI backend connection.
 type AIProvider struct {
 	ID      string `json:"id"`
@@ -94,6 +100,7 @@ type Config struct {
 	AIProviders      []AIProvider          `json:"aiProviders,omitempty"`
 	ActiveProviderID string                `json:"activeProviderId,omitempty"`
 	PromptTemplates  map[string]string     `json:"promptTemplates,omitempty"` // v1.2: op -> override system prompt
+	Retention        DataRetention         `json:"retention,omitempty"`       // v1.3+: data cleanup policy
 }
 
 func defaultPath() (string, error) {
