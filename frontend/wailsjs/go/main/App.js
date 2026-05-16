@@ -10,6 +10,10 @@ export function ApplyAllSchedules() {
   return window['go']['main']['App']['ApplyAllSchedules']();
 }
 
+export function ApplyRetention() {
+  return window['go']['main']['App']['ApplyRetention']();
+}
+
 export function ApplyZshrcOrganization(arg1) {
   return window['go']['main']['App']['ApplyZshrcOrganization'](arg1);
 }
@@ -28,6 +32,10 @@ export function CheckScriptHealth(arg1) {
 
 export function CheckZshrc() {
   return window['go']['main']['App']['CheckZshrc']();
+}
+
+export function CleanupDataDir(arg1) {
+  return window['go']['main']['App']['CleanupDataDir'](arg1);
 }
 
 export function ClearAITraces() {
@@ -74,6 +82,10 @@ export function GetAllServiceStatuses() {
   return window['go']['main']['App']['GetAllServiceStatuses']();
 }
 
+export function GetAppDataInventory() {
+  return window['go']['main']['App']['GetAppDataInventory']();
+}
+
 export function GetAppDataPaths() {
   return window['go']['main']['App']['GetAppDataPaths']();
 }
@@ -102,12 +114,20 @@ export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }
 
+export function GetDefaultPrompts() {
+  return window['go']['main']['App']['GetDefaultPrompts']();
+}
+
 export function GetDocLinks() {
   return window['go']['main']['App']['GetDocLinks']();
 }
 
 export function GetPromptTemplates() {
   return window['go']['main']['App']['GetPromptTemplates']();
+}
+
+export function GetRetentionPolicy() {
+  return window['go']['main']['App']['GetRetentionPolicy']();
 }
 
 export function GetRunLog(arg1, arg2) {
@@ -140,6 +160,10 @@ export function ImportSkillsFrom(arg1) {
 
 export function ListAliasInventory() {
   return window['go']['main']['App']['ListAliasInventory']();
+}
+
+export function ListRecentRunsSorted(arg1) {
+  return window['go']['main']['App']['ListRecentRunsSorted'](arg1);
 }
 
 export function ListRuns(arg1) {
@@ -210,6 +234,10 @@ export function SavePromptTemplates(arg1) {
   return window['go']['main']['App']['SavePromptTemplates'](arg1);
 }
 
+export function SaveRetentionPolicy(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveRetentionPolicy'](arg1, arg2, arg3);
+}
+
 export function SaveScriptMeta(arg1) {
   return window['go']['main']['App']['SaveScriptMeta'](arg1);
 }
@@ -248,6 +276,14 @@ export function SuggestScriptContentStream(arg1, arg2, arg3, arg4) {
 
 export function SuggestScriptMeta(arg1) {
   return window['go']['main']['App']['SuggestScriptMeta'](arg1);
+}
+
+export function SuggestSkillContent(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SuggestSkillContent'](arg1, arg2, arg3);
+}
+
+export function SuggestSkillFromDescription(arg1, arg2) {
+  return window['go']['main']['App']['SuggestSkillFromDescription'](arg1, arg2);
 }
 
 export function SuggestZshrcAnnotation(arg1) {

@@ -88,6 +88,11 @@ window.hatchApp = function () {
     // Multi-provider state
     aiProviders: [],
     activeProviderID: '',
+
+    // v1.3+: header quick AI panel
+    quickAIOpen: false,
+    quickAIActiveID: '',
+    quickAITraceID: null,
     providerForm: null,   // null = closed; object = editing/creating
     providerTesting: false,
     providerTestResult: '',
@@ -280,6 +285,42 @@ window.hatchApp = function () {
 
     get activeProvider() {
       return this.aiProviders.find(p => p.id === this.activeProviderID) || null;
+    },
+
+    get quickAIActiveLabel() {
+      const p = this.activeProvider;
+      if (!p) return '';
+      const label = p.name || '未命名';
+      return p.model ? `✦ ${label} · ${p.model}` : `✦ ${label}`;
+    },
+
+    async toggleQuickAI() {
+      this.quickAIOpen = !this.quickAIOpen;
+      if (this.quickAIOpen) {
+        this.quickAIActiveID = this.activeProviderID;
+        // refresh providers + traces lazily
+        try { if (!this.aiProviders.length) await this.loadAIProviders(); } catch (_) {}
+        try { await this.loadAITraces(); } catch (_) {}
+      }
+    },
+
+    async switchQuickAIProvider() {
+      if (!this.quickAIActiveID || this.quickAIActiveID === this.activeProviderID) return;
+      try {
+        await SaveAIProviders(this.aiProviders, this.quickAIActiveID);
+        this.activeProviderID = this.quickAIActiveID;
+        const p = this.activeProvider;
+        // Keep legacy aiForm in sync so the connect page reflects switch
+        if (p && this.aiForm) {
+          this.aiForm.baseUrl = p.baseUrl;
+          this.aiForm.apiKey  = p.apiKey;
+          this.aiForm.model   = p.model;
+        }
+        this.showSuccess(`已切换到 ${p ? (p.name || p.model) : this.quickAIActiveID}`);
+      } catch (e) {
+        this.showError(`切换失败: ${e}`);
+        this.quickAIActiveID = this.activeProviderID;
+      }
     },
 
     // ── Lifecycle ──────────────────────────────────────────────────────

@@ -9,6 +9,8 @@ export function AddDirectory(arg1:string,arg2:string,arg3:boolean):Promise<void>
 
 export function ApplyAllSchedules():Promise<void>;
 
+export function ApplyRetention():Promise<void>;
+
 export function ApplyZshrcOrganization(arg1:string):Promise<main.ZshrcApplyResult>;
 
 export function CheckCommandAvailable(arg1:string):Promise<boolean>;
@@ -18,6 +20,8 @@ export function CheckPathHealth():Promise<main.PathHealth>;
 export function CheckScriptHealth(arg1:string):Promise<main.HealthCheckResult>;
 
 export function CheckZshrc():Promise<main.ZshrcInfo>;
+
+export function CleanupDataDir(arg1:string):Promise<string>;
 
 export function ClearAITraces():Promise<void>;
 
@@ -41,6 +45,8 @@ export function GetAITraces():Promise<Array<main.AICallTrace>>;
 
 export function GetAllServiceStatuses():Promise<Record<string, string>>;
 
+export function GetAppDataInventory():Promise<Array<main.DataDirEntry>>;
+
 export function GetAppDataPaths():Promise<main.AppDataPaths>;
 
 export function GetAutoLaunchEnabled():Promise<boolean>;
@@ -55,9 +61,13 @@ export function GetCodexUsageStatus():Promise<main.CodexUsageStatus>;
 
 export function GetConfig():Promise<config.Config>;
 
+export function GetDefaultPrompts():Promise<Record<string, string>>;
+
 export function GetDocLinks():Promise<Array<config.DocLink>>;
 
 export function GetPromptTemplates():Promise<Record<string, string>>;
+
+export function GetRetentionPolicy():Promise<main.RetentionView>;
 
 export function GetRunLog(arg1:string,arg2:string):Promise<string>;
 
@@ -74,6 +84,8 @@ export function ImportBackup(arg1:string):Promise<string>;
 export function ImportSkillsFrom(arg1:string):Promise<main.SkillImportResult>;
 
 export function ListAliasInventory():Promise<Array<main.AliasGroup>>;
+
+export function ListRecentRunsSorted(arg1:number):Promise<Array<executor.RunRecord>>;
 
 export function ListRuns(arg1:string):Promise<Array<executor.RunRecord>>;
 
@@ -109,6 +121,8 @@ export function SaveExports(arg1:Array<config.ExportVar>):Promise<void>;
 
 export function SavePromptTemplates(arg1:Record<string, string>):Promise<void>;
 
+export function SaveRetentionPolicy(arg1:number,arg2:number,arg3:number):Promise<void>;
+
 export function SaveScriptMeta(arg1:config.ScriptMeta):Promise<void>;
 
 export function SaveSkillContent(arg1:string,arg2:string):Promise<void>;
@@ -128,6 +142,10 @@ export function SuggestScriptContent(arg1:string,arg2:string,arg3:string):Promis
 export function SuggestScriptContentStream(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function SuggestScriptMeta(arg1:config.ScriptMeta):Promise<main.AIScriptSuggestion>;
+
+export function SuggestSkillContent(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function SuggestSkillFromDescription(arg1:string,arg2:string):Promise<string>;
 
 export function SuggestZshrcAnnotation(arg1:zshrc.Entry):Promise<string>;
 

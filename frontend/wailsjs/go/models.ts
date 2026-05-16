@@ -72,6 +72,20 @@ export namespace config {
 	        this.args = source["args"];
 	    }
 	}
+	export class DataRetention {
+	    runsRetainDays?: number;
+	    runsKeepPerName?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DataRetention(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.runsRetainDays = source["runsRetainDays"];
+	        this.runsKeepPerName = source["runsKeepPerName"];
+	    }
+	}
 	export class DocLink {
 	    path: string;
 	    label: string;
@@ -193,6 +207,7 @@ export namespace config {
 	    aiProviders?: AIProvider[];
 	    activeProviderId?: string;
 	    promptTemplates?: Record<string, string>;
+	    retention?: DataRetention;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -212,6 +227,7 @@ export namespace config {
 	        this.aiProviders = this.convertValues(source["aiProviders"], AIProvider);
 	        this.activeProviderId = source["activeProviderId"];
 	        this.promptTemplates = source["promptTemplates"];
+	        this.retention = this.convertValues(source["retention"], DataRetention);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -232,6 +248,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 	
 	
 	
@@ -610,6 +627,38 @@ export namespace main {
 		}
 	}
 	
+	export class DataDirEntry {
+	    key: string;
+	    label: string;
+	    path: string;
+	    exists: boolean;
+	    isDir: boolean;
+	    totalBytes: number;
+	    fileCount: number;
+	    oldestUnix: number;
+	    newestUnix: number;
+	    cleanable: boolean;
+	    description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DataDirEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.label = source["label"];
+	        this.path = source["path"];
+	        this.exists = source["exists"];
+	        this.isDir = source["isDir"];
+	        this.totalBytes = source["totalBytes"];
+	        this.fileCount = source["fileCount"];
+	        this.oldestUnix = source["oldestUnix"];
+	        this.newestUnix = source["newestUnix"];
+	        this.cleanable = source["cleanable"];
+	        this.description = source["description"];
+	    }
+	}
 	export class HealthCheckResult {
 	    script: string;
 	    missingDeps: string[];
@@ -687,6 +736,22 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class RetentionView {
+	    traceRetainDays: number;
+	    runsRetainDays: number;
+	    runsKeepPerName: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RetentionView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.traceRetainDays = source["traceRetainDays"];
+	        this.runsRetainDays = source["runsRetainDays"];
+	        this.runsKeepPerName = source["runsKeepPerName"];
+	    }
 	}
 	export class ScheduleInfo {
 	    path: string;
