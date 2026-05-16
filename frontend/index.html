@@ -46,7 +46,7 @@
         title="重新扫描"
       >↻ 刷新</button>
       <!-- v1.3+: quick AI panel (model switch + trace log) -->
-      <div class="quick-ai-wrap" style="position:relative;">
+      <div class="quick-ai-wrap">
         <button
           class="btn-refresh"
           @click="toggleQuickAI()"
@@ -54,66 +54,63 @@
           title="切换模型 / 查看 AI 调用日志"
         >
           <span x-text="quickAIActiveLabel || '✦ AI'"></span>
-          <span style="margin-left:4px; font-size:10px;" x-text="quickAIOpen ? '▲' : '▼'"></span>
+          <span class="quick-ai-toggle-arrow" x-text="quickAIOpen ? '▲' : '▼'"></span>
         </button>
         <div
           class="quick-ai-popover"
           x-show="quickAIOpen"
           x-transition
           @click.outside="quickAIOpen=false"
-          style="position:absolute; top:calc(100% + 6px); right:0; width:420px; max-height:70vh; overflow:auto;
-                 background:#fff; border:1px solid var(--card-border,#e0d9cc); border-radius:10px; padding:14px;
-                 box-shadow: 0 10px 32px rgba(0,0,0,.15); z-index:1000;"
         >
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <div class="quick-ai-header">
             <strong>✦ AI 快捷</strong>
             <button class="icon-btn" @click="quickAIOpen=false">✕</button>
           </div>
 
           <!-- 模型切换 -->
-          <div style="margin-bottom:14px;">
-            <div class="muted" style="font-size:12px; margin-bottom:4px;">当前模型</div>
-            <select x-model="quickAIActiveID" @change="switchQuickAIProvider()" class="field-input" style="width:100%;">
+          <div class="quick-ai-section">
+            <div class="quick-ai-section-label">当前模型</div>
+            <select x-model="quickAIActiveID" @change="switchQuickAIProvider()" class="field-input">
               <template x-for="p in (aiProviders||[])" :key="p.id">
                 <option :value="p.id" x-text="(p.name || '未命名') + (p.model ? ' · ' + p.model : '')"></option>
               </template>
               <option x-show="!aiProviders.length" disabled selected>未配置 provider — 请去 ✦ AI → 🔌 连接 添加</option>
             </select>
-            <div style="display:flex; gap:6px; margin-top:6px;">
+            <div class="quick-ai-manage-row">
               <button class="btn-edit" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false">⚙ 管理 provider</button>
             </div>
           </div>
 
           <!-- 调用日志 -->
           <div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <strong style="font-size:13px;">最近 AI 调用</strong>
-              <span style="display:flex; gap:6px;">
+            <div class="quick-ai-traces-header">
+              <strong class="quick-ai-section-title">最近 AI 调用</strong>
+              <span class="quick-ai-actions">
                 <button class="icon-btn" @click="loadAITraces(); loadTraceStorage()" title="刷新">↻</button>
                 <button class="icon-btn" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; setTimeout(()=>{aiTraceCollapsed=false}, 50)" title="去完整日志页">↗</button>
               </span>
             </div>
             <template x-if="!(aiTraces || []).length">
-              <div class="muted" style="text-align:center; padding:16px 0; font-size:12px;">暂无调用记录</div>
+              <div class="quick-ai-empty">暂无调用记录</div>
             </template>
             <template x-for="t in (aiTraces || []).slice(0, 8)" :key="t.id">
               <div
+                class="quick-ai-trace"
+                :class="{'is-open': quickAITraceID === t.id}"
                 @click="quickAITraceID = quickAITraceID===t.id ? null : t.id"
-                style="padding:8px; border:1px solid var(--card-border,#e0d9cc); border-radius:6px; margin-bottom:6px; cursor:pointer; font-size:12px;"
-                :style="quickAITraceID===t.id ? 'background:#f6f3ee' : ''"
               >
-                <div style="display:flex; justify-content:space-between; gap:8px;">
+                <div class="quick-ai-trace-row">
                   <span>
-                    <span x-text="t.error ? '✗' : '✓'" :style="t.error ? 'color:#c04444' : 'color:#3aa55a'"></span>
+                    <span :class="t.error ? 'err-mark' : 'ok-mark'" x-text="t.error ? '✗' : '✓'"></span>
                     <strong x-text="t.op"></strong>
-                    <span class="muted" style="margin-left:6px;" x-text="t.model"></span>
+                    <span class="muted" x-text="' ' + (t.model || '')"></span>
                   </span>
                   <span class="muted" x-text="t.at + ' · ' + t.durationMs + 'ms'"></span>
                 </div>
-                <div x-show="t.error" style="color:#c04444; margin-top:4px;" x-text="t.error"></div>
+                <div class="quick-ai-trace-err" x-show="t.error" x-text="t.error"></div>
                 <pre
+                  class="quick-ai-trace-pre"
                   x-show="quickAITraceID === t.id"
-                  style="white-space:pre-wrap; background:#1a1a1a; color:#e6e6e6; padding:8px; border-radius:4px; margin-top:6px; max-height:240px; overflow:auto; font-size:11px;"
                   x-text="'[user]\n' + (t.userPrompt || '') + '\n\n[response]\n' + (t.rawResponse || t.error || '')"
                 ></pre>
               </div>
@@ -902,7 +899,7 @@
                     </div>
                   </div>
                   <div x-show="skillEditTarget === s.name" class="skill-editor-panel">
-                    <div class="se-ai-bar" style="margin-bottom: 8px;">
+                    <div class="se-ai-bar skill-ai-bar">
                       <span class="se-ai-label">✦ AI</span>
                       <textarea
                         x-model="skillAIInstruction"
@@ -930,7 +927,7 @@
                     </div>
                   </div>
                   <div class="skill-editor-panel">
-                    <div class="se-ai-bar" style="margin-bottom: 8px;">
+                    <div class="se-ai-bar skill-ai-bar">
                       <span class="se-ai-label">✦ AI</span>
                       <textarea
                         x-model="skillAIInstruction"
@@ -1179,25 +1176,24 @@
               覆盖每个 AI 操作的 system prompt。留空则用 Hatch 内置的默认提示。改完点保存即生效（无需重启）。
             </p>
             <template x-for="op in promptOps" :key="op.key">
-              <div class="form-field" style="margin-bottom: 20px; padding: 12px; border:1px solid var(--card-border,#e0d9cc); border-radius:8px; background:var(--card-bg,#fafaf7);">
-                <label class="field-label" style="display:flex; align-items:center; justify-content:space-between;">
-                  <span>
+              <div class="prompt-card">
+                <label class="field-label prompt-card-header">
+                  <span class="prompt-card-title">
                     <span x-text="op.label"></span>
-                    <span class="muted" style="margin-left:8px; font-size:12px;" x-text="'(' + op.key + ')'"></span>
+                    <span class="prompt-card-op" x-text="'(' + op.key + ')'"></span>
                   </span>
-                  <span style="display:flex; gap:6px; align-items:center;">
-                    <span x-show="(promptTemplates[op.key]||'').trim()" style="font-size:12px; color:#b06d1a;">● 已覆盖</span>
-                    <span x-show="!(promptTemplates[op.key]||'').trim()" class="muted" style="font-size:12px;">○ 使用默认</span>
+                  <span class="prompt-card-actions">
+                    <span class="prompt-status-on" x-show="(promptTemplates[op.key]||'').trim()">● 已覆盖</span>
+                    <span class="prompt-status-off" x-show="!(promptTemplates[op.key]||'').trim()">○ 使用默认</span>
                     <button class="btn-edit" type="button" @click="togglePromptDefault(op.key)" x-text="promptDefaultsOpen[op.key] ? '收起默认' : '查看默认'"></button>
                     <button class="btn-edit" type="button" @click="useDefaultAsTemplate(op.key)" title="把默认 Prompt 复制到下面，方便基于它修改">↓ 以默认为模板</button>
                   </span>
                 </label>
 
-                <!-- 当前内置默认 prompt，只读展示 -->
                 <pre
+                  class="prompt-default-block"
                   x-show="promptDefaultsOpen[op.key]"
                   x-text="promptDefaults[op.key] || '(加载中…)'"
-                  style="white-space: pre-wrap; background:#1f1f1f; color:#e6e6e6; padding:10px; border-radius:6px; font-size:11px; max-height:240px; overflow:auto; margin:8px 0;"
                 ></pre>
 
                 <textarea
@@ -1208,7 +1204,7 @@
                 ></textarea>
               </div>
             </template>
-            <div style="display:flex; gap:8px; margin-top:12px;">
+            <div class="prompt-actions-row">
               <button @click="savePromptTemplates()" :aria-busy="promptSaving">💾 保存模板</button>
               <button class="secondary" @click="resetPromptTemplate()">↺ 全部清空（恢复默认）</button>
             </div>
@@ -1224,7 +1220,7 @@
             </p>
 
             <!-- 保留策略 -->
-            <div class="form-field" style="display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap:12px; align-items:end; padding:12px; border:1px solid var(--card-border,#e0d9cc); border-radius:8px; background:var(--card-bg,#fafaf7); margin-bottom: 16px;">
+            <div class="retention-form">
               <div>
                 <label class="field-label">AI 日志保留天数</label>
                 <input type="number" min="1" max="365" x-model.number="retention.traceRetainDays" class="field-input" />
@@ -1239,41 +1235,41 @@
               </div>
               <button @click="saveRetention()" :aria-busy="retentionSaving">💾 保存策略</button>
             </div>
-            <div class="muted" style="font-size:12px; margin-bottom:16px;">
+            <div class="retention-note">
               策略保存后立即应用一次；之后每小时自动执行；App 启动时也会自动应用。
             </div>
 
             <!-- 数据目录列表 -->
             <div class="data-dir-list">
               <template x-for="d in dataInventory" :key="d.key">
-                <div style="padding:12px; border:1px solid var(--card-border,#e0d9cc); border-radius:8px; background:var(--card-bg,#fafaf7); margin-bottom: 10px;">
-                  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-                    <div style="flex:1;">
-                      <div style="display:flex; align-items:center; gap:8px;">
+                <div class="data-dir-card">
+                  <div class="data-dir-row">
+                    <div class="data-dir-info">
+                      <div class="data-dir-head">
                         <strong x-text="d.label"></strong>
-                        <span class="muted" style="font-size:11px;" x-text="'(' + d.key + ')'"></span>
-                        <span x-show="!d.exists" style="color:#c04444; font-size:12px;">未创建</span>
+                        <span class="data-dir-key" x-text="'(' + d.key + ')'"></span>
+                        <span class="data-dir-missing" x-show="!d.exists">未创建</span>
                       </div>
-                      <div class="muted" style="font-size:12px; margin-top:2px; word-break: break-all;" x-text="d.path"></div>
-                      <div class="muted" style="font-size:12px; margin-top:4px;" x-text="d.description"></div>
-                      <div style="margin-top:6px; font-size:12px; display:flex; gap:14px; flex-wrap:wrap;">
+                      <div class="data-dir-path" x-text="d.path"></div>
+                      <div class="data-dir-desc" x-text="d.description"></div>
+                      <div class="data-dir-stats">
                         <span><strong x-text="d.fileCount"></strong> 个文件</span>
                         <span><strong x-text="formatBytes(d.totalBytes)"></strong></span>
-                        <span x-show="d.oldestUnix>0" class="muted">最早: <span x-text="formatTime(d.oldestUnix)"></span></span>
-                        <span x-show="d.newestUnix>0" class="muted">最新: <span x-text="formatTime(d.newestUnix)"></span></span>
+                        <span class="muted" x-show="d.oldestUnix>0">最早: <span x-text="formatTime(d.oldestUnix)"></span></span>
+                        <span class="muted" x-show="d.newestUnix>0">最新: <span x-text="formatTime(d.newestUnix)"></span></span>
                       </div>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:6px; min-width:120px;">
+                    <div class="data-dir-actions">
                       <button class="btn-edit" @click="openDataDir(d.path)" title="在 Finder 中打开">📂 打开</button>
-                      <button class="btn-edit" @click="cleanupDataDir(d)" :disabled="!d.cleanable" :class="d.cleanable ? 'danger-text' : ''" x-show="d.cleanable" title="一键清理目录">🗑 清空</button>
+                      <button class="btn-edit danger-text" @click="cleanupDataDir(d)" x-show="d.cleanable" title="一键清理目录">🗑 清空</button>
                     </div>
                   </div>
                 </div>
               </template>
-              <div x-show="!dataInventory.length" class="muted" style="text-align:center; padding:40px;">加载中…</div>
+              <div class="data-empty" x-show="!dataInventory.length">加载中…</div>
             </div>
 
-            <div style="margin-top:12px;">
+            <div class="prompt-actions-row">
               <button class="secondary" @click="loadDataInventory()">↻ 刷新</button>
             </div>
           </section>
@@ -1394,6 +1390,7 @@
           </div>
         </div>
 
+
         <!-- v1.1: notify on done -->
         <div class="form-field">
           <label class="form-checkbox">
@@ -1406,7 +1403,7 @@
         <div class="form-field">
           <label class="field-label">定时执行 schedule</label>
           <input type="text" x-model="editForm.schedule" placeholder="@every 30m / @daily 09:00 / @hourly :15" class="field-input" />
-          <div class="muted" style="font-size:12px; margin-top:4px;">留空 = 不自动执行。仅 oneshot 类型生效。</div>
+          <div class="field-hint">留空 = 不自动执行。仅 oneshot 类型生效。</div>
         </div>
 
         <!-- v1.2: requires + health -->
@@ -1423,7 +1420,7 @@
         <div class="form-field">
           <label class="field-label">前置脚本 (每行一个绝对路径)</label>
           <textarea x-model="editForm.preScriptsRaw" placeholder="/Users/you/tools/check_env.sh&#10;/Users/you/tools/warmup.sh" class="field-textarea" rows="3"></textarea>
-          <div class="muted" style="font-size:12px; margin-top:4px;">按顺序执行；任一失败则中止主脚本（exit 99）。</div>
+          <div class="field-hint">按顺序执行；任一失败则中止主脚本（exit 99）。</div>
         </div>
 
       </div>
@@ -1608,7 +1605,7 @@
        RUN HISTORY MODAL (v1.1)
   ══════════════════════════════════════════════════════════════════ -->
   <div class="se-backdrop" x-show="historyTarget" x-transition.opacity @click.self="closeHistory()">
-    <div class="se-modal" x-show="historyTarget" x-transition style="max-width: 900px;">
+    <div class="se-modal history-modal-wide" x-show="historyTarget" x-transition>
       <div class="se-header">
         <div class="se-header-left">
           <span class="se-icon">📜</span>
@@ -1619,29 +1616,29 @@
         </div>
         <button class="se-close" @click="closeHistory()">✕</button>
       </div>
-      <div class="se-body" style="padding: 16px; max-height: 60vh; overflow:auto;">
+      <div class="se-body history-modal-body">
         <template x-if="historyRecords.length === 0">
-          <div class="muted" style="text-align:center; padding: 40px 0;">
+          <div class="history-empty">
             <div x-show="!historyLoading">暂无历史记录。执行脚本后会自动归档到 ~/Library/Application Support/Hatch/runs/</div>
             <div x-show="historyLoading">加载中…</div>
           </div>
         </template>
         <template x-for="r in historyRecords" :key="r.id">
-          <div class="preset-edit-row" style="flex-direction:column; align-items:stretch; gap:4px; padding:8px; border-radius:8px; background:var(--card-bg,#f6f3ee); margin-bottom:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="history-record">
+            <div class="history-record-row">
               <span>
-                <span x-text="r.exitCode === 0 ? '✓' : '✗'" :style="r.exitCode===0 ? 'color:#3aa55a' : 'color:#c04444'"></span>
+                <span :class="r.exitCode===0 ? 'ok-mark' : 'err-mark'" x-text="r.exitCode === 0 ? '✓' : '✗'"></span>
                 <span x-text="new Date(r.startedAt).toLocaleString()"></span>
-                <span class="muted" style="margin-left:8px;" x-text="`${r.durationMs}ms · exit ${r.exitCode}`"></span>
+                <span class="muted" x-text="' · ' + r.durationMs + 'ms · exit ' + r.exitCode"></span>
               </span>
-              <span style="display:flex; gap:6px;">
+              <span class="history-record-actions">
                 <button class="btn-edit" @click="rerunFromHistory(r)" title="使用相同参数重跑">▶ 重跑</button>
                 <button class="btn-edit" @click="viewHistoryLog(r)" title="查看完整日志">📋 日志</button>
                 <button class="icon-btn danger" @click="deleteHistory(r)">✕</button>
               </span>
             </div>
-            <div class="muted" x-show="r.args && r.args.length" x-text="'参数: ' + (r.args||[]).join(' ')" style="font-size:12px;"></div>
-            <pre x-show="historyOpenId===r.id" x-text="historyLogText" style="white-space:pre-wrap; background:#1a1a1a; color:#e6e6e6; padding:8px; border-radius:6px; max-height:40vh; overflow:auto; font-size:11px;"></pre>
+            <div class="history-record-args" x-show="r.args && r.args.length" x-text="'参数: ' + (r.args||[]).join(' ')"></div>
+            <pre class="history-record-log" x-show="historyOpenId===r.id" x-text="historyLogText"></pre>
           </div>
         </template>
       </div>

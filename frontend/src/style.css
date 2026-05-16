@@ -3701,3 +3701,281 @@ details[open] .export-preview-toggle::before {
   flex: 1;
   min-width: 100px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.1 – v1.3 additions
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* ── Skill AI bar tweak ──────────────────────────────────────────────── */
+.skill-ai-bar { margin-bottom: 8px; }
+
+/* ── Field hint (small muted line under inputs) ──────────────────────── */
+.field-hint {
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+  margin-top: 4px;
+}
+
+/* ── Inline form rows (key+value editors etc.) ───────────────────────── */
+.preset-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+/* ── History modal records ───────────────────────────────────────────── */
+.history-record {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--card-bg, #f6f3ee);
+  margin-bottom: 8px;
+}
+.history-record-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.history-record-actions {
+  display: flex;
+  gap: 6px;
+}
+.history-record-args {
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+}
+.history-record-log {
+  white-space: pre-wrap;
+  background: #1a1a1a;
+  color: #e6e6e6;
+  padding: 8px;
+  border-radius: 6px;
+  max-height: 40vh;
+  overflow: auto;
+  font-size: 11px;
+  margin: 0;
+}
+.history-modal-body {
+  padding: 16px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.history-empty {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-muted, #8a7e6b);
+}
+.history-modal-wide {
+  max-width: 900px;
+}
+.ok-mark  { color: #3aa55a; }
+.err-mark { color: #c04444; }
+
+/* ── Prompt-template editor cards ────────────────────────────────────── */
+.prompt-card {
+  margin-bottom: 20px;
+  padding: 12px;
+  border: 1px solid var(--card-border, #e0d9cc);
+  border-radius: 8px;
+  background: var(--card-bg, #fafaf7);
+}
+.prompt-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.prompt-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.prompt-card-op {
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+}
+.prompt-card-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.prompt-status-on  { font-size: 12px; color: #b06d1a; }
+.prompt-status-off { font-size: 12px; color: var(--text-muted, #8a7e6b); }
+.prompt-default-block {
+  white-space: pre-wrap;
+  background: #1f1f1f;
+  color: #e6e6e6;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  max-height: 240px;
+  overflow: auto;
+  margin: 8px 0;
+}
+.prompt-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── Data-directory dashboard ────────────────────────────────────────── */
+.retention-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--card-border, #e0d9cc);
+  border-radius: 8px;
+  background: var(--card-bg, #fafaf7);
+  margin-bottom: 16px;
+}
+.retention-note {
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+  margin-bottom: 16px;
+}
+.data-dir-list { display: flex; flex-direction: column; gap: 10px; }
+.data-dir-card {
+  padding: 12px;
+  border: 1px solid var(--card-border, #e0d9cc);
+  border-radius: 8px;
+  background: var(--card-bg, #fafaf7);
+}
+.data-dir-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.data-dir-info { flex: 1; min-width: 0; }
+.data-dir-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.data-dir-key {
+  font-size: 11px;
+  color: var(--text-muted, #8a7e6b);
+}
+.data-dir-missing { color: #c04444; font-size: 12px; }
+.data-dir-path {
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+  margin-top: 2px;
+  word-break: break-all;
+}
+.data-dir-desc {
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+  margin-top: 4px;
+}
+.data-dir-stats {
+  margin-top: 6px;
+  font-size: 12px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.data-dir-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 100px;
+}
+.data-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted, #8a7e6b);
+}
+
+/* ── Quick AI popover (header dropdown) ──────────────────────────────── */
+.quick-ai-wrap { position: relative; }
+.quick-ai-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 420px;
+  max-height: 70vh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--card-border, #e0d9cc);
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+.quick-ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.quick-ai-section { margin-bottom: 14px; }
+.quick-ai-section-label {
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+  margin-bottom: 4px;
+}
+.quick-ai-section-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.quick-ai-traces-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.quick-ai-trace {
+  padding: 8px;
+  border: 1px solid var(--card-border, #e0d9cc);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.quick-ai-trace.is-open { background: #f6f3ee; }
+.quick-ai-trace-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.quick-ai-trace-err {
+  color: #c04444;
+  margin-top: 4px;
+}
+.quick-ai-trace-pre {
+  white-space: pre-wrap;
+  background: #1a1a1a;
+  color: #e6e6e6;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 6px;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 11px;
+}
+.quick-ai-empty {
+  text-align: center;
+  padding: 16px 0;
+  font-size: 12px;
+  color: var(--text-muted, #8a7e6b);
+}
+.quick-ai-manage-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.quick-ai-actions {
+  display: flex;
+  gap: 6px;
+}
+.quick-ai-toggle-arrow {
+  margin-left: 4px;
+  font-size: 10px;
+}
