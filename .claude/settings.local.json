@@ -44,7 +44,9 @@
       "Bash(/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app)",
       "Bash(awk *)",
       "Bash(/Users/yinchengxin/.local/bin/claude --help)",
-      "Bash(grep -B5 '> \"${CACHE_FILE}.tmp\"' ~/.claude/statusline.sh)"
+      "Bash(grep -B5 '> \"${CACHE_FILE}.tmp\"' ~/.claude/statusline.sh)",
+      "Bash(npm run *)",
+      "Skill(hatch-docs-update)"
     ]
   }
 }
