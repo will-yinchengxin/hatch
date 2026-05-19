@@ -151,7 +151,7 @@ Methods added after the last `wails dev`/`wails build` must be called via `windo
 ## Tab Navigation
 
 ```
-tab = 'scripts' | 'ai'
+tab = 'scripts' | 'ai'   (default: 'ai' on launch)
 
 scripts + !selectedDir  →  Directory card grid + workspace-settings accordion
 scripts + selectedDir   →  Script list for that dir

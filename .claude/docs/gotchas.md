@@ -98,6 +98,9 @@ Run-history dirs use `filepath.Base(scriptPath)` as the grouping key. Two script
 ### Pre-scripts don't emit
 Pre-scripts in `RunWithPreScripts` execute with `nil` emitter — they only show as `[hatch] pre: <path>` lines in the **main** script's log stream, not as standalone runs. That's by design so the user sees one continuous log for the whole chain. Pre-scripts still archive to history individually.
 
+### Skill save auto-resyncs to Claude / Codex
+`saveSkillContent()` checks `skill.inClaude` / `skill.inCodex` **before** calling `SaveSkillContent`, then calls `SetSkillSync(name, target, true)` for each enabled target after the master save. This keeps the synced directories up to date without manual re-toggle. New skills (not yet synced anywhere) skip this step silently.
+
 ### Quick-AI popover provider sync
 `switchQuickAIProvider()` calls `SaveAIProviders(providers, newActiveID)` and **also** copies the new provider's `baseUrl/apiKey/model` into `aiForm` so the `🔌 连接` page reflects the switch. If you change provider config independently, update both stores together.
 

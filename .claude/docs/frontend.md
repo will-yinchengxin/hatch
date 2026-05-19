@@ -3,7 +3,7 @@
 ## Alpine State Machine (`main.js` → `hatchApp()`)
 
 ```
-tab = 'scripts' | 'ai'   (settings removed — accordion on scripts home)
+tab = 'scripts' | 'ai'   (default: 'ai' on launch; settings removed — accordion on scripts home)
 selectedDir = null | { path, exportName, isScriptDir }
 aiSubTab = 'overview' | 'connect' | 'skills' | 'tools' | 'prompts' | 'data'
 
