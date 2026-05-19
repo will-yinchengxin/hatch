@@ -57,7 +57,7 @@ const SaveCodexConfig       = (content)                     => window['go']['mai
 window.hatchApp = function () {
   return {
     // ── State ──────────────────────────────────────────────────────────
-    tab: 'scripts',
+    tab: 'ai',
 
     selectedDir: null,
     allScripts: [],
@@ -1041,10 +1041,23 @@ window.hatchApp = function () {
       this.skillEditSaving = true;
       try {
         const name = this.skillEditTarget;
+        // capture current sync state before saving
+        const skill = this.skills.find(s => s.name === name);
         await SaveSkillContent(name, this.skillEditContent);
+        // re-sync to any targets that were already enabled
+        const resynced = [];
+        if (skill?.inClaude) {
+          await SetSkillSync(name, 'claude', true);
+          resynced.push('Claude');
+        }
+        if (skill?.inCodex) {
+          await SetSkillSync(name, 'codex', true);
+          resynced.push('Codex');
+        }
         await this.loadSkills();
         this.closeSkillEditor();
-        this.showSuccess(`Skill「${name}」已保存`);
+        const syncNote = resynced.length ? `，已同步到 ${resynced.join(' / ')}` : '';
+        this.showSuccess(`Skill「${name}」已保存${syncNote}`);
       } catch (e) { this.showError(`保存 Skill 失败: ${e}`); }
       finally { this.skillEditSaving = false; }
     },
