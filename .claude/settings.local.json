@@ -46,7 +46,11 @@
       "Bash(/Users/yinchengxin/.local/bin/claude --help)",
       "Bash(grep -B5 '> \"${CACHE_FILE}.tmp\"' ~/.claude/statusline.sh)",
       "Bash(npm run *)",
-      "Skill(hatch-docs-update)"
+      "Skill(hatch-docs-update)",
+      "Bash(iconutil -c iconset /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app/Contents/Resources/iconfile.icns -o /tmp/hatch_iconset)",
+      "Read(//tmp/**)",
+      "Bash(iconutil -c iconset /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app/Contents/Resources/iconfile.icns --output /tmp/hatch_iconset.iconset)",
+      "Bash(iconutil -c icns /tmp/hatch_new.iconset --output /tmp/iconfile_new.icns)"
     ]
   }
 }
