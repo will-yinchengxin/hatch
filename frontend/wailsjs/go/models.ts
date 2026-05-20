@@ -883,6 +883,26 @@ export namespace main {
 	        this.error = source["error"];
 	    }
 	}
+	export class VPNEnhanceData {
+	    prependRules: string[];
+	    hosts: Record<string, string>;
+	    dnsFakeIPFilter: string[];
+	    hasData: boolean;
+	    sourceFiles: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNEnhanceData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.prependRules = source["prependRules"];
+	        this.hosts = source["hosts"];
+	        this.dnsFakeIPFilter = source["dnsFakeIPFilter"];
+	        this.hasData = source["hasData"];
+	        this.sourceFiles = source["sourceFiles"];
+	    }
+	}
 	export class VPNProfile {
 	    uid: string;
 	    type: string;
@@ -907,6 +927,20 @@ export namespace main {
 	        this.isCurrent = source["isCurrent"];
 	    }
 	}
+	export class VPNProxyGroup {
+	    name: string;
+	    node: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNProxyGroup(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.node = source["node"];
+	    }
+	}
 	export class VPNSettings {
 	    appDir: string;
 	    backupDir: string;
@@ -928,8 +962,11 @@ export namespace main {
 	export class VPNStatus {
 	    systemProxyEnabled: boolean;
 	    tunEnabled: boolean;
+	    tunInterface: string;
+	    tunExcludedCidrs: string[];
 	    currentGroup: string;
 	    currentNode: string;
+	    proxyGroups: VPNProxyGroup[];
 	    expireAt: number;
 	    upload: number;
 	    download: number;
@@ -943,13 +980,34 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.systemProxyEnabled = source["systemProxyEnabled"];
 	        this.tunEnabled = source["tunEnabled"];
+	        this.tunInterface = source["tunInterface"];
+	        this.tunExcludedCidrs = source["tunExcludedCidrs"];
 	        this.currentGroup = source["currentGroup"];
 	        this.currentNode = source["currentNode"];
+	        this.proxyGroups = this.convertValues(source["proxyGroups"], VPNProxyGroup);
 	        this.expireAt = source["expireAt"];
 	        this.upload = source["upload"];
 	        this.download = source["download"];
 	        this.total = source["total"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ZshrcApplyResult {
 	    zshrcPath: string;

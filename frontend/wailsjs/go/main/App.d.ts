@@ -87,6 +87,8 @@ export function GetVPNConfigFile(arg1:string):Promise<main.VPNConfigFile>;
 
 export function GetVPNCurrentIP():Promise<main.VPNCurrentIP>;
 
+export function GetVPNEnhanceData():Promise<main.VPNEnhanceData>;
+
 export function GetVPNProfileContent(arg1:string):Promise<string>;
 
 export function GetVPNProfiles():Promise<Array<main.VPNProfile>>;

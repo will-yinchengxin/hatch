@@ -210,7 +210,7 @@ window.hatchApp = function () {
     aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'tools'
 
     // VPN module
-    vpnSubTab: 'overview',   // 'overview' | 'config' | 'profiles' | 'backup'
+    vpnSubTab: 'overview',   // 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
     vpnProfiles: [],
     vpnCurrentProfile: null,
     vpnAppDir: '',
@@ -233,6 +233,10 @@ window.hatchApp = function () {
     vpnBackupBusy: false,
     vpnRestoreBusy: false,
     vpnMsg: '',
+    vpnTUNExpanded: false,
+    vpnStatusRefreshing: false,
+    vpnEnhanceData: null,
+    vpnEnhanceLoading: false,
 
     // Workspace-settings accordion state
     wsShellOpen: false,
@@ -375,6 +379,7 @@ window.hatchApp = function () {
       this.setupEvents();
       this.setupSearchShortcuts();
       setInterval(() => this.refreshStatuses(), 3000);
+      try { this.vpnStatus = await GetVPNStatus(); } catch (_) {}
     },
 
     async loadConfig() {
@@ -1782,6 +1787,18 @@ window.hatchApp = function () {
 
     // ── VPN ───────────────────────────────────────────────────────────────
 
+    async refreshVPNStatus() {
+      this.vpnStatusRefreshing = true;
+      try {
+        this.vpnStatus = await GetVPNStatus();
+      } catch (e) {
+        this.vpnMsg = '刷新失败: ' + e;
+      } finally {
+        this.vpnStatusRefreshing = false;
+      }
+      this.refreshVPNCurrentIP();
+    },
+
     async loadVPNOverview() {
       try {
         const [profiles, dir, backups, status, settings] = await Promise.all([
@@ -1945,6 +1962,40 @@ window.hatchApp = function () {
     vpnFormatTs(ts) {
       if (!ts) return '—';
       return new Date(ts * 1000).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
+    },
+
+    async loadVPNEnhanceData() {
+      this.vpnEnhanceLoading = true;
+      try {
+        this.vpnEnhanceData = await window['go']['main']['App']['GetVPNEnhanceData']();
+      } catch (e) {
+        this.vpnMsg = '加载增强配置失败: ' + e;
+      } finally {
+        this.vpnEnhanceLoading = false;
+      }
+    },
+
+    vpnEnhanceRuleType(rule) {
+      if (!rule) return '';
+      const prefix = rule.split(',')[0].trim().toUpperCase();
+      const map = {
+        'DOMAIN': '域名', 'DOMAIN-SUFFIX': '域名后缀', 'DOMAIN-KEYWORD': '域名关键词',
+        'IP-CIDR': 'IP段', 'IP-CIDR6': 'IPv6段', 'GEOIP': '地理IP',
+        'PROCESS-NAME': '进程', 'MATCH': '默认'
+      };
+      return map[prefix] || prefix;
+    },
+
+    vpnEnhanceRuleTarget(rule) {
+      if (!rule) return '';
+      const parts = rule.split(',');
+      return parts[parts.length - 1]?.replace(',no-resolve', '').trim() || '';
+    },
+
+    vpnEnhanceRuleValue(rule) {
+      if (!rule) return '';
+      const parts = rule.split(',');
+      return parts.length >= 2 ? parts[1]?.trim() : '';
     },
   };
 };

@@ -2,9 +2,11 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -50,15 +52,31 @@ type VPNSettings struct {
 	BackupIsSet  bool   `json:"backupIsSet"`
 }
 
+type VPNProxyGroup struct {
+	Name string `json:"name"`
+	Node string `json:"node"`
+}
+
+type VPNEnhanceData struct {
+	PrependRules    []string          `json:"prependRules"`
+	Hosts           map[string]string `json:"hosts"`
+	DNSFakeIPFilter []string          `json:"dnsFakeIPFilter"`
+	HasData         bool              `json:"hasData"`
+	SourceFiles     []string          `json:"sourceFiles"`
+}
+
 type VPNStatus struct {
-	SystemProxyEnabled bool   `json:"systemProxyEnabled"`
-	TUNEnabled         bool   `json:"tunEnabled"`
-	CurrentGroup       string `json:"currentGroup"` // proxy group name
-	CurrentNode        string `json:"currentNode"`  // selected node label
-	ExpireAt           int64  `json:"expireAt"`
-	Upload             int64  `json:"upload"`
-	Download           int64  `json:"download"`
-	Total              int64  `json:"total"`
+	SystemProxyEnabled bool            `json:"systemProxyEnabled"`
+	TUNEnabled         bool            `json:"tunEnabled"`
+	TUNInterface       string          `json:"tunInterface"`      // e.g. "utun3: 198.18.0.1"
+	TUNExcludedCIDRs   []string        `json:"tunExcludedCidrs"`  // from clash-verge.yaml tun config
+	CurrentGroup       string          `json:"currentGroup"`      // primary proxy group name
+	CurrentNode        string          `json:"currentNode"`       // selected node label
+	ProxyGroups        []VPNProxyGroup `json:"proxyGroups"`       // all proxy group selections
+	ExpireAt           int64           `json:"expireAt"`
+	Upload             int64           `json:"upload"`
+	Download           int64           `json:"download"`
+	Total              int64           `json:"total"`
 }
 
 type VPNCurrentIP struct {
@@ -157,16 +175,12 @@ func (a *App) GetVPNStatus() VPNStatus {
 		}
 	}
 
-	// Parse profiles.yaml for current profile's selected node and traffic stats
+	// Parse profiles.yaml for traffic stats (upload/download/total/expire)
 	if data, err := os.ReadFile(filepath.Join(dir, "profiles.yaml")); err == nil {
 		var raw struct {
 			Current string `yaml:"current"`
 			Items   []struct {
-				UID      string `yaml:"uid"`
-				Selected []struct {
-					Name string `yaml:"name"`
-					Now  string `yaml:"now"`
-				} `yaml:"selected"`
+				UID   string `yaml:"uid"`
 				Extra struct {
 					Upload   int64 `yaml:"upload"`
 					Download int64 `yaml:"download"`
@@ -178,10 +192,6 @@ func (a *App) GetVPNStatus() VPNStatus {
 		if yaml.Unmarshal(data, &raw) == nil {
 			for _, item := range raw.Items {
 				if item.UID == raw.Current {
-					if len(item.Selected) > 0 {
-						status.CurrentGroup = item.Selected[0].Name
-						status.CurrentNode = item.Selected[0].Now
-					}
 					status.Upload = item.Extra.Upload
 					status.Download = item.Extra.Download
 					status.Total = item.Extra.Total
@@ -192,7 +202,192 @@ func (a *App) GetVPNStatus() VPNStatus {
 		}
 	}
 
+	// Live proxy selections: query Clash core API via Unix socket.
+	// Falls back to profiles.yaml selected[] if API is unavailable.
+	if apiData, err := a.queryClashUnixAPI("/proxies"); err == nil {
+		var result struct {
+			Proxies map[string]struct {
+				Now  string `json:"now"`
+				Type string `json:"type"`
+			} `json:"proxies"`
+		}
+		if json.Unmarshal(apiData, &result) == nil {
+			// Build set of all group names to distinguish nodes from sub-groups
+			groupNames := map[string]bool{}
+			for name, p := range result.Proxies {
+				switch p.Type {
+				case "Selector", "URLTest", "Fallback", "LoadBalance":
+					groupNames[name] = true
+				}
+			}
+
+			for name, p := range result.Proxies {
+				if p.Type != "Selector" || name == "GLOBAL" {
+					continue
+				}
+				status.ProxyGroups = append(status.ProxyGroups, VPNProxyGroup{
+					Name: name,
+					Node: p.Now,
+				})
+			}
+			// Sort: real server selections first, then meta (DIRECT/chain), alpha within each tier
+			isRealNode := func(node string) bool {
+				return node != "DIRECT" && node != "REJECT" && !groupNames[node]
+			}
+			sort.Slice(status.ProxyGroups, func(i, j int) bool {
+				iReal := isRealNode(status.ProxyGroups[i].Node)
+				jReal := isRealNode(status.ProxyGroups[j].Node)
+				if iReal != jReal {
+					return iReal
+				}
+				return status.ProxyGroups[i].Name < status.ProxyGroups[j].Name
+			})
+			if len(status.ProxyGroups) > 0 {
+				status.CurrentGroup = status.ProxyGroups[0].Name
+				status.CurrentNode = status.ProxyGroups[0].Node
+			}
+		}
+	} else {
+		// Fallback: read from profiles.yaml selected[] (may be stale)
+		if data, err := os.ReadFile(filepath.Join(dir, "profiles.yaml")); err == nil {
+			var raw struct {
+				Current string `yaml:"current"`
+				Items   []struct {
+					UID      string `yaml:"uid"`
+					Selected []struct {
+						Name string `yaml:"name"`
+						Now  string `yaml:"now"`
+					} `yaml:"selected"`
+				} `yaml:"items"`
+			}
+			if yaml.Unmarshal(data, &raw) == nil {
+				for _, item := range raw.Items {
+					if item.UID == raw.Current {
+						for _, sel := range item.Selected {
+							status.ProxyGroups = append(status.ProxyGroups, VPNProxyGroup{
+								Name: sel.Name, Node: sel.Now,
+							})
+						}
+						if len(item.Selected) > 0 {
+							status.CurrentGroup = item.Selected[0].Name
+							status.CurrentNode = item.Selected[0].Now
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Live TUN excluded routes from Clash API
+	if apiData, err := a.queryClashUnixAPI("/configs"); err == nil {
+		var result struct {
+			TUN struct {
+				RouteExcludeAddress []string `json:"route-exclude-address"`
+			} `json:"tun"`
+		}
+		if json.Unmarshal(apiData, &result) == nil && len(result.TUN.RouteExcludeAddress) > 0 {
+			status.TUNExcludedCIDRs = result.TUN.RouteExcludeAddress
+		}
+	}
+	// Fallback: read excluded CIDRs from clash-verge.yaml (all known key variants)
+	if len(status.TUNExcludedCIDRs) == 0 {
+		if data, err := os.ReadFile(filepath.Join(dir, "clash-verge.yaml")); err == nil {
+			var cvConfig struct {
+				TUN struct {
+					RouteExcludeAddress      []string `yaml:"route-exclude-address"`
+					Inet4RouteExcludeAddress  []string `yaml:"inet4-route-exclude-address"`
+					ExcludeAddress            []string `yaml:"exclude-address"`
+				} `yaml:"tun"`
+			}
+			if yaml.Unmarshal(data, &cvConfig) == nil {
+				switch {
+				case len(cvConfig.TUN.RouteExcludeAddress) > 0:
+					status.TUNExcludedCIDRs = cvConfig.TUN.RouteExcludeAddress
+				case len(cvConfig.TUN.Inet4RouteExcludeAddress) > 0:
+					status.TUNExcludedCIDRs = cvConfig.TUN.Inet4RouteExcludeAddress
+				case len(cvConfig.TUN.ExcludeAddress) > 0:
+					status.TUNExcludedCIDRs = cvConfig.TUN.ExcludeAddress
+				}
+			}
+		}
+	}
+
+	// Detect TUN virtual interface (Clash uses 198.18.0.0/15 subnet)
+	if status.TUNEnabled {
+		if iface, ip := detectTUNInterface(); iface != "" {
+			status.TUNInterface = iface + ": " + ip
+		}
+	}
+
 	return status
+}
+
+// detectTUNInterface finds the active Clash TUN virtual network interface by scanning
+// for utun interfaces with IP in the 198.18.0.0/15 range (Clash Meta's TUN subnet).
+func detectTUNInterface() (iface, ip string) {
+	out, err := exec.Command("ifconfig").Output()
+	if err != nil {
+		return "", ""
+	}
+	lines := strings.Split(string(out), "\n")
+	currentIface := ""
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Interface header: "utun3: flags=..."
+		if strings.HasPrefix(line, "utun") && strings.Contains(line, ":") {
+			currentIface = strings.SplitN(line, ":", 2)[0]
+			continue
+		}
+		if currentIface != "" && strings.HasPrefix(trimmed, "inet ") {
+			fields := strings.Fields(trimmed)
+			for i, f := range fields {
+				if f == "inet" && i+1 < len(fields) {
+					ipStr := fields[i+1]
+					if strings.HasPrefix(ipStr, "198.18.") || strings.HasPrefix(ipStr, "198.19.") {
+						return currentIface, ipStr
+					}
+				}
+			}
+		}
+	}
+	return "", ""
+}
+
+// clashUnixSocketPath reads external-controller-unix from clash-verge.yaml,
+// falling back to the default Clash Verge Rev socket path.
+func (a *App) clashUnixSocketPath() string {
+	dir, _ := a.clashVergeDir()
+	if dir != "" {
+		if data, err := os.ReadFile(filepath.Join(dir, "clash-verge.yaml")); err == nil {
+			var cfg struct {
+				ExternalControllerUnix string `yaml:"external-controller-unix"`
+			}
+			if yaml.Unmarshal(data, &cfg) == nil && cfg.ExternalControllerUnix != "" {
+				return cfg.ExternalControllerUnix
+			}
+		}
+	}
+	return "/tmp/verge/verge-mihomo.sock"
+}
+
+// queryClashUnixAPI makes a GET request to the Clash core API via Unix socket.
+func (a *App) queryClashUnixAPI(path string) ([]byte, error) {
+	socketPath := a.clashUnixSocketPath()
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
+			},
+		},
+	}
+	resp, err := client.Get("http://localhost" + path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
 }
 
 // clashHTTPPort reads the HTTP proxy port from the active Clash profile's YAML.
@@ -599,4 +794,77 @@ func (a *App) OpenVPNBackupDir() error {
 		return err
 	}
 	return exec.Command("open", dir).Run()
+}
+
+// GetVPNEnhanceData reads all "merge"-type profiles and extracts prepend rules,
+// hosts overrides, and DNS fake-ip-filter entries added by the user.
+func (a *App) GetVPNEnhanceData() (VPNEnhanceData, error) {
+	dir, err := a.clashVergeDir()
+	if err != nil {
+		return VPNEnhanceData{}, err
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "profiles.yaml"))
+	if err != nil {
+		return VPNEnhanceData{}, fmt.Errorf("读取 profiles.yaml 失败: %w", err)
+	}
+
+	var raw struct {
+		Items []struct {
+			UID  string `yaml:"uid"`
+			Type string `yaml:"type"`
+			Name string `yaml:"name"`
+			File string `yaml:"file"`
+		} `yaml:"items"`
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return VPNEnhanceData{}, fmt.Errorf("解析 profiles.yaml 失败: %w", err)
+	}
+
+	result := VPNEnhanceData{
+		Hosts:           make(map[string]string),
+		PrependRules:    []string{},
+		DNSFakeIPFilter: []string{},
+		SourceFiles:     []string{},
+	}
+
+	for _, item := range raw.Items {
+		// Both "merge" and "rules" profile types can carry prepend/append/hosts/dns overrides.
+		if item.Type != "merge" && item.Type != "rules" {
+			continue
+		}
+		content, err := a.GetVPNProfileContent(item.File)
+		if err != nil {
+			continue
+		}
+
+		var mc struct {
+			Prepend []string          `yaml:"prepend"`
+			Append  []string          `yaml:"append"`
+			Hosts   map[string]string `yaml:"hosts"`
+			DNS     struct {
+				FakeIPFilter []string `yaml:"fake-ip-filter"`
+			} `yaml:"dns"`
+		}
+		if yaml.Unmarshal([]byte(content), &mc) != nil {
+			continue
+		}
+
+		if len(mc.Prepend) > 0 || len(mc.Append) > 0 || len(mc.Hosts) > 0 || len(mc.DNS.FakeIPFilter) > 0 {
+			label := item.Name
+			if label == "" {
+				label = item.File
+			}
+			result.SourceFiles = append(result.SourceFiles, label)
+			result.HasData = true
+		}
+		result.PrependRules = append(result.PrependRules, mc.Prepend...)
+		result.PrependRules = append(result.PrependRules, mc.Append...)
+		for k, v := range mc.Hosts {
+			result.Hosts[k] = v
+		}
+		result.DNSFakeIPFilter = append(result.DNSFakeIPFilter, mc.DNS.FakeIPFilter...)
+	}
+
+	return result, nil
 }

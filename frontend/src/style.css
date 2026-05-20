@@ -4059,6 +4059,7 @@ details[open] .export-preview-toggle::before {
   flex-direction: column;
   align-items: stretch;
   gap: 16px;
+  position: relative;
 }
 .vpn-hero-left {
   flex-shrink: 0;
@@ -4070,9 +4071,6 @@ details[open] .export-preview-toggle::before {
 }
 .vpn-hero-stats {
   flex-wrap: wrap;
-}
-.vpn-stat-on {
-  border-color: rgba(79, 123, 88, 0.4);
 }
 .vpn-hero-traffic {
   display: flex;
@@ -4424,4 +4422,301 @@ details[open] .export-preview-toggle::before {
   border-radius: var(--radius);
   background: var(--surface-2);
   color: var(--text);
+}
+
+/* ─── VPN Header Pill ───────────────────────────────────────── */
+.vpn-hdr-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  transition: border-color 0.2s, color 0.2s;
+}
+.vpn-hdr-pill-on {
+  border-color: rgba(79,123,88,0.45);
+  color: var(--green);
+}
+.vpn-hdr-pill-on:hover:not(:disabled) {
+  border-color: rgba(79,123,88,0.7);
+}
+.vpn-hdr-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.vpn-hdr-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.vpn-hdr-node {
+  font-size: 12px;
+  font-weight: 500;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── VPN Hero Refresh Button ───────────────────────────────── */
+.vpn-hero-refresh-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 0 8px;
+  font-size: 14px;
+  height: 28px;
+  min-width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── VPN Hero Card Redesign ────────────────────────────────── */
+
+/* Status cards (系统代理 / TUN模式) */
+.vpn-status-card {
+  min-width: 110px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: default;
+}
+.vpn-stat-on {
+  border-color: rgba(79,123,88,0.5) !important;
+  background: linear-gradient(135deg, var(--surface-2) 60%, rgba(79,123,88,0.06)) !important;
+  box-shadow: 0 0 0 1px rgba(79,123,88,0.15), var(--shadow-sm) !important;
+}
+.vpn-stat-off {
+  opacity: 0.75;
+}
+
+.vpn-status-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  flex: 1;
+}
+.vpn-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.vpn-dot-on {
+  background: var(--green);
+  box-shadow: 0 0 5px rgba(79,123,88,0.7);
+  animation: pulse 2s ease-in-out infinite;
+}
+.vpn-dot-off {
+  background: var(--border);
+}
+.vpn-status-text {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* TUN card extras */
+.vpn-tun-card {
+  cursor: default;
+}
+.vpn-tun-hint {
+  font-size: 9px;
+  color: var(--text-dim);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+.vpn-tun-iface {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--cyan);
+  margin-top: 3px;
+  opacity: 0.9;
+}
+.vpn-tun-cidrs {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.vpn-tun-cidrs-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.vpn-tun-cidrs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.vpn-cidr-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  background: rgba(79,107,123,0.14);
+  color: var(--cyan);
+  border: 1px solid rgba(79,107,123,0.25);
+  border-radius: var(--radius-xs);
+  padding: 2px 7px;
+}
+
+/* Proxy groups card */
+.vpn-node-card {
+  flex: 1.4;
+  min-width: 160px;
+}
+.vpn-proxy-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  flex: 1;
+}
+.vpn-proxy-group-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.vpn-pg-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-3);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+}
+.vpn-pg-node {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cyan);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.vpn-pg-more {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding-left: 2px;
+}
+
+/* ─── Enhance / Custom Rules Tab ────────────────────────────── */
+.vpn-enhance-loading {
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.vpn-enhance-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 0 16px;
+  margin: 0 24px;
+}
+.vpn-enhance-source-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.vpn-enhance-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: 10px;
+}
+.vpn-enhance-thead {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  gap: 0;
+  padding: 6px 12px;
+  background: var(--surface-3);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.vpn-enhance-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  gap: 0;
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  align-items: center;
+  font-size: 12px;
+}
+.vpn-enhance-row:hover {
+  background: var(--surface-3);
+}
+.vpn-hosts-row {
+  grid-template-columns: 1fr 100px;
+}
+.vpn-rule-type-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-dim);
+  border-radius: 3px;
+  padding: 2px 6px;
+  width: fit-content;
+}
+.vpn-rule-value {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text);
+  word-break: break-all;
+  padding: 0 8px;
+}
+.vpn-rule-target {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 2px 6px;
+  width: fit-content;
+}
+.vpn-target-direct {
+  background: rgba(79,123,88,0.14);
+  color: var(--green);
+}
+.vpn-target-proxy {
+  background: rgba(193,95,60,0.12);
+  color: var(--primary);
+}
+.vpn-hosts-ip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan);
+  text-align: right;
+}
+.vpn-enhance-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+.vpn-enhance-chip {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: rgba(79,107,123,0.1);
+  color: var(--cyan);
+  border: 1px solid rgba(79,107,123,0.22);
+  border-radius: var(--radius-xs);
+  padding: 3px 8px;
 }

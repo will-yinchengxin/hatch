@@ -120,6 +120,21 @@
         </div>
       </div>
 
+      <!-- VPN quick-status pill -->
+      <button class="btn-refresh vpn-hdr-pill"
+              :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-hdr-pill-on' : ''"
+              @click="tab='vpn'; loadVPNOverview()"
+              title="VPN 状态 — 点击打开配置中心">
+        <span class="vpn-hdr-dots">
+          <span class="vpn-hdr-dot" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-dot-on' : 'vpn-dot-off'" title="系统代理"></span>
+          <span class="vpn-hdr-dot" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-dot-on' : 'vpn-dot-off'" title="TUN"></span>
+        </span>
+        <span class="vpn-hdr-node"
+              x-text="vpnStatus && vpnStatus.currentNode
+                ? (vpnStatus.currentNode.length > 7 ? vpnStatus.currentNode.slice(0,7) + '…' : vpnStatus.currentNode)
+                : '🔒 VPN'"></span>
+      </button>
+
       <label class="autolaunch-toggle" :class="{active: autoLaunchEnabled}" title="开机自启动 (点击切换)">
         <input type="checkbox" x-model="autoLaunchEnabled" @change="toggleAutoLaunch()" :disabled="autoLaunchSaving" />
         <span x-text="autoLaunchEnabled ? '⏻ 自启 ✓' : '⏻ 自启'"></span>
@@ -1665,6 +1680,13 @@
 
     <!-- Hero -->
     <section class="page-hero ai-hero vpn-hero">
+      <!-- 刷新按钮 — 右上角，刷新四项状态 -->
+      <button class="btn-refresh vpn-hero-refresh-btn"
+              @click="refreshVPNStatus()"
+              :aria-busy="vpnStatusRefreshing"
+              :disabled="vpnStatusRefreshing"
+              title="刷新代理状态、TUN、出口 IP、代理节点">↻</button>
+
       <div class="vpn-hero-left">
         <p class="eyebrow">代理配置管理</p>
         <h1>VPN 配置中心</h1>
@@ -1673,22 +1695,48 @@
       <div class="vpn-hero-right">
         <!-- 状态卡行 -->
         <div class="hero-stats vpn-hero-stats">
-          <div class="hero-stat-card vpn-stat-proxy" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-stat-on' : ''">
+
+          <!-- 系统代理 card -->
+          <div class="hero-stat-card vpn-status-card" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-stat-on' : 'vpn-stat-off'">
             <div class="hero-stat-label">系统代理</div>
-            <div class="hero-stat-body">
-              <span class="hero-stat-value"
+            <div class="vpn-status-row">
+              <span class="vpn-status-dot" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-dot-on' : 'vpn-dot-off'"></span>
+              <span class="vpn-status-text"
                 :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-on' : 'vpn-off'"
                 x-text="vpnStatus ? (vpnStatus.systemProxyEnabled ? '已开启' : '已关闭') : '—'"></span>
             </div>
           </div>
-          <div class="hero-stat-card" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-stat-on' : ''">
-            <div class="hero-stat-label">TUN 模式</div>
-            <div class="hero-stat-body">
-              <span class="hero-stat-value"
+
+          <!-- TUN 模式 card (double-click to toggle excluded CIDRs) -->
+          <div class="hero-stat-card vpn-status-card vpn-tun-card"
+               :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-stat-on' : 'vpn-stat-off'"
+               @dblclick="vpnTUNExpanded = !vpnTUNExpanded"
+               title="双击查看排除网段">
+            <div class="hero-stat-label">TUN 模式
+              <span x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length"
+                    class="vpn-tun-hint">双击展开</span>
+            </div>
+            <div class="vpn-status-row">
+              <span class="vpn-status-dot" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-dot-on' : 'vpn-dot-off'"></span>
+              <span class="vpn-status-text"
                 :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-on' : 'vpn-off'"
                 x-text="vpnStatus ? (vpnStatus.tunEnabled ? '已开启' : '已关闭') : '—'"></span>
             </div>
+            <!-- TUN interface info -->
+            <div class="vpn-tun-iface" x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunInterface"
+                 x-text="vpnStatus && vpnStatus.tunInterface"></div>
+            <!-- Excluded CIDRs expansion -->
+            <div class="vpn-tun-cidrs" x-show="vpnTUNExpanded && vpnStatus && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length">
+              <div class="vpn-tun-cidrs-title">排除网段</div>
+              <div class="vpn-tun-cidrs-list">
+                <template x-for="cidr in (vpnStatus && vpnStatus.tunExcludedCidrs || [])">
+                  <span class="vpn-cidr-tag" x-text="cidr"></span>
+                </template>
+              </div>
+            </div>
           </div>
+
+          <!-- 出口 IP card -->
           <div class="hero-stat-card vpn-ip-card">
             <div class="hero-stat-label">
               出口 IP
@@ -1712,13 +1760,32 @@
               </template>
             </div>
           </div>
-          <div class="hero-stat-card" x-show="vpnStatus && vpnStatus.currentNode">
-            <div class="hero-stat-label">选中节点</div>
-            <div class="hero-stat-body">
-              <span class="hero-stat-value hero-stat-value--sm vpn-node"
-                x-text="vpnStatus && vpnStatus.currentNode || '—'"></span>
+
+          <!-- 代理节点 card -->
+          <div class="hero-stat-card vpn-node-card" x-show="vpnStatus && (vpnStatus.currentNode || (vpnStatus.proxyGroups && vpnStatus.proxyGroups.length))">
+            <div class="hero-stat-label">代理节点</div>
+            <div class="vpn-proxy-groups">
+              <template x-if="vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length">
+                <div>
+                  <template x-for="(pg, idx) in (vpnStatus && vpnStatus.proxyGroups || [])" :key="pg.name">
+                    <div class="vpn-proxy-group-row" x-show="idx < 3">
+                      <span class="vpn-pg-label" x-text="pg.name"></span>
+                      <span class="vpn-pg-node" x-text="pg.node"></span>
+                    </div>
+                  </template>
+                  <div class="vpn-pg-more" x-show="vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length > 3"
+                       x-text="'+ ' + ((vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length) - 3) + ' 个'"></div>
+                </div>
+              </template>
+              <template x-if="!(vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length) && vpnStatus && vpnStatus.currentNode">
+                <div class="vpn-proxy-group-row">
+                  <span class="vpn-pg-label">节点</span>
+                  <span class="vpn-pg-node" x-text="vpnStatus.currentNode"></span>
+                </div>
+              </template>
             </div>
           </div>
+
         </div>
         <!-- 流量 + 到期行 -->
         <div class="vpn-hero-traffic" x-show="vpnStatus && vpnStatus.total">
@@ -1760,6 +1827,14 @@
           <span class="ai-sidenav-icon">💾</span>
           <span>备份恢复</span>
           <span class="ai-sidenav-count" x-show="vpnBackups.length > 0" x-text="vpnBackups.length"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="vpnSubTab==='enhance' ? 'active' : ''"
+          @click="vpnSubTab='enhance'; loadVPNEnhanceData()">
+          <span class="ai-sidenav-icon">✦</span>
+          <span>自定义规则</span>
+          <span class="ai-sidenav-count"
+            x-show="vpnEnhanceData && vpnEnhanceData.hasData"
+            x-text="(vpnEnhanceData && vpnEnhanceData.prependRules && vpnEnhanceData.prependRules.length || 0) + (vpnEnhanceData && vpnEnhanceData.dnsFakeIPFilter && vpnEnhanceData.dnsFakeIPFilter.length || 0)"></span>
         </button>
       </nav>
 
@@ -1959,6 +2034,95 @@
               </button>
             </div>
           </section>
+        </div>
+
+        <!-- ══ 自定义规则 ═══════════════════════════════════════════ -->
+        <div x-show="vpnSubTab==='enhance'">
+
+          <template x-if="vpnEnhanceLoading">
+            <div class="vpn-enhance-loading">加载中…</div>
+          </template>
+
+          <template x-if="!vpnEnhanceLoading && (!vpnEnhanceData || !vpnEnhanceData.hasData)">
+            <section class="settings-section">
+              <p class="settings-desc">未检测到 Merge 类型的 Profile，或该 Profile 中没有自定义的 prepend / hosts / dns 配置。</p>
+              <p class="settings-desc">你可以在 Clash Verge Rev 中创建一个 <strong>Merge</strong> 类型的 Profile，添加自定义规则后在此查看。</p>
+            </section>
+          </template>
+
+          <template x-if="!vpnEnhanceLoading && vpnEnhanceData && vpnEnhanceData.hasData">
+            <div>
+              <!-- 来源说明 -->
+              <div class="vpn-enhance-source" x-show="vpnEnhanceData.sourceFiles && vpnEnhanceData.sourceFiles.length">
+                <span class="vpn-enhance-source-label">来源 Profile：</span>
+                <template x-for="src in (vpnEnhanceData.sourceFiles || [])">
+                  <span class="vpn-cidr-tag" x-text="src"></span>
+                </template>
+              </div>
+
+              <!-- Prepend 规则 -->
+              <section class="settings-section" x-show="vpnEnhanceData.prependRules && vpnEnhanceData.prependRules.length">
+                <div class="section-header-row">
+                  <h3>Prepend 规则
+                    <span class="ai-sidenav-count" x-text="vpnEnhanceData.prependRules && vpnEnhanceData.prependRules.length"></span>
+                  </h3>
+                  <span class="muted" style="font-size:11px">优先于订阅规则匹配</span>
+                </div>
+                <p class="settings-desc">这些规则会被插入到订阅规则列表的最前面，优先匹配。格式：<code>类型,值,目标</code></p>
+                <div class="vpn-enhance-table">
+                  <div class="vpn-enhance-thead">
+                    <span>类型</span><span>值</span><span>目标</span>
+                  </div>
+                  <template x-for="rule in (vpnEnhanceData.prependRules || [])">
+                    <div class="vpn-enhance-row">
+                      <span class="vpn-rule-type-tag" x-text="vpnEnhanceRuleType(rule)"></span>
+                      <code class="vpn-rule-value" x-text="vpnEnhanceRuleValue(rule)"></code>
+                      <span class="vpn-rule-target" :class="vpnEnhanceRuleTarget(rule)==='DIRECT'?'vpn-target-direct':'vpn-target-proxy'"
+                            x-text="vpnEnhanceRuleTarget(rule)"></span>
+                    </div>
+                  </template>
+                </div>
+              </section>
+
+              <!-- Hosts 覆盖 -->
+              <section class="settings-section" x-show="vpnEnhanceData.hosts && Object.keys(vpnEnhanceData.hosts).length">
+                <div class="section-header-row">
+                  <h3>Hosts 覆盖
+                    <span class="ai-sidenav-count" x-text="Object.keys(vpnEnhanceData.hosts || {}).length"></span>
+                  </h3>
+                  <span class="muted" style="font-size:11px">强制域名 → IP 映射</span>
+                </div>
+                <p class="settings-desc">这些 Hosts 条目会覆盖系统 DNS 解析，将指定域名强制解析到特定 IP。用于内网服务或访问控制。</p>
+                <div class="vpn-enhance-table">
+                  <div class="vpn-enhance-thead">
+                    <span>域名</span><span>→ IP</span>
+                  </div>
+                  <template x-for="[host, ip] in Object.entries(vpnEnhanceData.hosts || {})">
+                    <div class="vpn-enhance-row vpn-hosts-row">
+                      <code class="vpn-rule-value" x-text="host"></code>
+                      <span class="vpn-hosts-ip" x-text="ip"></span>
+                    </div>
+                  </template>
+                </div>
+              </section>
+
+              <!-- DNS Fake-IP 过滤 -->
+              <section class="settings-section" x-show="vpnEnhanceData.dnsFakeIPFilter && vpnEnhanceData.dnsFakeIPFilter.length">
+                <div class="section-header-row">
+                  <h3>DNS Fake-IP 过滤
+                    <span class="ai-sidenav-count" x-text="vpnEnhanceData.dnsFakeIPFilter && vpnEnhanceData.dnsFakeIPFilter.length"></span>
+                  </h3>
+                  <span class="muted" style="font-size:11px">不使用 Fake-IP 的域名</span>
+                </div>
+                <p class="settings-desc">列表中的域名不会返回 Fake-IP，而是使用真实 DNS 解析。通常用于需要真实 IP 的内网或特定服务域名。</p>
+                <div class="vpn-enhance-chips">
+                  <template x-for="domain in (vpnEnhanceData.dnsFakeIPFilter || [])">
+                    <span class="vpn-enhance-chip" x-text="domain"></span>
+                  </template>
+                </div>
+              </section>
+            </div>
+          </template>
         </div>
 
       </div>

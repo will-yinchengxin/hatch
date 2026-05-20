@@ -166,6 +166,10 @@ export function GetVPNCurrentIP() {
   return window['go']['main']['App']['GetVPNCurrentIP']();
 }
 
+export function GetVPNEnhanceData() {
+  return window['go']['main']['App']['GetVPNEnhanceData']();
+}
+
 export function GetVPNProfileContent(arg1) {
   return window['go']['main']['App']['GetVPNProfileContent'](arg1);
 }

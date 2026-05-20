@@ -13,19 +13,22 @@ Target: Apple Silicon, no App Store, no Apple Developer account.
 | Styling | Custom CSS variables, Anthropic-inspired warm light theme |
 | Config | JSON at `~/Library/Application Support/Hatch/config.json` |
 
-Build: `$(go env GOPATH)/bin/wails build -platform darwin/arm64` · Dev: `$(go env GOPATH)/bin/wails dev`
-Tests: `go test ./...` (after `app.go` changes) or `go test ./internal/... -v`
-Make targets: `dev / test / build / build-clean / sign / dmg / release / install / open`
+## Commands
 
----
+```
+Build:  $(go env GOPATH)/bin/wails build -platform darwin/arm64
+Dev:    $(go env GOPATH)/bin/wails dev
+Tests:  go test ./...   (or: go test ./internal/... -v after app.go changes)
+Make:   dev / test / build / build-clean / sign / dmg / release / install / open
+```
 
 ## Repository Layout
 
 ```
 hatch/
-├── app.go                  # App struct + startup; method set is split below.
+├── app.go                  # App struct + startup
 ├── app_scripts.go          # Directory CRUD + scanning + SaveScriptMeta
-├── app_executor.go         # RunScript / ServiceAction / Run history / scriptEnv
+├── app_executor.go         # RunScript / ServiceAction / run history / scriptEnv
 ├── app_zshrc.go            # zshrc parse / annotate / AI organize
 ├── app_ai.go               # AI providers / Suggest* / callAIOp / trace emit
 ├── app_observability.go    # Claude/Codex status / trace persistence / macOS notify
@@ -51,147 +54,6 @@ hatch/
         └── style.css       # Full custom CSS (sections per feature)
 ```
 
----
-
-## Core Data Model (`internal/config/config.go`)
-
-```go
-type ScriptMeta struct {
-    Path, Name, Desc, Language string
-    Type         ScriptType        // "oneshot" | "service"
-    Commands     []string          // service sub-commands
-    PidFile      string            // default /tmp/hatch/<name>.pid
-    Args         []ArgDef          // nil = show input; [] = hide input
-    Presets      []CommandPreset   // named arg invocations
-    Tags         []string
-    Env          map[string]string // v1.1 per-script env (merged over os.Environ)
-    NotifyOnDone bool              // v1.1 macOS osascript banner
-    Schedule     string            // v1.2 @every / @daily / @hourly
-    Requires     []string          // v1.2 required CLI commands
-    HealthURL    string            // v1.2 GET /healthz target
-    PreScripts   []string          // v1.3 sequential pre-script chain
-    LastRunAt, UpdatedAt int64
-}
-
-type Config struct {
-    Directories      []Directory
-    Exports          []ExportVar
-    OverrideMeta     map[string]ScriptMeta
-    ZshrcAnnotations map[string]string
-    AI               AIConfig         // legacy single-provider (kept in sync)
-    AIProviders      []AIProvider     // multi-provider list
-    ActiveProviderID string
-    AutoLaunch       bool
-    TraceLogDir      string           // default <cfgDir>/Hatch/traces
-    SkillsDir        string           // default <cfgDir>/Hatch/skills
-    DocLinks         []DocLink
-    PromptTemplates  map[string]string // v1.2 op → override system prompt
-    Retention        DataRetention     // v1.3 cleanup policy
-    VPNAppDir        string            // Clash Verge Rev data dir (default: auto-detect)
-    VPNBackupDir     string            // VPN backup dir (default: Hatch/vpn-backups)
-}
-
-type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
-type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceRetainDays int }
-```
-
-`Args nil` → show input; `Args []ArgDef{}` → hide. `mergeOverride` only replaces non-zero fields — use `DeleteScriptMeta` to fully reset auto-detection.
-
----
-
-## App.go — Bound Methods
-
-| Method | Purpose |
-|---|---|
-| `GetConfig / ScanAll / GetScriptsByDir` | Config + scan |
-| `AddDirectory / RemoveDirectory / UpdateDirectoryExport` | Directory CRUD |
-| `SaveScriptMeta / DeleteScriptMeta` | Override CRUD (re-applies schedules) |
-| `RunScript(id, path, args)` | Oneshot launch (pre-scripts auto-chained if set) |
-| `ServiceAction(path, action, args)` | start / stop / restart with env |
-| `GetAllServiceStatuses()` | path → "running" \| "stopped" |
-| `ListRuns / GetRunLog / DeleteRun` | v1.1 run-history archive |
-| `SaveExports / CheckZshrc / ParseZshrc / SaveZshrcAnnotation` | Shell config |
-| `SuggestZshrcOrganization / ApplyZshrcOrganization` | AI zshrc rewrite preview + write |
-| `GetAutoLaunchEnabled / SetAutoLaunchEnabled` | Login autostart |
-| `GetClaudeCodeStatus / GetCodexUsageStatus` | Status cards |
-| `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / GetSkillsStats` | Skill CRUD |
-| `SetSkillSync(name, target, enabled) / ImportSkillsFrom / CreateSkillTemplate` | Skill sync + import |
-| `SuggestSkillContent / SuggestSkillFromDescription` | v1.3 Skill AI optimize |
-| `GetAppDataPaths / SaveAppDataPaths` | Trace + Skills dir config |
-| `GetAITraces / ClearAITraces / GetAITraceStorageInfo` | AI trace inspect |
-| `SaveAIConfig / GetAIProviders / SaveAIProviders / TestAIConfig` | Provider mgmt |
-| `SuggestScriptMeta / SuggestZshrcAnnotation / SuggestScriptContent` | AI Suggest |
-| `SuggestScriptContentStream(id, ...)` | v1.2 streaming (emits `ai:stream`) |
-| `GetPromptTemplates / SavePromptTemplates / GetDefaultPrompts` | v1.2 prompt overrides |
-| `ApplyAllSchedules / ListSchedules / RemoveSchedule` | v1.2 scheduler control |
-| `CheckScriptHealth(path) / CheckCommandAvailable(name)` | v1.2 dep + health probe |
-| `CheckPathHealth / ListAliasInventory` | v1.3 PATH + alias inspection |
-| `ExportBackup(dir) / ImportBackup(zipPath)` | v1.3 zip backup |
-| `RunWithPreScripts(id, path, args, pre)` | v1.3 explicit chain runner |
-| `GetAppDataInventory / CleanupDataDir(key) / GetRetentionPolicy / SaveRetentionPolicy` | v1.3 data dashboard |
-| `ListRecentRunsSorted(limit)` | flat newest-first run list |
-| `GetClaudeSettings / SaveClaudeSettings / GetCodexConfig / SaveCodexConfig` | Edit ~/.claude / ~/.codex configs |
-| `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File I/O |
-| `GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN read |
-| `GetVPNConfigFile / SaveVPNConfigFile` | VPN config edit (verge/config/dns/profiles yaml) |
-| `GetVPNProfileContent / SaveVPNProfileContent` | VPN profile file edit |
-| `ExportVPNBackup / ImportVPNBackup / ListVPNBackups` | VPN zip backup / restore |
-| `GetVPNSettings / SaveVPNSettings` | VPN configurable dirs (appDir + backupDir) |
-| `OpenVPNDir / OpenVPNBackupDir` | Finder open VPN data / backup dirs |
-
-Methods added after the last `wails dev`/`wails build` must be called via `window['go']['main']['App']['Method']()` until bindings regenerate.
-
----
-
-## Real-time Events (Go → JS via EventsEmit)
-
-| Event | Payload | When |
-|---|---|---|
-| `executor:log` | `{id, line, stream}` | Every stdout/stderr line |
-| `executor:done` | `{id, exitCode}` | Oneshot completed |
-| `executor:status` | `{id, status}` | running / stopped / error |
-| `ai:trace` | `AICallTrace` | Each AI call recorded |
-| `ai:stream` | `{id, chunk, done, error}` | Streaming Suggest output |
-
-`id` = script's absolute `path` for executor events.
-
----
-
-## Tab Navigation
-
-```
-tab = 'scripts' | 'ai' | 'vpn'   (default: 'ai' on launch)
-
-scripts + !selectedDir  →  Directory card grid + workspace-settings accordion
-scripts + selectedDir   →  Script list for that dir
-ai  + aiSubTab          →  概览 | 连接 | Skills | 工具 | Prompt | 数据
-vpn + vpnSubTab         →  概览 | 配置编辑 | Profiles | 备份恢复
-editTarget   != null    →  Edit drawer (env / notify / schedule / requires / health / preScripts)
-historyTarget != null   →  Run-history modal
-quickAIOpen             →  Header popover: model switch + recent traces
-```
-
-Workspace settings live on the scripts home page accordion: ⚙ 环境与路径配置 · 📁 目录管理 · 🔑 环境变量 · 📄 Shell 配置解析.
-
----
-
-## AI Module
-
-| Sub-tab | Content |
-|---|---|
-| 📖 概览 | Capability summary |
-| 🔌 连接 | Providers + trace log viewer |
-| 📚 Skills | List/edit/sync/create + ✦ AI optimize bar in editor |
-| ⚡ 工具 | Claude Code + Codex status cards |
-| 📝 Prompt | Per-op system-prompt override editor (shows defaults inline) |
-| 📦 数据 | Data-dir inventory + retention policy + per-dir 📂/🗑 |
-
-**Header quick-AI popover** (next to ⏻ 自启): badge shows active provider `✦ name · model`; click for model switcher + last 8 traces.
-
-**Trace log**: every AI call appends a JSONL record to `TraceLogDir/<YYYY-MM-DD>.jsonl`. Pruned by `AI.TraceRetainDays`.
-
----
-
 ## Runtime Data Paths
 
 | Purpose | Path |
@@ -212,32 +74,15 @@ Workspace settings live on the scripts home page accordion: ⚙ 环境与路径�
 
 Retention runs on startup + hourly ticker (`ApplyRetention`): trace days, runs days, runs-per-script cap.
 
----
+## Reference
 
-## VPN Module (`app_vpn.go`)
-
-Manages Clash Verge Rev (`io.github.clash-verge-rev.clash-verge-rev`) config files.
-
-| Sub-tab | Content |
+| Topic | File |
 |---|---|
-| 📋 概览 | Hero: 系统代理/TUN 状态 + 出口IP(ipinfo.io) + 选中节点 + 流量/到期 · Profile 卡片 · 数据目录配置 |
-| 📝 配置编辑 | 下拉选文件 (verge/config/dns/profiles yaml) + 内联编辑器，保存前自动 `.bak` |
-| 🗂 Profiles | 全部 profile 卡片，内联展开编辑器 |
-| 💾 备份恢复 | 一键 zip 备份（排除 cache.db/*.dat/logs）· 备份列表 + 恢复 · 外部 zip 导入 |
-
-**出口 IP 探测**：`GetVPNCurrentIP()` 先通过 Clash HTTP 代理端口（从活跃 profile yaml 读取，默认 7890）路由请求到 `ipinfo.io/json`，若失败则直连（TUN 模式下有效）。
-
-**写入安全**：所有配置写回前调用 `backupIfExists(path)` 创建 `.bak`；profile 文件名校验阻止路径穿越（`..` / `/\`），允许合法扩展名。
-
-**目录可配置**：`Config.VPNAppDir` / `Config.VPNBackupDir` 存入 config.json，留空走自动检测。
-
----
-
-## Detailed Reference
-
-- [VPN module: Clash Verge Rev config, profile types, backup strategy, IP probe](implementation-notes.md)
-- [Frontend architecture, Alpine state, UI design tokens, CSS rules](.claude/docs/frontend.md)
-- [Internals: scanner, executor, zshrc, scheduler, history](.claude/docs/internals.md)
-- [Known gotchas & Pico CSS integration notes](.claude/docs/gotchas.md)
-- [Frontend skill (component patterns, CSS classes)](.claude/skills/hatch-frontend/SKILL.md)
-- [Upgrade log (v1.1 → v1.3)](UPGRADE_LOG.md)
+| Core data model (`ScriptMeta` / `Config` structs) | [.claude/reference/data-model.md](.claude/reference/data-model.md) |
+| All bound Go methods + real-time events | [.claude/reference/bound-methods.md](.claude/reference/bound-methods.md) |
+| Frontend: Alpine state, UI tokens, CSS classes | [.claude/docs/frontend.md](.claude/docs/frontend.md) |
+| Internals: scanner, executor, zshrc, scheduler | [.claude/docs/internals.md](.claude/docs/internals.md) |
+| Known gotchas & Pico CSS notes | [.claude/docs/gotchas.md](.claude/docs/gotchas.md) |
+| VPN module: Clash Verge Rev details | [implementation-notes.md](implementation-notes.md) |
+| Frontend skill (component patterns) | [.claude/skills/hatch-frontend/SKILL.md](.claude/skills/hatch-frontend/SKILL.md) |
+| Upgrade log (v1.1 → v1.3) | [UPGRADE_LOG.md](UPGRADE_LOG.md) |
