@@ -29,8 +29,11 @@ editTarget != null      →  Edit drawer overlay
 | `aiSubTab` | Active AI sub-tab |
 | `claudeStatus / claudeStatusLoading` | Claude Code status card |
 | `codexStatus / codexStatusLoading` | Codex status card |
-| `skills` | `[]` from `ListSkills()` |
+| `skills` | `[]` from `GetSkills()` — sorted by modTime desc, SKILL.md-validated only |
 | `skillsStats` | `{total, claude, codex}` |
+| `skillSearch` | Search query string for filtering skills by name |
+| `skillFilter` | `'all' \| 'claude' \| 'codex'` — active category filter tab |
+| `filteredSkills` | Getter: `skills` filtered by `skillFilter` then `skillSearch` |
 | `traceLog / traceLogDate` | Trace log viewer state |
 | `dataPaths / dataPathsForm` | App data paths config |
 | `zshrcEntries / zshrcFilter` | Parsed zshrc + filter |
@@ -177,6 +180,13 @@ Positional keys (`source:N`, `other:N`, `comment:N`) change when the file is edi
 - `📂` calls `OpenFile(path)` (macOS `open`); `🗑` calls `CleanupDataDir(key)` only when `d.cleanable`
 - `formatBytes(n)` / `formatTime(unix)` helpers in `main.js`
 
+### Skills sub-tab filter bar
+- `.skill-filter-bar` — flex row: segment-control tabs + search input
+- `.skill-filter-tabs` / `.skill-filter-tab` — 全部 / Claude / Codex segment control; active tab uses `var(--primary)` text
+- `.skill-search-input` — name search; uses `!important` overrides to suppress Pico's large form-element padding
+- `filteredSkills` getter applies category filter first, then name substring match
+- Backend `GetSkills()` skips dirs without `SKILL.md` and returns skills sorted by `modTime` desc (newest first)
+
 ### Skill editor `✦ AI` bar
 - `.se-ai-bar.skill-ai-bar` mirrors the script-editor AI bar
 - `optimizeSkillWithAI()` → `SuggestSkillContent(name, current, instruction)` — overwrites `skillEditContent`, user reviews then saves
@@ -198,5 +208,6 @@ Class prefixes by feature:
 - `prompt-*` — Prompt sub-tab cards
 - `data-dir-*` / `retention-*` — Data sub-tab
 - `quick-ai-*` — header popover
+- `skill-filter-*` — Skills filter bar (segment tabs + search)
 - `field-hint`, `ok-mark`, `err-mark` — shared small atoms
 

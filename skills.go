@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -145,6 +146,10 @@ func (a *App) GetSkills() ([]SkillEntry, error) {
 			continue
 		}
 		skillPath := filepath.Join(master, e.Name())
+		// skip dirs that don't have SKILL.md — they're not valid skills
+		if _, err := os.Stat(filepath.Join(skillPath, "SKILL.md")); err != nil {
+			continue
+		}
 		fi, _ := e.Info()
 		modTime := int64(0)
 		if fi != nil {
@@ -161,6 +166,9 @@ func (a *App) GetSkills() ([]SkillEntry, error) {
 		}
 		skills = append(skills, skill)
 	}
+	sort.Slice(skills, func(i, j int) bool {
+		return skills[i].ModTime > skills[j].ModTime
+	})
 	return skills, nil
 }
 

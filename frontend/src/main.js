@@ -180,6 +180,8 @@ window.hatchApp = function () {
     skills: [],
     skillsStats: { total: 0, claude: 0, codex: 0, both: 0 },
     skillsLoading: false,
+    skillSearch: '',
+    skillFilter: 'all',   // 'all' | 'claude' | 'codex'
     skillEditTarget: null,   // skill name being edited, or null
     skillEditContent: '',
     skillEditSaving: false,
@@ -1727,6 +1729,15 @@ window.hatchApp = function () {
       this.searchActiveEl.dispatchEvent(new Event('input', { bubbles: true }));
       this.updateSearchMatches();
       this.showSuccess(`已替换 ${count} 处`);
+    },
+
+    get filteredSkills() {
+      let list = this.skills;
+      if (this.skillFilter === 'claude') list = list.filter(s => s.inClaude);
+      else if (this.skillFilter === 'codex')  list = list.filter(s => s.inCodex);
+      const q = (this.skillSearch || '').trim().toLowerCase();
+      if (q) list = list.filter(s => s.name.toLowerCase().includes(q));
+      return list;
     },
   };
 };

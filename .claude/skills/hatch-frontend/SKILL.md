@@ -278,8 +278,11 @@ editTarget != null      → 右侧编辑抽屉叠加
 | `aiForm` | `{enabled,baseUrl,apiKey,model}` | AI 连接配置 |
 | `aiSubTab` | `string` | AI 子页面（overview/connect/skills/tools/prompts/data） |
 | `claudeStatus` / `codexStatus` | `object\|null` | AI 工具状态卡片数据 |
-| `skills` | `array` | ListSkills() 结果 |
+| `skills` | `array` | GetSkills() 结果（按 modTime 降序，仅含 SKILL.md 的目录） |
 | `skillsStats` | `{total,claude,codex}` | hero stat 用 |
+| `skillSearch` | `string` | 按名称过滤的搜索词 |
+| `skillFilter` | `string` | `'all'\|'claude'\|'codex'` — 分类 tab |
+| `filteredSkills` | getter | 先按 skillFilter 过滤，再按 skillSearch 过滤 |
 | `traceLog / traceLogDate` | — | trace log 查看器 |
 | `dataPaths / dataPathsForm` | — | trace log dir / skills dir 配置 |
 | `zshrcEntries / zshrcFilter` | — | 解析后 zshrc + 类型过滤 |
@@ -368,6 +371,9 @@ window['go']['main']['App']['MethodName'](arg)
 | `.quick-ai-section / .quick-ai-section-label / .quick-ai-section-title` | 弹层内部分块 |
 | `.quick-ai-traces-header / .quick-ai-trace + .is-open / .quick-ai-trace-row / .quick-ai-trace-err / .quick-ai-trace-pre / .quick-ai-empty / .quick-ai-actions / .quick-ai-manage-row / .quick-ai-toggle-arrow` | trace 列表细节 |
 | `.skill-ai-bar` | Skill 编辑器 ✦ AI bar 间距（继承 `.se-ai-bar`） |
+| `.skill-filter-bar` | Skills 列表顶部过滤行，flex row |
+| `.skill-filter-tabs` / `.skill-filter-tab` | 全部/Claude/Codex segment-control；`.active` 用 primary 色 |
+| `.skill-search-input` | 名称搜索框；用 `!important` 覆盖 Pico 大内边距 |
 
 ---
 

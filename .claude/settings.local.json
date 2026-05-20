@@ -50,7 +50,8 @@
       "Bash(iconutil -c iconset /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app/Contents/Resources/iconfile.icns -o /tmp/hatch_iconset)",
       "Read(//tmp/**)",
       "Bash(iconutil -c iconset /Users/yinchengxin/MyHub/hatch/build/bin/Hatch.app/Contents/Resources/iconfile.icns --output /tmp/hatch_iconset.iconset)",
-      "Bash(iconutil -c icns /tmp/hatch_new.iconset --output /tmp/iconfile_new.icns)"
+      "Bash(iconutil -c icns /tmp/hatch_new.iconset --output /tmp/iconfile_new.icns)",
+      "Bash(grep -n \"^  },$\\\\|^  }$\" /Users/yinchengxin/MyHub/hatch/frontend/src/main.js)"
     ]
   }
 }

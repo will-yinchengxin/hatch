@@ -857,13 +857,25 @@
               <button class="btn-sm btn-primary" @click="openNewSkillEditor()">+ 新建</button>
             </div>
 
+            <div class="skill-filter-bar">
+              <div class="skill-filter-tabs">
+                <button class="skill-filter-tab" :class="skillFilter==='all'    ? 'active' : ''" @click="skillFilter='all'">全部</button>
+                <button class="skill-filter-tab" :class="skillFilter==='claude' ? 'active' : ''" @click="skillFilter='claude'">Claude</button>
+                <button class="skill-filter-tab" :class="skillFilter==='codex'  ? 'active' : ''" @click="skillFilter='codex'">Codex</button>
+              </div>
+              <input type="search" x-model="skillSearch" placeholder="按名称搜索…" class="skill-search-input" />
+            </div>
+
             <div x-show="skillsLoading" class="muted text-sm" style="padding:12px 0">加载中…</div>
             <div x-show="!skillsLoading && skills.length === 0" class="muted text-sm" style="padding:12px 0">
               暂无 Skills。点击「↓ 从 Claude 导入」或「↓ 从 Codex 导入」，或手动新建。
             </div>
+            <div x-show="!skillsLoading && skills.length > 0 && filteredSkills.length === 0" class="muted text-sm" style="padding:12px 0">
+              无匹配的 Skill。
+            </div>
 
-            <div class="skill-list" x-show="!skillsLoading && skills.length > 0">
-              <template x-for="s in skills" :key="s.name">
+            <div class="skill-list" x-show="!skillsLoading && filteredSkills.length > 0">
+              <template x-for="s in filteredSkills" :key="s.name">
                 <div class="skill-item" :class="skillEditTarget === s.name ? 'skill-item-editing' : ''">
                   <div class="skill-row">
                     <div class="skill-info">
