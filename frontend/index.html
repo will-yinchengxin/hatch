@@ -78,7 +78,7 @@
               <option x-show="!aiProviders.length" disabled selected>未配置 provider — 请去 ✦ AI → 🔌 连接 添加</option>
             </select>
             <div class="quick-ai-manage-row">
-              <button class="btn-edit" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false">⚙ 管理 provider</button>
+              <button class="btn-edit" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; selectedDir=null">⚙ 管理 provider</button>
             </div>
           </div>
 
@@ -88,7 +88,7 @@
               <strong class="quick-ai-section-title">最近 AI 调用</strong>
               <span class="quick-ai-actions">
                 <button class="icon-btn" @click="loadAITraces(); loadTraceStorage()" title="刷新">↻</button>
-                <button class="icon-btn" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; setTimeout(()=>{aiTraceCollapsed=false}, 50)" title="去完整日志页">↗</button>
+                <button class="icon-btn" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; selectedDir=null; setTimeout(()=>{aiTraceCollapsed=false}, 50)" title="去完整日志页">↗</button>
               </span>
             </div>
             <template x-if="!(aiTraces || []).length">
@@ -123,7 +123,7 @@
       <!-- VPN quick-status pill -->
       <button class="btn-refresh vpn-hdr-pill"
               :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-hdr-pill-on' : ''"
-              @click="tab='vpn'; loadVPNOverview()"
+              @click="tab='vpn'; selectedDir=null; loadVPNOverview()"
               title="VPN 状态 — 点击打开配置中心">
         <span class="vpn-hdr-dots">
           <span class="vpn-hdr-dot" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-dot-on' : 'vpn-dot-off'" title="系统代理"></span>
