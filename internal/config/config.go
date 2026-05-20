@@ -101,6 +101,8 @@ type Config struct {
 	ActiveProviderID string                `json:"activeProviderId,omitempty"`
 	PromptTemplates  map[string]string     `json:"promptTemplates,omitempty"` // v1.2: op -> override system prompt
 	Retention        DataRetention         `json:"retention,omitempty"`       // v1.3+: data cleanup policy
+	VPNAppDir        string                `json:"vpnAppDir,omitempty"`       // Clash Verge Rev data dir (default: auto-detect)
+	VPNBackupDir     string                `json:"vpnBackupDir,omitempty"`    // VPN backup dir (default: Hatch/vpn-backups)
 }
 
 func defaultPath() (string, error) {

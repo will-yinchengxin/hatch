@@ -33,6 +33,7 @@ hatch/
 ├── app_v12.go              # v1.2: scheduler / health-check / prompt templates / stream
 ├── app_v13.go              # v1.3: PATH health / backup-restore / pre-script chain
 ├── app_datadir.go          # Data-dir inventory + cleanup + retention + Skill AI
+├── app_vpn.go              # VPN module: Clash Verge Rev config/profile/backup + IP probe
 ├── skills.go               # SKILL.md store + claude/codex sync
 ├── main.go                 # Wails entry
 ├── internal/
@@ -86,6 +87,8 @@ type Config struct {
     DocLinks         []DocLink
     PromptTemplates  map[string]string // v1.2 op → override system prompt
     Retention        DataRetention     // v1.3 cleanup policy
+    VPNAppDir        string            // Clash Verge Rev data dir (default: auto-detect)
+    VPNBackupDir     string            // VPN backup dir (default: Hatch/vpn-backups)
 }
 
 type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
@@ -129,6 +132,12 @@ type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceR
 | `ListRecentRunsSorted(limit)` | flat newest-first run list |
 | `GetClaudeSettings / SaveClaudeSettings / GetCodexConfig / SaveCodexConfig` | Edit ~/.claude / ~/.codex configs |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File I/O |
+| `GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN read |
+| `GetVPNConfigFile / SaveVPNConfigFile` | VPN config edit (verge/config/dns/profiles yaml) |
+| `GetVPNProfileContent / SaveVPNProfileContent` | VPN profile file edit |
+| `ExportVPNBackup / ImportVPNBackup / ListVPNBackups` | VPN zip backup / restore |
+| `GetVPNSettings / SaveVPNSettings` | VPN configurable dirs (appDir + backupDir) |
+| `OpenVPNDir / OpenVPNBackupDir` | Finder open VPN data / backup dirs |
 
 Methods added after the last `wails dev`/`wails build` must be called via `window['go']['main']['App']['Method']()` until bindings regenerate.
 
@@ -151,11 +160,12 @@ Methods added after the last `wails dev`/`wails build` must be called via `windo
 ## Tab Navigation
 
 ```
-tab = 'scripts' | 'ai'   (default: 'ai' on launch)
+tab = 'scripts' | 'ai' | 'vpn'   (default: 'ai' on launch)
 
 scripts + !selectedDir  →  Directory card grid + workspace-settings accordion
 scripts + selectedDir   →  Script list for that dir
-ai + aiSubTab           →  概览 | 连接 | Skills | 工具 | Prompt | 数据
+ai  + aiSubTab          →  概览 | 连接 | Skills | 工具 | Prompt | 数据
+vpn + vpnSubTab         →  概览 | 配置编辑 | Profiles | 备份恢复
 editTarget   != null    →  Edit drawer (env / notify / schedule / requires / health / preScripts)
 historyTarget != null   →  Run-history modal
 quickAIOpen             →  Header popover: model switch + recent traces
@@ -197,13 +207,35 @@ Workspace settings live on the scripts home page accordion: ⚙ 环境与路径�
 | Claude usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
 | Backup exports | `~/Desktop/hatch-backup-<ts>.zip` (default) |
+| VPN config | `~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/` (configurable) |
+| VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` (configurable) |
 
 Retention runs on startup + hourly ticker (`ApplyRetention`): trace days, runs days, runs-per-script cap.
 
 ---
 
+## VPN Module (`app_vpn.go`)
+
+Manages Clash Verge Rev (`io.github.clash-verge-rev.clash-verge-rev`) config files.
+
+| Sub-tab | Content |
+|---|---|
+| 📋 概览 | Hero: 系统代理/TUN 状态 + 出口IP(ipinfo.io) + 选中节点 + 流量/到期 · Profile 卡片 · 数据目录配置 |
+| 📝 配置编辑 | 下拉选文件 (verge/config/dns/profiles yaml) + 内联编辑器，保存前自动 `.bak` |
+| 🗂 Profiles | 全部 profile 卡片，内联展开编辑器 |
+| 💾 备份恢复 | 一键 zip 备份（排除 cache.db/*.dat/logs）· 备份列表 + 恢复 · 外部 zip 导入 |
+
+**出口 IP 探测**：`GetVPNCurrentIP()` 先通过 Clash HTTP 代理端口（从活跃 profile yaml 读取，默认 7890）路由请求到 `ipinfo.io/json`，若失败则直连（TUN 模式下有效）。
+
+**写入安全**：所有配置写回前调用 `backupIfExists(path)` 创建 `.bak`；profile 文件名校验阻止路径穿越（`..` / `/\`），允许合法扩展名。
+
+**目录可配置**：`Config.VPNAppDir` / `Config.VPNBackupDir` 存入 config.json，留空走自动检测。
+
+---
+
 ## Detailed Reference
 
+- [VPN module: Clash Verge Rev config, profile types, backup strategy, IP probe](implementation-notes.md)
 - [Frontend architecture, Alpine state, UI design tokens, CSS rules](.claude/docs/frontend.md)
 - [Internals: scanner, executor, zshrc, scheduler, history](.claude/docs/internals.md)
 - [Known gotchas & Pico CSS integration notes](.claude/docs/gotchas.md)

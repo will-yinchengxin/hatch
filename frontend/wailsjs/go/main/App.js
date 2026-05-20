@@ -66,6 +66,10 @@ export function ExportBackup(arg1) {
   return window['go']['main']['App']['ExportBackup'](arg1);
 }
 
+export function ExportVPNBackup() {
+  return window['go']['main']['App']['ExportVPNBackup']();
+}
+
 export function GetAIProviders() {
   return window['go']['main']['App']['GetAIProviders']();
 }
@@ -150,12 +154,44 @@ export function GetSkillsStats() {
   return window['go']['main']['App']['GetSkillsStats']();
 }
 
+export function GetVPNAppDir() {
+  return window['go']['main']['App']['GetVPNAppDir']();
+}
+
+export function GetVPNConfigFile(arg1) {
+  return window['go']['main']['App']['GetVPNConfigFile'](arg1);
+}
+
+export function GetVPNCurrentIP() {
+  return window['go']['main']['App']['GetVPNCurrentIP']();
+}
+
+export function GetVPNProfileContent(arg1) {
+  return window['go']['main']['App']['GetVPNProfileContent'](arg1);
+}
+
+export function GetVPNProfiles() {
+  return window['go']['main']['App']['GetVPNProfiles']();
+}
+
+export function GetVPNSettings() {
+  return window['go']['main']['App']['GetVPNSettings']();
+}
+
+export function GetVPNStatus() {
+  return window['go']['main']['App']['GetVPNStatus']();
+}
+
 export function ImportBackup(arg1) {
   return window['go']['main']['App']['ImportBackup'](arg1);
 }
 
 export function ImportSkillsFrom(arg1) {
   return window['go']['main']['App']['ImportSkillsFrom'](arg1);
+}
+
+export function ImportVPNBackup(arg1) {
+  return window['go']['main']['App']['ImportVPNBackup'](arg1);
 }
 
 export function ListAliasInventory() {
@@ -174,8 +210,20 @@ export function ListSchedules() {
   return window['go']['main']['App']['ListSchedules']();
 }
 
+export function ListVPNBackups() {
+  return window['go']['main']['App']['ListVPNBackups']();
+}
+
 export function OpenFile(arg1) {
   return window['go']['main']['App']['OpenFile'](arg1);
+}
+
+export function OpenVPNBackupDir() {
+  return window['go']['main']['App']['OpenVPNBackupDir']();
+}
+
+export function OpenVPNDir() {
+  return window['go']['main']['App']['OpenVPNDir']();
 }
 
 export function ParseZshrc() {
@@ -244,6 +292,18 @@ export function SaveScriptMeta(arg1) {
 
 export function SaveSkillContent(arg1, arg2) {
   return window['go']['main']['App']['SaveSkillContent'](arg1, arg2);
+}
+
+export function SaveVPNConfigFile(arg1, arg2) {
+  return window['go']['main']['App']['SaveVPNConfigFile'](arg1, arg2);
+}
+
+export function SaveVPNProfileContent(arg1, arg2) {
+  return window['go']['main']['App']['SaveVPNProfileContent'](arg1, arg2);
+}
+
+export function SaveVPNSettings(arg1, arg2) {
+  return window['go']['main']['App']['SaveVPNSettings'](arg1, arg2);
 }
 
 export function SaveZshrcAnnotation(arg1, arg2) {

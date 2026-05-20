@@ -2992,7 +2992,9 @@ code {
 .ai-sidenav-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
+  width: 100%;
   padding: 9px 12px;
   border-radius: var(--radius);
   border: none;
@@ -4038,4 +4040,388 @@ details[open] .export-preview-toggle::before {
 .quick-ai-toggle-arrow {
   margin-left: 4px;
   font-size: 10px;
+}
+
+/* ─── VPN Module ──────────────────────────────────────────────────────── */
+
+.vpn-msg-bar {
+  margin: 0 24px 12px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  background: rgba(79, 123, 88, 0.15);
+  color: var(--green);
+  font-size: 12.5px;
+  border: 1px solid rgba(79, 123, 88, 0.25);
+}
+
+/* Hero layout override for VPN */
+.vpn-hero {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+.vpn-hero-left {
+  flex-shrink: 0;
+}
+.vpn-hero-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vpn-hero-stats {
+  flex-wrap: wrap;
+}
+.vpn-stat-on {
+  border-color: rgba(79, 123, 88, 0.4);
+}
+.vpn-hero-traffic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+.vpn-hero-traffic strong {
+  color: var(--text);
+}
+.vpn-traffic-sep {
+  color: var(--border-hover);
+}
+
+/* Exit IP card */
+.vpn-ip-card .hero-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vpn-ip-refresh {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.vpn-ip-refresh:hover { opacity: 1; }
+.vpn-ip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vpn-ip-location {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.vpn-ip-addr {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.vpn-muted {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Status grid */
+.vpn-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.vpn-status-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.vpn-status-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.vpn-status-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+.vpn-on  { color: var(--green); }
+.vpn-off { color: var(--text-muted); }
+.vpn-node { font-size: 12px; color: var(--cyan); font-family: var(--font-mono); }
+
+.vpn-traffic-row {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 6px 2px;
+}
+
+/* Settings form */
+.vpn-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vpn-settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vpn-settings-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.vpn-settings-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.vpn-settings-input {
+  flex: 1;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.vpn-settings-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.vpn-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* Current profile card */
+.vpn-current-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vpn-current-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vpn-current-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.vpn-current-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.vpn-current-url {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.vpn-url-masked {
+  font-family: var(--font-mono);
+}
+
+/* Type badge */
+.vpn-type-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.vpn-type-remote  { background: rgba(79,107,123,0.18); color: var(--cyan); }
+.vpn-type-merge   { background: rgba(123,107,79,0.18); color: #c9a86c; }
+.vpn-type-script  { background: rgba(123,79,123,0.18); color: var(--purple); }
+.vpn-type-rules   { background: rgba(79,123,88,0.18);  color: var(--green); }
+.vpn-type-proxies { background: rgba(123,88,79,0.18);  color: #d4836a; }
+.vpn-type-groups  { background: rgba(88,79,123,0.18);  color: #9b8fd4; }
+
+/* Directory row */
+.vpn-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.vpn-dir-path {
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Overview profile list */
+.vpn-profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vpn-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.vpn-profile-row.vpn-profile-current {
+  border-color: var(--primary);
+  background: rgba(185, 100, 74, 0.06);
+}
+.vpn-profile-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vpn-profile-ts {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.vpn-current-mark {
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Config editor toolbar */
+.vpn-config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.vpn-file-select {
+  flex: 1;
+  max-width: 340px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.vpn-editor {
+  min-height: 400px;
+}
+.vpn-config-error {
+  color: var(--red);
+  font-size: 12px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: rgba(185, 76, 63, 0.08);
+  border-radius: var(--radius);
+  border: 1px solid rgba(185, 76, 63, 0.2);
+}
+
+/* Profile items (Profiles sub-tab) */
+.vpn-profile-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vpn-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.vpn-item:hover {
+  border-color: var(--border-hover);
+}
+.vpn-item-current {
+  border-left: 3px solid var(--primary);
+}
+.vpn-item-editing {
+  border-color: var(--primary);
+}
+.vpn-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+.vpn-item-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vpn-item-file {
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+.vpn-item-ts {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* Backup */
+.vpn-backup-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.vpn-backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vpn-backup-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.vpn-backup-name {
+  flex: 1;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  word-break: break-all;
+}
+.vpn-restore-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.vpn-zip-input {
+  flex: 1;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
 }

@@ -208,6 +208,8 @@ export namespace config {
 	    activeProviderId?: string;
 	    promptTemplates?: Record<string, string>;
 	    retention?: DataRetention;
+	    vpnAppDir?: string;
+	    vpnBackupDir?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -228,6 +230,8 @@ export namespace config {
 	        this.activeProviderId = source["activeProviderId"];
 	        this.promptTemplates = source["promptTemplates"];
 	        this.retention = this.convertValues(source["retention"], DataRetention);
+	        this.vpnAppDir = source["vpnAppDir"];
+	        this.vpnBackupDir = source["vpnBackupDir"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -823,6 +827,128 @@ export namespace main {
 	        this.claude = source["claude"];
 	        this.codex = source["codex"];
 	        this.both = source["both"];
+	    }
+	}
+	export class VPNBackupResult {
+	    path: string;
+	    size: number;
+	    numFiles: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNBackupResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.size = source["size"];
+	        this.numFiles = source["numFiles"];
+	    }
+	}
+	export class VPNConfigFile {
+	    name: string;
+	    path: string;
+	    content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNConfigFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.content = source["content"];
+	    }
+	}
+	export class VPNCurrentIP {
+	    ip: string;
+	    country: string;
+	    region: string;
+	    city: string;
+	    org: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNCurrentIP(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ip = source["ip"];
+	        this.country = source["country"];
+	        this.region = source["region"];
+	        this.city = source["city"];
+	        this.org = source["org"];
+	        this.error = source["error"];
+	    }
+	}
+	export class VPNProfile {
+	    uid: string;
+	    type: string;
+	    name: string;
+	    file: string;
+	    url?: string;
+	    updated: number;
+	    isCurrent: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.uid = source["uid"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.file = source["file"];
+	        this.url = source["url"];
+	        this.updated = source["updated"];
+	        this.isCurrent = source["isCurrent"];
+	    }
+	}
+	export class VPNSettings {
+	    appDir: string;
+	    backupDir: string;
+	    appDirIsSet: boolean;
+	    backupIsSet: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.appDir = source["appDir"];
+	        this.backupDir = source["backupDir"];
+	        this.appDirIsSet = source["appDirIsSet"];
+	        this.backupIsSet = source["backupIsSet"];
+	    }
+	}
+	export class VPNStatus {
+	    systemProxyEnabled: boolean;
+	    tunEnabled: boolean;
+	    currentGroup: string;
+	    currentNode: string;
+	    expireAt: number;
+	    upload: number;
+	    download: number;
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.systemProxyEnabled = source["systemProxyEnabled"];
+	        this.tunEnabled = source["tunEnabled"];
+	        this.currentGroup = source["currentGroup"];
+	        this.currentNode = source["currentNode"];
+	        this.expireAt = source["expireAt"];
+	        this.upload = source["upload"];
+	        this.download = source["download"];
+	        this.total = source["total"];
 	    }
 	}
 	export class ZshrcApplyResult {

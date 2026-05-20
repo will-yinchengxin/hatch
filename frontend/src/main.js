@@ -49,6 +49,21 @@ const SaveAIProviders       = (providers, activeID)         => window['go']['mai
 const GetDocLinks           = ()                            => window['go']['main']['App']['GetDocLinks']();
 const SaveDocLinks          = (links)                       => window['go']['main']['App']['SaveDocLinks'](links);
 const OpenFile              = (path)                        => window['go']['main']['App']['OpenFile'](path);
+const GetVPNAppDir          = ()                            => window['go']['main']['App']['GetVPNAppDir']();
+const GetVPNProfiles        = ()                            => window['go']['main']['App']['GetVPNProfiles']();
+const GetVPNConfigFile      = (name)                        => window['go']['main']['App']['GetVPNConfigFile'](name);
+const SaveVPNConfigFile     = (name, content)               => window['go']['main']['App']['SaveVPNConfigFile'](name, content);
+const GetVPNProfileContent  = (uid)                         => window['go']['main']['App']['GetVPNProfileContent'](uid);
+const SaveVPNProfileContent = (uid, content)                => window['go']['main']['App']['SaveVPNProfileContent'](uid, content);
+const ExportVPNBackup       = ()                            => window['go']['main']['App']['ExportVPNBackup']();
+const ImportVPNBackup       = (zipPath)                     => window['go']['main']['App']['ImportVPNBackup'](zipPath);
+const ListVPNBackups        = ()                            => window['go']['main']['App']['ListVPNBackups']();
+const OpenVPNDir            = ()                            => window['go']['main']['App']['OpenVPNDir']();
+const OpenVPNBackupDir      = ()                            => window['go']['main']['App']['OpenVPNBackupDir']();
+const GetVPNSettings        = ()                            => window['go']['main']['App']['GetVPNSettings']();
+const SaveVPNSettings       = (appDir, backupDir)           => window['go']['main']['App']['SaveVPNSettings'](appDir, backupDir);
+const GetVPNStatus          = ()                            => window['go']['main']['App']['GetVPNStatus']();
+const GetVPNCurrentIP       = ()                            => window['go']['main']['App']['GetVPNCurrentIP']();
 const GetClaudeSettings     = ()                            => window['go']['main']['App']['GetClaudeSettings']();
 const SaveClaudeSettings    = (content)                     => window['go']['main']['App']['SaveClaudeSettings'](content);
 const GetCodexConfig        = ()                            => window['go']['main']['App']['GetCodexConfig']();
@@ -193,6 +208,31 @@ window.hatchApp = function () {
 
     // AI sub-navigation
     aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'tools'
+
+    // VPN module
+    vpnSubTab: 'overview',   // 'overview' | 'config' | 'profiles' | 'backup'
+    vpnProfiles: [],
+    vpnCurrentProfile: null,
+    vpnAppDir: '',
+    vpnStatus: null,
+    vpnCurrentIP: null,
+    vpnIPLoading: false,
+    vpnSettings: null,
+    vpnSettingsForm: { appDir: '', backupDir: '' },
+    vpnSettingsSaving: false,
+    vpnConfigFile: 'verge.yaml',
+    vpnConfigContent: '',
+    vpnConfigSaving: false,
+    vpnConfigError: '',
+    vpnProfileEditing: null,
+    vpnProfileContent: '',
+    vpnProfileSaving: false,
+    vpnProfileError: '',
+    vpnBackups: [],
+    vpnBackupDir: '',
+    vpnBackupBusy: false,
+    vpnRestoreBusy: false,
+    vpnMsg: '',
 
     // Workspace-settings accordion state
     wsShellOpen: false,
@@ -1738,6 +1778,173 @@ window.hatchApp = function () {
       const q = (this.skillSearch || '').trim().toLowerCase();
       if (q) list = list.filter(s => s.name.toLowerCase().includes(q));
       return list;
+    },
+
+    // ── VPN ───────────────────────────────────────────────────────────────
+
+    async loadVPNOverview() {
+      try {
+        const [profiles, dir, backups, status, settings] = await Promise.all([
+          GetVPNProfiles(),
+          GetVPNAppDir(),
+          ListVPNBackups(),
+          GetVPNStatus(),
+          GetVPNSettings(),
+        ]);
+        this.vpnProfiles = profiles || [];
+        this.vpnCurrentProfile = this.vpnProfiles.find(p => p.isCurrent) || null;
+        this.vpnAppDir = dir || '';
+        this.vpnBackups = backups || [];
+        this.vpnStatus = status || null;
+        this.vpnSettings = settings || null;
+        // Fetch real exit IP in background (network call, takes a moment)
+        this.refreshVPNCurrentIP();
+        if (settings) {
+          this.vpnSettingsForm = { appDir: settings.appDir, backupDir: settings.backupDir };
+          this.vpnBackupDir = settings.backupDir;
+        }
+      } catch (e) {
+        this.vpnMsg = '加载失败: ' + e;
+      }
+    },
+
+    async saveVPNSettings() {
+      this.vpnSettingsSaving = true;
+      try {
+        await SaveVPNSettings(this.vpnSettingsForm.appDir, this.vpnSettingsForm.backupDir);
+        await this.loadVPNOverview();
+        this.vpnMsg = '目录设置已保存';
+        setTimeout(() => { this.vpnMsg = ''; }, 3000);
+      } catch (e) {
+        this.vpnMsg = '保存失败: ' + e;
+      } finally {
+        this.vpnSettingsSaving = false;
+      }
+    },
+
+    async openVPNDir() {
+      try { await OpenVPNDir(); } catch (e) { this.vpnMsg = '打开失败: ' + e; }
+    },
+
+    async openVPNBackupDir() {
+      try { await OpenVPNBackupDir(); } catch (e) { this.vpnMsg = '打开失败: ' + e; }
+    },
+
+    vpnFormatBytes(bytes) {
+      if (!bytes) return '—';
+      const gb = bytes / 1024 / 1024 / 1024;
+      return gb >= 1 ? gb.toFixed(2) + ' GB' : (bytes / 1024 / 1024).toFixed(0) + ' MB';
+    },
+
+    async refreshVPNCurrentIP() {
+      this.vpnIPLoading = true;
+      this.vpnCurrentIP = null;
+      try {
+        this.vpnCurrentIP = await GetVPNCurrentIP();
+      } catch (e) {
+        this.vpnCurrentIP = { error: String(e) };
+      } finally {
+        this.vpnIPLoading = false;
+      }
+    },
+
+    async loadVPNConfig() {
+      this.vpnConfigContent = '';
+      this.vpnConfigError = '';
+      try {
+        const r = await GetVPNConfigFile(this.vpnConfigFile);
+        this.vpnConfigContent = r.content || '';
+      } catch (e) {
+        this.vpnConfigError = String(e);
+      }
+    },
+
+    async saveVPNConfig() {
+      this.vpnConfigSaving = true;
+      this.vpnConfigError = '';
+      try {
+        await SaveVPNConfigFile(this.vpnConfigFile, this.vpnConfigContent);
+        this.vpnMsg = '已保存 ' + this.vpnConfigFile;
+        setTimeout(() => { this.vpnMsg = ''; }, 3000);
+      } catch (e) {
+        this.vpnConfigError = String(e);
+      } finally {
+        this.vpnConfigSaving = false;
+      }
+    },
+
+    async openVPNProfile(profile) {
+      this.vpnProfileEditing = profile;
+      this.vpnProfileContent = '';
+      this.vpnProfileError = '';
+      try {
+        this.vpnProfileContent = await GetVPNProfileContent(profile.file);
+      } catch (e) {
+        this.vpnProfileError = String(e);
+      }
+    },
+
+    async saveVPNProfile() {
+      if (!this.vpnProfileEditing) return;
+      this.vpnProfileSaving = true;
+      this.vpnProfileError = '';
+      try {
+        await SaveVPNProfileContent(this.vpnProfileEditing.file, this.vpnProfileContent);
+        this.vpnMsg = '已保存 ' + this.vpnProfileEditing.file;
+        setTimeout(() => { this.vpnMsg = ''; }, 3000);
+      } catch (e) {
+        this.vpnProfileError = String(e);
+      } finally {
+        this.vpnProfileSaving = false;
+      }
+    },
+
+    closeVPNProfile() {
+      this.vpnProfileEditing = null;
+      this.vpnProfileContent = '';
+      this.vpnProfileError = '';
+    },
+
+    async exportVPNBackup() {
+      this.vpnBackupBusy = true;
+      this.vpnMsg = '';
+      try {
+        const r = await ExportVPNBackup();
+        this.vpnMsg = `备份成功: ${r.path} (${r.numFiles} 个文件)`;
+        this.vpnBackups = await ListVPNBackups();
+      } catch (e) {
+        this.vpnMsg = '备份失败: ' + e;
+      } finally {
+        this.vpnBackupBusy = false;
+      }
+    },
+
+    async importVPNBackup(zipPath) {
+      if (!confirm(`确认从以下备份恢复？\n${zipPath}\n\n建议先关闭 Clash Verge Rev。`)) return;
+      this.vpnRestoreBusy = true;
+      this.vpnMsg = '';
+      try {
+        const msg = await ImportVPNBackup(zipPath);
+        this.vpnMsg = '恢复成功: ' + msg;
+      } catch (e) {
+        this.vpnMsg = '恢复失败: ' + e;
+      } finally {
+        this.vpnRestoreBusy = false;
+      }
+    },
+
+    vpnBackupBasename(path) {
+      return path.split('/').pop();
+    },
+
+    vpnProfileTypeBadge(type) {
+      const map = { remote: '订阅', merge: '合并', script: '脚本', rules: '规则', proxies: '节点', groups: '分组' };
+      return map[type] || type;
+    },
+
+    vpnFormatTs(ts) {
+      if (!ts) return '—';
+      return new Date(ts * 1000).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
     },
   };
 };

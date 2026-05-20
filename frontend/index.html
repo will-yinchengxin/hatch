@@ -27,6 +27,7 @@
     <nav class="tab-nav" x-show="!selectedDir">
       <button class="tab" :class="tab==='scripts' ? 'active' : ''" @click="tab='scripts'">工作台</button>
       <button class="tab" :class="tab==='ai'      ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses(); loadAITraces()">✦ AI</button>
+      <button class="tab" :class="tab==='vpn'     ? 'active' : ''" @click="tab='vpn'; loadVPNOverview()">🔒 VPN</button>
     </nav>
 
     <div class="header-right">
@@ -1656,6 +1657,313 @@
       </div>
     </div>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- VPN 配置中心                                                       -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <main x-show="tab==='vpn' && !selectedDir" class="ai-main">
+
+    <!-- Hero -->
+    <section class="page-hero ai-hero vpn-hero">
+      <div class="vpn-hero-left">
+        <p class="eyebrow">代理配置管理</p>
+        <h1>VPN 配置中心</h1>
+        <p class="page-subtitle">Clash Verge Rev 配置查看、编辑、备份与恢复。</p>
+      </div>
+      <div class="vpn-hero-right">
+        <!-- 状态卡行 -->
+        <div class="hero-stats vpn-hero-stats">
+          <div class="hero-stat-card vpn-stat-proxy" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-stat-on' : ''">
+            <div class="hero-stat-label">系统代理</div>
+            <div class="hero-stat-body">
+              <span class="hero-stat-value"
+                :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-on' : 'vpn-off'"
+                x-text="vpnStatus ? (vpnStatus.systemProxyEnabled ? '已开启' : '已关闭') : '—'"></span>
+            </div>
+          </div>
+          <div class="hero-stat-card" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-stat-on' : ''">
+            <div class="hero-stat-label">TUN 模式</div>
+            <div class="hero-stat-body">
+              <span class="hero-stat-value"
+                :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-on' : 'vpn-off'"
+                x-text="vpnStatus ? (vpnStatus.tunEnabled ? '已开启' : '已关闭') : '—'"></span>
+            </div>
+          </div>
+          <div class="hero-stat-card vpn-ip-card">
+            <div class="hero-stat-label">
+              出口 IP
+              <button class="vpn-ip-refresh" @click.stop="refreshVPNCurrentIP()" :aria-busy="vpnIPLoading" title="刷新">↻</button>
+            </div>
+            <div class="hero-stat-body">
+              <template x-if="vpnIPLoading">
+                <span class="hero-stat-value hero-stat-value--sm vpn-muted">检测中…</span>
+              </template>
+              <template x-if="!vpnIPLoading && vpnCurrentIP && !vpnCurrentIP.error">
+                <div class="vpn-ip-body">
+                  <span class="vpn-ip-location">
+                    <span x-text="vpnCurrentIP.country"></span>
+                    <span x-show="vpnCurrentIP.city" x-text="' · ' + vpnCurrentIP.city"></span>
+                  </span>
+                  <span class="vpn-ip-addr" x-text="vpnCurrentIP.ip"></span>
+                </div>
+              </template>
+              <template x-if="!vpnIPLoading && (!vpnCurrentIP || vpnCurrentIP.error)">
+                <span class="hero-stat-value hero-stat-value--sm vpn-muted">—</span>
+              </template>
+            </div>
+          </div>
+          <div class="hero-stat-card" x-show="vpnStatus && vpnStatus.currentNode">
+            <div class="hero-stat-label">选中节点</div>
+            <div class="hero-stat-body">
+              <span class="hero-stat-value hero-stat-value--sm vpn-node"
+                x-text="vpnStatus && vpnStatus.currentNode || '—'"></span>
+            </div>
+          </div>
+        </div>
+        <!-- 流量 + 到期行 -->
+        <div class="vpn-hero-traffic" x-show="vpnStatus && vpnStatus.total">
+          <span>↑ <strong x-text="vpnFormatBytes(vpnStatus && vpnStatus.upload)"></strong></span>
+          <span class="vpn-traffic-sep">·</span>
+          <span>↓ <strong x-text="vpnFormatBytes(vpnStatus && vpnStatus.download)"></strong></span>
+          <span class="vpn-traffic-sep">·</span>
+          <span>总量 <strong x-text="vpnFormatBytes(vpnStatus && vpnStatus.total)"></strong></span>
+          <span class="vpn-traffic-sep">·</span>
+          <span>到期 <strong x-text="vpnStatus && vpnStatus.expireAt ? new Date(vpnStatus.expireAt*1000).toLocaleDateString('zh-CN') : '—'"></strong></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 全局消息条 -->
+    <div class="vpn-msg-bar" x-show="vpnMsg" x-text="vpnMsg"></div>
+
+    <!-- Layout: sidenav + content -->
+    <div class="ai-layout">
+      <nav class="ai-sidenav">
+        <button class="ai-sidenav-item" :class="vpnSubTab==='overview' ? 'active' : ''"
+          @click="vpnSubTab='overview'; loadVPNOverview()">
+          <span class="ai-sidenav-icon">📋</span>
+          <span>概览</span>
+        </button>
+        <button class="ai-sidenav-item" :class="vpnSubTab==='config' ? 'active' : ''"
+          @click="vpnSubTab='config'; loadVPNConfig()">
+          <span class="ai-sidenav-icon">📝</span>
+          <span>配置编辑</span>
+        </button>
+        <button class="ai-sidenav-item" :class="vpnSubTab==='profiles' ? 'active' : ''"
+          @click="vpnSubTab='profiles'; loadVPNOverview()">
+          <span class="ai-sidenav-icon">🗂</span>
+          <span>Profiles</span>
+          <span class="ai-sidenav-count" x-show="vpnProfiles.length > 0" x-text="vpnProfiles.length"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="vpnSubTab==='backup' ? 'active' : ''"
+          @click="vpnSubTab='backup'; loadVPNOverview()">
+          <span class="ai-sidenav-icon">💾</span>
+          <span>备份恢复</span>
+          <span class="ai-sidenav-count" x-show="vpnBackups.length > 0" x-text="vpnBackups.length"></span>
+        </button>
+      </nav>
+
+      <div class="ai-content">
+
+        <!-- ══ 概览 ══════════════════════════════════════════════════ -->
+        <div x-show="vpnSubTab==='overview'">
+
+          <!-- 当前激活 Profile -->
+          <section class="settings-section">
+            <h3>当前激活 Profile</h3>
+            <template x-if="vpnCurrentProfile">
+              <div class="vpn-current-card">
+                <div class="vpn-current-main">
+                  <div class="vpn-current-name" x-text="vpnCurrentProfile.name || vpnCurrentProfile.uid"></div>
+                  <span class="vpn-type-badge" :class="'vpn-type-' + vpnCurrentProfile.type"
+                    x-text="vpnProfileTypeBadge(vpnCurrentProfile.type)"></span>
+                </div>
+                <div class="vpn-current-meta">
+                  <span class="muted">UID: </span><code x-text="vpnCurrentProfile.uid"></code>
+                  &nbsp;·&nbsp;
+                  <span class="muted">更新: </span><span x-text="vpnFormatTs(vpnCurrentProfile.updated)"></span>
+                </div>
+                <div class="vpn-current-url" x-show="vpnCurrentProfile.url">
+                  <span class="muted">订阅: </span>
+                  <span class="vpn-url-masked" x-text="vpnCurrentProfile.url ? vpnCurrentProfile.url.replace(/\/link\/[^?]+/, '/link/***') : ''"></span>
+                </div>
+              </div>
+            </template>
+            <template x-if="!vpnCurrentProfile">
+              <p class="muted">未检测到激活的 Profile，请确认 Clash Verge Rev 已安装。</p>
+            </template>
+          </section>
+
+          <!-- 数据目录（可配置） -->
+          <section class="settings-section">
+            <h3>数据目录配置</h3>
+            <div class="vpn-settings-form">
+              <div class="vpn-settings-row">
+                <label class="vpn-settings-label">Clash Verge Rev 数据目录</label>
+                <div class="vpn-settings-field">
+                  <input type="text" x-model="vpnSettingsForm.appDir" class="vpn-settings-input"
+                    placeholder="留空使用自动检测路径" />
+                  <button class="btn-edit" @click="openVPNDir()" x-show="vpnAppDir" title="在 Finder 中打开">📂</button>
+                </div>
+              </div>
+              <div class="vpn-settings-row">
+                <label class="vpn-settings-label">备份存储目录</label>
+                <div class="vpn-settings-field">
+                  <input type="text" x-model="vpnSettingsForm.backupDir" class="vpn-settings-input"
+                    placeholder="留空使用默认: Hatch/vpn-backups" />
+                  <button class="btn-edit" @click="openVPNBackupDir()" title="在 Finder 中打开">📂</button>
+                </div>
+              </div>
+              <div class="vpn-settings-actions">
+                <button class="btn-edit btn-primary" @click="saveVPNSettings()" :aria-busy="vpnSettingsSaving" :disabled="vpnSettingsSaving">
+                  💾 保存目录设置
+                </button>
+                <span class="muted" style="font-size:11px" x-show="vpnAppDir">当前: <code x-text="vpnAppDir"></code></span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 全部 Profiles -->
+          <section class="settings-section">
+            <h3>全部 Profiles</h3>
+            <template x-if="vpnProfiles.length === 0">
+              <p class="muted">暂无 Profile 数据。</p>
+            </template>
+            <div class="vpn-profile-list">
+              <template x-for="p in vpnProfiles" :key="p.uid">
+                <div class="vpn-profile-row" :class="p.isCurrent ? 'vpn-profile-current' : ''">
+                  <span class="vpn-type-badge" :class="'vpn-type-' + p.type" x-text="vpnProfileTypeBadge(p.type)"></span>
+                  <span class="vpn-profile-name" x-text="p.name || p.uid"></span>
+                  <span class="vpn-profile-ts muted" x-text="vpnFormatTs(p.updated)"></span>
+                  <span class="vpn-current-mark" x-show="p.isCurrent">✓ 当前</span>
+                  <button class="btn-edit" @click="vpnSubTab='profiles'; openVPNProfile(p)">编辑</button>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ 配置编辑 ════════════════════════════════════════════ -->
+        <div x-show="vpnSubTab==='config'">
+          <section class="settings-section">
+            <h3>配置文件编辑</h3>
+            <p class="settings-desc">保存前会自动创建 <code>.bak</code> 备份文件。</p>
+            <div class="vpn-config-toolbar">
+              <select x-model="vpnConfigFile" @change="loadVPNConfig()" class="vpn-file-select">
+                <option value="verge.yaml">verge.yaml（应用设置）</option>
+                <option value="config.yaml">config.yaml（Clash 核心）</option>
+                <option value="dns_config.yaml">dns_config.yaml（DNS 策略）</option>
+                <option value="clash-verge.yaml">clash-verge.yaml</option>
+                <option value="profiles.yaml">profiles.yaml（Profile 列表）</option>
+              </select>
+              <button class="btn-edit btn-primary" @click="saveVPNConfig()" :aria-busy="vpnConfigSaving" :disabled="vpnConfigSaving">
+                💾 保存
+              </button>
+            </div>
+            <div class="vpn-config-error" x-show="vpnConfigError" x-text="vpnConfigError"></div>
+            <textarea
+              class="skill-editor-textarea vpn-editor"
+              x-model="vpnConfigContent"
+              placeholder="加载中…"
+              spellcheck="false"
+            ></textarea>
+          </section>
+        </div>
+
+        <!-- ══ Profiles ═══════════════════════════════════════════ -->
+        <div x-show="vpnSubTab==='profiles'">
+          <section class="settings-section">
+            <h3>Profile 列表</h3>
+            <template x-if="vpnProfiles.length === 0">
+              <p class="muted">暂无 Profile，请先加载。</p>
+            </template>
+            <div class="vpn-profile-items">
+              <template x-for="p in vpnProfiles" :key="p.uid">
+                <div class="vpn-item" :class="[p.isCurrent ? 'vpn-item-current' : '', vpnProfileEditing && vpnProfileEditing.uid===p.uid ? 'vpn-item-editing' : '']">
+                  <div class="vpn-item-row">
+                    <span class="vpn-type-badge" :class="'vpn-type-' + p.type" x-text="vpnProfileTypeBadge(p.type)"></span>
+                    <span class="vpn-item-name" x-text="p.name || p.uid"></span>
+                    <span class="vpn-item-file muted" x-text="p.file"></span>
+                    <span class="vpn-current-mark" x-show="p.isCurrent">✓ 当前</span>
+                    <span class="vpn-item-ts muted" x-text="vpnFormatTs(p.updated)"></span>
+                    <div class="skill-actions">
+                      <button class="btn-edit" @click="vpnProfileEditing && vpnProfileEditing.uid===p.uid ? closeVPNProfile() : openVPNProfile(p)">
+                        <span x-text="vpnProfileEditing && vpnProfileEditing.uid===p.uid ? '收起' : '编辑'"></span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 内联编辑器 -->
+                  <div class="skill-editor-panel" x-show="vpnProfileEditing && vpnProfileEditing.uid===p.uid">
+                    <div class="vpn-config-error" x-show="vpnProfileError" x-text="vpnProfileError"></div>
+                    <textarea
+                      class="skill-editor-textarea"
+                      x-model="vpnProfileContent"
+                      spellcheck="false"
+                    ></textarea>
+                    <div class="skill-editor-footer">
+                      <button class="btn-edit btn-primary" @click="saveVPNProfile()" :aria-busy="vpnProfileSaving" :disabled="vpnProfileSaving">
+                        💾 保存
+                      </button>
+                      <button class="btn-edit" @click="closeVPNProfile()">取消</button>
+                      <span class="muted" style="font-size:11px">保存前会自动创建 .bak 备份</span>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ 备份恢复 ════════════════════════════════════════════ -->
+        <div x-show="vpnSubTab==='backup'">
+          <section class="settings-section">
+            <h3>创建备份</h3>
+            <p class="settings-desc">将 Clash Verge Rev 全部配置（yaml/js，排除缓存）打包保存。</p>
+            <div class="vpn-dir-row" style="margin-bottom:10px">
+              <span class="muted" style="font-size:12px">备份目录：</span>
+              <code class="vpn-dir-path" x-text="vpnBackupDir || '—'"></code>
+              <button class="btn-edit" @click="openVPNBackupDir()">📂 打开</button>
+            </div>
+            <div class="vpn-backup-actions">
+              <button class="btn-edit btn-primary" @click="exportVPNBackup()" :aria-busy="vpnBackupBusy" :disabled="vpnBackupBusy">
+                📦 立即备份
+              </button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>备份列表</h3>
+            <template x-if="vpnBackups.length === 0">
+              <p class="muted">暂无备份文件。点击「立即备份」创建第一份备份。</p>
+            </template>
+            <div class="vpn-backup-list">
+              <template x-for="bk in vpnBackups" :key="bk">
+                <div class="vpn-backup-row">
+                  <span class="vpn-backup-name" x-text="vpnBackupBasename(bk)"></span>
+                  <button class="btn-edit" @click="importVPNBackup(bk)" :aria-busy="vpnRestoreBusy" :disabled="vpnRestoreBusy">
+                    ↩ 恢复
+                  </button>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>从外部 zip 恢复</h3>
+            <p class="settings-desc">输入备份 zip 的完整路径，点击恢复。</p>
+            <div class="vpn-restore-row">
+              <input type="text" x-ref="vpnZipInput" placeholder="/path/to/clash-verge-backup.zip" class="vpn-zip-input" />
+              <button class="btn-edit" @click="importVPNBackup($refs.vpnZipInput.value)" :disabled="vpnRestoreBusy">
+                ↩ 恢复
+              </button>
+            </div>
+          </section>
+        </div>
+
+      </div>
+    </div>
+  </main>
 
   <script type="module" src="/src/main.js"></script>
 </body>

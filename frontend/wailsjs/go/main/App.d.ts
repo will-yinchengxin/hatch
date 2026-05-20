@@ -37,6 +37,8 @@ export function DeleteSkill(arg1:string):Promise<void>;
 
 export function ExportBackup(arg1:string):Promise<main.BackupResult>;
 
+export function ExportVPNBackup():Promise<main.VPNBackupResult>;
+
 export function GetAIProviders():Promise<main.AIProvidersResult>;
 
 export function GetAITraceStorageInfo():Promise<main.AITraceStorageInfo>;
@@ -79,9 +81,25 @@ export function GetSkills():Promise<Array<main.SkillEntry>>;
 
 export function GetSkillsStats():Promise<main.SkillsStats>;
 
+export function GetVPNAppDir():Promise<string>;
+
+export function GetVPNConfigFile(arg1:string):Promise<main.VPNConfigFile>;
+
+export function GetVPNCurrentIP():Promise<main.VPNCurrentIP>;
+
+export function GetVPNProfileContent(arg1:string):Promise<string>;
+
+export function GetVPNProfiles():Promise<Array<main.VPNProfile>>;
+
+export function GetVPNSettings():Promise<main.VPNSettings>;
+
+export function GetVPNStatus():Promise<main.VPNStatus>;
+
 export function ImportBackup(arg1:string):Promise<string>;
 
 export function ImportSkillsFrom(arg1:string):Promise<main.SkillImportResult>;
+
+export function ImportVPNBackup(arg1:string):Promise<string>;
 
 export function ListAliasInventory():Promise<Array<main.AliasGroup>>;
 
@@ -91,7 +109,13 @@ export function ListRuns(arg1:string):Promise<Array<executor.RunRecord>>;
 
 export function ListSchedules():Promise<Array<main.ScheduleInfo>>;
 
+export function ListVPNBackups():Promise<Array<string>>;
+
 export function OpenFile(arg1:string):Promise<void>;
+
+export function OpenVPNBackupDir():Promise<void>;
+
+export function OpenVPNDir():Promise<void>;
 
 export function ParseZshrc():Promise<Array<zshrc.Entry>>;
 
@@ -126,6 +150,12 @@ export function SaveRetentionPolicy(arg1:number,arg2:number,arg3:number):Promise
 export function SaveScriptMeta(arg1:config.ScriptMeta):Promise<void>;
 
 export function SaveSkillContent(arg1:string,arg2:string):Promise<void>;
+
+export function SaveVPNConfigFile(arg1:string,arg2:string):Promise<void>;
+
+export function SaveVPNProfileContent(arg1:string,arg2:string):Promise<void>;
+
+export function SaveVPNSettings(arg1:string,arg2:string):Promise<void>;
 
 export function SaveZshrcAnnotation(arg1:string,arg2:string):Promise<void>;
 
