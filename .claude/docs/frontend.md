@@ -47,6 +47,18 @@ editTarget != null      →  Edit drawer overlay
 | `dataInventory / retention / retentionSaving` | v1.3 Data sub-tab |
 | `aiProviders / activeProviderID / quickAIOpen / quickAIActiveID / quickAITraceID` | Header quick-AI popover |
 | `skillAIInstruction / skillAIBusy` | v1.3 Skill ✦ AI optimize bar |
+| `vpnSubTab` | `'overview' \| 'config' \| 'profiles' \| 'backup' \| 'enhance'` |
+| `vpnStatus` | `VPNStatus` from `GetVPNStatus()` — loaded on `init()` + tab enter + manual refresh |
+| `vpnCurrentIP / vpnIPLoading` | Exit IP card — refreshed separately via `refreshVPNCurrentIP()` |
+| `vpnStatusRefreshing` | Hero refresh button busy state |
+| `vpnTUNExpanded` | Toggle TUN card's excluded-CIDR expansion (double-click) |
+| `vpnProfiles / vpnCurrentProfile` | All profiles + the current active one |
+| `vpnEnhanceData / vpnEnhanceLoading` | Enhance tab: prepend rules, hosts, DNS fake-IP |
+| `vpnProfileEditing / vpnProfileContent` | Inline profile YAML editor |
+| `vpnBackups / vpnBackupDir / vpnBackupBusy / vpnRestoreBusy` | Backup tab state |
+| `vpnMsg` | Inline message bar (success/error, auto-dismiss) |
+| `vpnSettingsForm / vpnSettingsSaving` | App-dir + backup-dir settings |
+| `vpnConfigFile / vpnConfigContent / vpnConfigSaving / vpnConfigError` | Config editor tab |
 
 ### Toast System
 
@@ -85,7 +97,7 @@ Warm off-white, charcoal text, muted clay accent. **No neon/cold-blue dark theme
 
 ## Layout Structure
 
-- Sticky header (52px, blur) — logo left · tab nav center · search + refresh + **`✦ 当前 provider ▼` quick-AI button** + autostart toggle right
+- Sticky header (52px, blur) — logo left · tab nav center · search + refresh + **`✦ 当前 provider ▼` quick-AI button** + **VPN status pill** + autostart toggle right
 - Content: `max-width: 1080px`, centered, `padding: 24px 22px 44px`
 - `page-hero` band: eyebrow + h1 + subtitle + stat row
 - Responsive at 820px — cards/forms go single-column, drawer full-width
@@ -196,6 +208,60 @@ Positional keys (`source:N`, `other:N`, `comment:N`) change when the file is edi
 - Outside-click closes via `@click.outside`
 - Model switcher binds to `aiProviders`; `switchQuickAIProvider()` calls `SaveAIProviders(providers, newActiveID)` and syncs `aiForm`
 - Trace list shows newest 8; click to expand inline `.quick-ai-trace-pre` (user prompt + raw response)
+
+---
+
+### VPN Module Layout (`tab='vpn'`)
+
+Same left-sidebar layout as AI (`ai-layout` + `ai-sidenav` + `ai-content`).
+
+```html
+<main class="ai-main">
+  <section class="page-hero ai-hero vpn-hero"> <!-- position: relative for refresh btn -->
+    <button class="vpn-hero-refresh-btn">↻</button>   <!-- absolute top-right -->
+    <div class="vpn-hero-left"> eyebrow + h1 + subtitle </div>
+    <div class="vpn-hero-right">
+      <div class="hero-stats vpn-hero-stats">
+        <!-- 系统代理 card: vpn-status-card + vpn-stat-on/off -->
+        <!-- TUN card: @dblclick toggles vpnTUNExpanded, shows tunInterface + CIDR chips -->
+        <!-- 出口 IP card: vpn-ip-card -->
+        <!-- 代理节点 card: vpn-node-card, iterates vpnStatus.proxyGroups -->
+      </div>
+      <div class="vpn-hero-traffic"> upload · download · total · expire </div>
+    </div>
+  </section>
+  <div class="ai-layout">
+    <nav class="ai-sidenav"> 概览 / 配置编辑 / Profiles / 备份恢复 / ✦ 自定义规则 </nav>
+    <div class="ai-content"> ... </div>
+  </div>
+</main>
+```
+
+**Header VPN pill** (`.vpn-hdr-pill`): shows two 5px dots (system proxy + TUN state) + truncated node name. Loaded via `GetVPNStatus()` during `init()`. Clicking jumps to VPN tab.
+
+**TUN card double-click**: `vpnTUNExpanded` toggles `.vpn-tun-cidrs` section showing CIDR chips from `vpnStatus.tunExcludedCidrs`.
+
+**Proxy groups card** (`.vpn-node-card`): iterates `vpnStatus.proxyGroups` (live from Clash API), sorted real-node groups first, shows up to 3 rows with "+N 个" overflow.
+
+**Enhance tab** (`vpnSubTab='enhance'`): calls `GetVPNEnhanceData()` which reads `merge` + `rules` type profiles. Shows: prepend rules table (type/value/target color-coded), hosts override table, DNS fake-IP filter chips.
+
+### VPN CSS Classes
+
+| Prefix / Class | Purpose |
+|---|---|
+| `.vpn-hdr-pill` / `.vpn-hdr-pill-on` | Header status pill (green border when proxy on) |
+| `.vpn-hdr-dots` / `.vpn-hdr-dot` | Two 5px indicator dots in pill |
+| `.vpn-hero-refresh-btn` | Absolute-positioned ↻ in hero top-right |
+| `.vpn-status-card` / `.vpn-stat-on` / `.vpn-stat-off` | Status cards (系统代理 + TUN) |
+| `.vpn-status-dot` / `.vpn-dot-on` / `.vpn-dot-off` | Animated green / gray dot in status cards |
+| `.vpn-tun-iface` | Monospace interface+IP line below TUN status |
+| `.vpn-tun-cidrs` / `.vpn-cidr-tag` | Expanded CIDR chip list |
+| `.vpn-node-card` / `.vpn-proxy-groups` / `.vpn-proxy-group-row` | Proxy groups list card |
+| `.vpn-pg-label` / `.vpn-pg-node` | Group name tag + selected node text |
+| `.vpn-enhance-table` / `.vpn-enhance-row` / `.vpn-enhance-thead` | Enhance tab rule tables |
+| `.vpn-rule-type-tag` / `.vpn-rule-value` / `.vpn-rule-target` | Rule cell styling |
+| `.vpn-target-direct` / `.vpn-target-proxy` | DIRECT=green, proxy=clay |
+| `.vpn-enhance-chips` / `.vpn-enhance-chip` | DNS fake-IP filter chip list |
 
 ---
 

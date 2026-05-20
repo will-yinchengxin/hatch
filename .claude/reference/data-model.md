@@ -50,3 +50,33 @@ type Config struct {
 type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
 type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceRetainDays int }
 ```
+
+## VPN Types (`app_vpn.go`)
+
+```go
+type VPNStatus struct {
+    SystemProxyEnabled bool            // verge.yaml enable_system_proxy
+    TUNEnabled         bool            // verge.yaml enable_tun_mode
+    TUNInterface       string          // "utun3: 198.18.0.1" (detected via ifconfig)
+    TUNExcludedCIDRs   []string        // clash-verge.yaml tun.route-exclude-address
+    CurrentGroup       string          // primary proxy group name
+    CurrentNode        string          // selected node in primary group
+    ProxyGroups        []VPNProxyGroup // ALL Selector groups from Clash API (live)
+    ExpireAt, Upload, Download, Total int64
+}
+
+type VPNProxyGroup struct {
+    Name string  // group name, e.g. "😎佛跳墙VPN"
+    Node string  // currently selected node, e.g. "美国 03"
+}
+
+type VPNEnhanceData struct {
+    PrependRules    []string          // from merge+rules profiles: prepend + append rules
+    Hosts           map[string]string // domain → IP overrides
+    DNSFakeIPFilter []string          // domains excluded from fake-IP
+    HasData         bool
+    SourceFiles     []string          // profile names/files that contributed data
+}
+```
+
+**Live data source**: `VPNStatus.ProxyGroups` and `TUNExcludedCIDRs` are fetched from the Clash core API via Unix socket (`external-controller-unix` in `clash-verge.yaml`, default `/tmp/verge/verge-mihomo.sock`). `profiles.yaml` `selected[]` is used only as fallback (it can be stale after in-session node switches).

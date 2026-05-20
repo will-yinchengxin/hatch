@@ -38,7 +38,8 @@ Methods exposed to the Wails JS frontend via `app.go` and sibling files.
 | `ListRecentRunsSorted(limit)` | flat newest-first run list |
 | `GetClaudeSettings / SaveClaudeSettings / GetCodexConfig / SaveCodexConfig` | Edit ~/.claude / ~/.codex configs |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File I/O |
-| `GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN read |
+| `GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN read — `GetVPNStatus` queries Clash Unix socket for live proxy+TUN state |
+| `GetVPNEnhanceData()` | Parse all `merge`+`rules` profiles → prepend rules, hosts, DNS fake-IP list |
 | `GetVPNConfigFile / SaveVPNConfigFile` | VPN config edit (verge/config/dns/profiles yaml) |
 | `GetVPNProfileContent / SaveVPNProfileContent` | VPN profile file edit |
 | `ExportVPNBackup / ImportVPNBackup / ListVPNBackups` | VPN zip backup / restore |
