@@ -50,6 +50,14 @@ export function CreateSkillTemplate(arg1) {
   return window['go']['main']['App']['CreateSkillTemplate'](arg1);
 }
 
+export function DeleteClaudeCodePreset(arg1) {
+  return window['go']['main']['App']['DeleteClaudeCodePreset'](arg1);
+}
+
+export function DeleteCodexPreset(arg1) {
+  return window['go']['main']['App']['DeleteCodexPreset'](arg1);
+}
+
 export function DeleteRun(arg1, arg2) {
   return window['go']['main']['App']['DeleteRun'](arg1, arg2);
 }
@@ -98,6 +106,14 @@ export function GetAutoLaunchEnabled() {
   return window['go']['main']['App']['GetAutoLaunchEnabled']();
 }
 
+export function GetClaudeCodeConfig() {
+  return window['go']['main']['App']['GetClaudeCodeConfig']();
+}
+
+export function GetClaudeCodePresets() {
+  return window['go']['main']['App']['GetClaudeCodePresets']();
+}
+
 export function GetClaudeCodeStatus() {
   return window['go']['main']['App']['GetClaudeCodeStatus']();
 }
@@ -108,6 +124,14 @@ export function GetClaudeSettings() {
 
 export function GetCodexConfig() {
   return window['go']['main']['App']['GetCodexConfig']();
+}
+
+export function GetCodexModelConfig() {
+  return window['go']['main']['App']['GetCodexModelConfig']();
+}
+
+export function GetCodexPresets() {
+  return window['go']['main']['App']['GetCodexPresets']();
 }
 
 export function GetCodexUsageStatus() {
@@ -266,12 +290,20 @@ export function SaveAppDataPaths(arg1, arg2) {
   return window['go']['main']['App']['SaveAppDataPaths'](arg1, arg2);
 }
 
+export function SaveClaudeCodePreset(arg1) {
+  return window['go']['main']['App']['SaveClaudeCodePreset'](arg1);
+}
+
 export function SaveClaudeSettings(arg1) {
   return window['go']['main']['App']['SaveClaudeSettings'](arg1);
 }
 
 export function SaveCodexConfig(arg1) {
   return window['go']['main']['App']['SaveCodexConfig'](arg1);
+}
+
+export function SaveCodexPreset(arg1) {
+  return window['go']['main']['App']['SaveCodexPreset'](arg1);
 }
 
 export function SaveDocLinks(arg1) {
@@ -292,6 +324,10 @@ export function SaveRetentionPolicy(arg1, arg2, arg3) {
 
 export function SaveScriptMeta(arg1) {
   return window['go']['main']['App']['SaveScriptMeta'](arg1);
+}
+
+export function SaveScriptOrder(arg1, arg2) {
+  return window['go']['main']['App']['SaveScriptOrder'](arg1, arg2);
 }
 
 export function SaveSkillContent(arg1, arg2) {
@@ -324,6 +360,14 @@ export function ServiceAction(arg1, arg2, arg3) {
 
 export function SetAutoLaunchEnabled(arg1) {
   return window['go']['main']['App']['SetAutoLaunchEnabled'](arg1);
+}
+
+export function SetClaudeCodeConfig(arg1, arg2) {
+  return window['go']['main']['App']['SetClaudeCodeConfig'](arg1, arg2);
+}
+
+export function SetCodexModelConfig(arg1, arg2) {
+  return window['go']['main']['App']['SetCodexModelConfig'](arg1, arg2);
 }
 
 export function SetSkillSync(arg1, arg2, arg3) {

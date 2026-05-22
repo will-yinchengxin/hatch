@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	"hatch/internal/config"
 	"hatch/internal/executor"
@@ -170,15 +171,39 @@ func (a *App) ScanAll() ([]config.ScriptMeta, error) {
 	return all, nil
 }
 
+// applyScriptOrder reorders scripts according to a saved path list; new scripts append at the end.
+func applyScriptOrder(scripts []config.ScriptMeta, order []string) []config.ScriptMeta {
+	rank := make(map[string]int, len(order))
+	for i, p := range order {
+		rank[p] = i
+	}
+	result := make([]config.ScriptMeta, len(scripts))
+	copy(result, scripts)
+	sort.SliceStable(result, func(i, j int) bool {
+		ri, iok := rank[result[i].Path]
+		rj, jok := rank[result[j].Path]
+		if iok && jok {
+			return ri < rj
+		}
+		return iok
+	})
+	return result
+}
+
 // GetScriptsByDir scans a single directory and returns its scripts.
 func (a *App) GetScriptsByDir(dirPath string) ([]config.ScriptMeta, error) {
 	a.mu.RLock()
 	overrides := a.cfg.OverrideMeta
+	order := a.cfg.ScriptOrders[dirPath]
 	a.mu.RUnlock()
 
 	scripts, err := scanner.ScanDir(dirPath, overrides)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(order) > 0 {
+		scripts = applyScriptOrder(scripts, order)
 	}
 
 	a.mu.Lock()
@@ -223,5 +248,16 @@ func (a *App) DeleteScriptMeta(path string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	delete(a.cfg.OverrideMeta, path)
+	return a.cfg.Save()
+}
+
+// SaveScriptOrder persists the display order for scripts in a directory.
+func (a *App) SaveScriptOrder(dirPath string, paths []string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cfg.ScriptOrders == nil {
+		a.cfg.ScriptOrders = make(map[string][]string)
+	}
+	a.cfg.ScriptOrders[dirPath] = paths
 	return a.cfg.Save()
 }

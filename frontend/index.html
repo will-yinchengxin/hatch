@@ -400,7 +400,13 @@
       <div class="toolbar-summary">
         <span x-text="filteredScripts.length + ' / ' + currentScripts.length + ' 个脚本'"></span>
         <span x-text="currentScripts.filter(s=>s.type==='service').length + ' service'"></span>
-        <button class="btn-sm btn-new-script" @click="openNewScript()">＋ 新建脚本</button>
+        <template x-if="!sortMode">
+          <button class="btn-sm" @click="enterSortMode()" title="拖拽调整脚本顺序">⇅ 排序</button>
+        </template>
+        <template x-if="sortMode">
+          <button class="btn-sm btn-sort-done" @click="exitSortMode()">✓ 完成排序</button>
+        </template>
+        <button class="btn-sm btn-new-script" x-show="!sortMode" @click="openNewScript()">＋ 新建脚本</button>
       </div>
     </section>
 
@@ -416,10 +422,21 @@
 
     <div class="script-list">
       <template x-for="s in pagedScripts" :key="s.path">
-        <article class="script-card" :data-type="s.type">
+        <article
+          class="script-card"
+          :data-type="s.type"
+          :draggable="sortMode"
+          @dragstart="sortMode && scriptDragStart($event, s.path)"
+          @dragover="sortMode && scriptDragOver($event, s.path)"
+          @dragleave="sortMode && scriptDragLeave($event)"
+          @drop="sortMode && scriptDrop($event, s.path)"
+          @dragend="scriptDragEnd()"
+          :class="{'is-dragging': dragSrcPath===s.path, 'drag-over-top': dragOverPath===s.path, 'sort-mode-card': sortMode}"
+        >
 
           <div class="card-header">
             <div class="card-title">
+              <span class="drag-handle" x-show="sortMode" title="拖拽调整顺序">⠿</span>
               <span x-text="langIcon(s.language)" class="lang-icon"></span>
               <strong x-text="s.name"></strong>
               <span class="badge" :class="'lang-'+s.language" x-text="s.language"></span>
@@ -560,7 +577,7 @@
       </template>
     </div>
 
-    <nav class="pagination" x-show="totalPages>1">
+    <nav class="pagination" x-show="totalPages>1 && !sortMode">
       <button @click="page--" :disabled="page<=1">←</button>
       <span x-text="`${page} / ${totalPages}`"></span>
       <button @click="page++" :disabled="page>=totalPages">→</button>
@@ -1046,6 +1063,96 @@
                   </template>
                 </div>
               </template>
+              <!-- Model + EffortLevel 快捷配置 -->
+              <div class="cc-config-block">
+                <!-- 当前配置 status 展示行 -->
+                <div class="cc-current-row">
+                  <span class="cc-current-label">当前配置</span>
+                  <span class="badge cc-model-badge" x-text="claudeCodeConfig.effectiveModel ? modelLabel(claudeCodeConfig.effectiveModel) : (claudeCodeConfig.model ? modelLabel(claudeCodeConfig.model) : '加载中…')"></span>
+                  <span class="badge cc-effort-badge" :class="'cc-effort-'+(claudeCodeConfig.effortLevel||'default')" x-text="effortLabel(claudeCodeConfig.effortLevel)"></span>
+                  <span class="cc-default-hint" x-show="!claudeCodeConfig.model && claudeCodeConfig.effectiveModel">系统默认</span>
+                </div>
+
+                <!-- 编辑区 -->
+                <div class="cc-config-row">
+                  <div class="cc-config-field">
+                    <label class="cc-config-label">模型</label>
+                    <select class="cc-config-select" x-model="claudeCodeConfig.model">
+                      <option value="">系统默认</option>
+                      <option value="claude-opus-4-7">claude-opus-4-7</option>
+                      <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+                      <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+                      <option value="claude-opus-4-5">claude-opus-4-5</option>
+                    </select>
+                  </div>
+                  <div class="cc-config-field">
+                    <label class="cc-config-label">努力程度</label>
+                    <select class="cc-config-select" x-model="claudeCodeConfig.effortLevel">
+                      <option value="">系统默认</option>
+                      <option value="low">low · 快速响应</option>
+                      <option value="medium">medium · 均衡</option>
+                      <option value="high">high · 深度思考</option>
+                      <option value="xhigh" :disabled="!effortSupportsXhigh(claudeCodeConfig.model)" x-text="effortSupportsXhigh(claudeCodeConfig.model) ? 'xhigh · 超深思考' : 'xhigh · 仅 Opus / Sonnet'"></option>
+                      <option value="max" :disabled="!effortSupportsMax(claudeCodeConfig.model)" x-text="effortSupportsMax(claudeCodeConfig.model) ? 'max · 极限思考' : 'max · 仅 Opus'"></option>
+                    </select>
+                  </div>
+                  <button class="btn-sm active cc-config-save" @click="saveClaudeCodeConfig()" :aria-busy="claudeCodeConfigSaving">保存</button>
+                </div>
+
+                <!-- 快捷预设 -->
+                <div class="cc-presets-header">
+                  <span class="cc-presets-title">快捷预设</span>
+                  <button class="btn-sm" @click="openNewPreset()">+ 新建</button>
+                </div>
+
+                <div class="cc-presets-list" x-show="claudeCodePresets.length > 0">
+                  <template x-for="preset in claudeCodePresets" :key="preset.id">
+                    <div class="cc-preset-card">
+                      <div class="cc-preset-info">
+                        <span class="cc-preset-name" x-text="preset.name"></span>
+                        <div class="cc-preset-badges">
+                          <span class="badge cc-model-badge" x-text="modelLabel(preset.model)"></span>
+                          <span class="badge cc-effort-badge" :class="'cc-effort-'+preset.effortLevel" x-text="effortLabel(preset.effortLevel)"></span>
+                        </div>
+                      </div>
+                      <div class="cc-preset-actions">
+                        <button class="btn-sm active" @click="applyClaudeCodePreset(preset)">应用</button>
+                        <button class="btn-sm" @click="openEditPreset(preset)">编辑</button>
+                        <button class="icon-btn danger" @click="deleteClaudeCodePreset(preset.id)" title="删除">✕</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <p class="muted text-sm cc-presets-empty" x-show="claudeCodePresets.length === 0">暂无预设，点击「新建」创建组合</p>
+
+                <!-- 新建 / 编辑预设内联表单 -->
+                <div class="cc-preset-form" x-show="claudeCodePresetOpen" x-transition>
+                  <div class="cc-preset-form-title" x-text="claudeCodePresetForm.id ? '编辑预设' : '新建预设'"></div>
+                  <div class="cc-preset-form-body">
+                    <input class="cc-preset-name-input" type="text" placeholder="预设名称" x-model="claudeCodePresetForm.name" />
+                    <select class="cc-config-select" x-model="claudeCodePresetForm.model">
+                      <option value="">系统默认</option>
+                      <option value="claude-opus-4-7">claude-opus-4-7</option>
+                      <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+                      <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+                      <option value="claude-opus-4-5">claude-opus-4-5</option>
+                    </select>
+                    <select class="cc-config-select" x-model="claudeCodePresetForm.effortLevel">
+                      <option value="">系统默认</option>
+                      <option value="low">low · 快速响应</option>
+                      <option value="medium">medium · 均衡</option>
+                      <option value="high">high · 深度思考</option>
+                      <option value="xhigh" :disabled="!effortSupportsXhigh(claudeCodePresetForm.model)" x-text="effortSupportsXhigh(claudeCodePresetForm.model) ? 'xhigh · 超深思考' : 'xhigh · 仅 Opus / Sonnet'"></option>
+                      <option value="max" :disabled="!effortSupportsMax(claudeCodePresetForm.model)" x-text="effortSupportsMax(claudeCodePresetForm.model) ? 'max · 极限思考' : 'max · 仅 Opus'"></option>
+                    </select>
+                  </div>
+                  <div class="cc-preset-form-footer">
+                    <button class="btn-sm" @click="claudeCodePresetOpen=false">取消</button>
+                    <button class="btn-sm active" @click="saveClaudeCodePreset()">保存</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Config editor -->
               <div class="cfg-editor-block">
                 <button class="cfg-editor-toggle" @click="claudeSettingsOpen ? (claudeSettingsOpen=false) : openClaudeSettings()">
@@ -1129,6 +1236,91 @@
                   </template>
                 </div>
               </template>
+              <!-- Model + Reasoning Effort 快捷配置 -->
+              <div class="codex-model-config-block">
+                <div class="codex-current-row">
+                  <span class="codex-current-label">当前配置</span>
+                  <span class="badge codex-model-badge" x-text="codexModelConfig.model ? codexModelLabel(codexModelConfig.model) : '系统默认模型'"></span>
+                  <span class="badge codex-effort-badge" :class="'codex-effort-'+(codexModelConfig.effortLevel||'default')" x-text="effortLabel(codexModelConfig.effortLevel)"></span>
+                </div>
+
+                <div class="codex-model-config-row">
+                  <div class="codex-model-config-field">
+                    <label class="codex-model-config-label">模型</label>
+                    <select class="codex-model-config-select" x-model="codexModelConfig.model">
+                      <option value="">系统默认</option>
+                      <option value="gpt-5.5">gpt-5.5</option>
+                      <option value="gpt-5.4">gpt-5.4</option>
+                      <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                      <option value="gpt-5.3-codex">gpt-5.3-codex</option>
+                      <option value="gpt-5.2">gpt-5.2</option>
+                    </select>
+                  </div>
+                  <div class="codex-model-config-field">
+                    <label class="codex-model-config-label">努力程度</label>
+                    <select class="codex-model-config-select" x-model="codexModelConfig.effortLevel">
+                      <option value="">系统默认</option>
+                      <option value="low">low · 快速响应</option>
+                      <option value="medium">medium · 均衡</option>
+                      <option value="high">high · 深度推理</option>
+                      <option value="xhigh">xhigh · 超深推理</option>
+                    </select>
+                  </div>
+                  <button class="btn-sm active codex-model-config-save" @click="saveCodexModelConfig()" :aria-busy="codexModelConfigSaving">保存</button>
+                </div>
+
+                <div class="codex-presets-header">
+                  <span class="codex-presets-title">快捷预设</span>
+                  <button class="btn-sm" @click="openNewCodexPreset()">+ 新建</button>
+                </div>
+
+                <div class="codex-presets-list" x-show="codexPresets.length > 0">
+                  <template x-for="preset in codexPresets" :key="preset.id">
+                    <div class="codex-preset-card">
+                      <div class="codex-preset-info">
+                        <span class="codex-preset-name" x-text="preset.name"></span>
+                        <div class="codex-preset-badges">
+                          <span class="badge codex-model-badge" x-text="codexModelLabel(preset.model)"></span>
+                          <span class="badge codex-effort-badge" :class="'codex-effort-'+(preset.effortLevel||'default')" x-text="effortLabel(preset.effortLevel)"></span>
+                        </div>
+                      </div>
+                      <div class="codex-preset-actions">
+                        <button class="btn-sm active" @click="applyCodexPreset(preset)">应用</button>
+                        <button class="btn-sm" @click="openEditCodexPreset(preset)">编辑</button>
+                        <button class="icon-btn danger" @click="deleteCodexPreset(preset.id)" title="删除">✕</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <p class="muted text-sm codex-presets-empty" x-show="codexPresets.length === 0">暂无预设，点击「新建」创建组合</p>
+
+                <div class="codex-preset-form" x-show="codexPresetOpen" x-transition>
+                  <div class="codex-preset-form-title" x-text="codexPresetForm.id ? '编辑预设' : '新建预设'"></div>
+                  <div class="codex-preset-form-body">
+                    <input class="codex-preset-name-input" type="text" placeholder="预设名称" x-model="codexPresetForm.name" />
+                    <select class="codex-model-config-select" x-model="codexPresetForm.model">
+                      <option value="">系统默认</option>
+                      <option value="gpt-5.5">gpt-5.5</option>
+                      <option value="gpt-5.4">gpt-5.4</option>
+                      <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                      <option value="gpt-5.3-codex">gpt-5.3-codex</option>
+                      <option value="gpt-5.2">gpt-5.2</option>
+                    </select>
+                    <select class="codex-model-config-select" x-model="codexPresetForm.effortLevel">
+                      <option value="">系统默认</option>
+                      <option value="low">low · 快速响应</option>
+                      <option value="medium">medium · 均衡</option>
+                      <option value="high">high · 深度推理</option>
+                      <option value="xhigh">xhigh · 超深推理</option>
+                    </select>
+                  </div>
+                  <div class="codex-preset-form-footer">
+                    <button class="btn-sm" @click="codexPresetOpen=false">取消</button>
+                    <button class="btn-sm active" @click="saveCodexPreset()">保存</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Config editor -->
               <div class="cfg-editor-block">
                 <button class="cfg-editor-toggle" @click="codexConfigOpen ? (codexConfigOpen=false) : openCodexConfig()">

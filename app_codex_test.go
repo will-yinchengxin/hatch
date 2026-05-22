@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -42,5 +43,36 @@ func TestParseCodexRateLimitLineIgnoresNonTokenCount(t *testing.T) {
 	_, ok := parseCodexRateLimitLine(`{"timestamp":"2026-05-15T08:40:00.000Z","payload":{"type":"other"}}`)
 	if ok {
 		t.Fatal("expected non-token_count payload to be ignored")
+	}
+}
+
+func TestCodexModelConfigTOMLHelpersOnlyTouchTopLevelKeys(t *testing.T) {
+	content := `# user config
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+
+[profiles.deep]
+model = "do-not-touch"
+model_reasoning_effort = "do-not-touch"
+`
+
+	if got := readTOMLStringKey(content, "model"); got != "gpt-5.4" {
+		t.Fatalf("model = %q", got)
+	}
+	if got := readTOMLStringKey(content, "model_reasoning_effort"); got != "high" {
+		t.Fatalf("effort = %q", got)
+	}
+
+	updated := setTOMLStringKey(content, "model_reasoning_effort", "xhigh")
+	updated = setTOMLStringKey(updated, "model", "gpt-5.5")
+
+	if got := readTOMLStringKey(updated, "model"); got != "gpt-5.5" {
+		t.Fatalf("updated model = %q", got)
+	}
+	if got := readTOMLStringKey(updated, "model_reasoning_effort"); got != "xhigh" {
+		t.Fatalf("updated effort = %q", got)
+	}
+	if !strings.Contains(updated, `[profiles.deep]`) || !strings.Contains(updated, `model = "do-not-touch"`) {
+		t.Fatalf("nested section was modified:\n%s", updated)
 	}
 }

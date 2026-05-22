@@ -58,6 +58,42 @@ export namespace config {
 	        this.required = source["required"];
 	    }
 	}
+	export class ClaudeCodePreset {
+	    id: string;
+	    name: string;
+	    model: string;
+	    effortLevel: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClaudeCodePreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.model = source["model"];
+	        this.effortLevel = source["effortLevel"];
+	    }
+	}
+	export class CodexPreset {
+	    id: string;
+	    name: string;
+	    model: string;
+	    effortLevel: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodexPreset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.model = source["model"];
+	        this.effortLevel = source["effortLevel"];
+	    }
+	}
 	export class CommandPreset {
 	    name: string;
 	    args: string;
@@ -210,6 +246,11 @@ export namespace config {
 	    retention?: DataRetention;
 	    vpnAppDir?: string;
 	    vpnBackupDir?: string;
+	    claudeCodePresets?: ClaudeCodePreset[];
+	    claudeCodePresetsSeeded?: boolean;
+	    codexPresets?: CodexPreset[];
+	    codexPresetsSeeded?: boolean;
+	    scriptOrders?: Record<string, Array<string>>;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -232,6 +273,11 @@ export namespace config {
 	        this.retention = this.convertValues(source["retention"], DataRetention);
 	        this.vpnAppDir = source["vpnAppDir"];
 	        this.vpnBackupDir = source["vpnBackupDir"];
+	        this.claudeCodePresets = this.convertValues(source["claudeCodePresets"], ClaudeCodePreset);
+	        this.claudeCodePresetsSeeded = source["claudeCodePresetsSeeded"];
+	        this.codexPresets = this.convertValues(source["codexPresets"], CodexPreset);
+	        this.codexPresetsSeeded = source["codexPresetsSeeded"];
+	        this.scriptOrders = source["scriptOrders"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -528,6 +574,22 @@ export namespace main {
 	        this.numFiles = source["numFiles"];
 	    }
 	}
+	export class ClaudeCodeConfig {
+	    model: string;
+	    effortLevel: string;
+	    effectiveModel: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClaudeCodeConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.model = source["model"];
+	        this.effortLevel = source["effortLevel"];
+	        this.effectiveModel = source["effectiveModel"];
+	    }
+	}
 	export class ClaudeCodeStatus {
 	    claudeInstalled: boolean;
 	    claudeVersion: string;
@@ -556,6 +618,20 @@ export namespace main {
 	        this.sevenDayPct = source["sevenDayPct"];
 	        this.sevenDayReset = source["sevenDayReset"];
 	        this.planType = source["planType"];
+	    }
+	}
+	export class CodexModelConfig {
+	    model: string;
+	    effortLevel: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CodexModelConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.model = source["model"];
+	        this.effortLevel = source["effortLevel"];
 	    }
 	}
 	export class CodexUsageWindow {

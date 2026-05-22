@@ -78,6 +78,13 @@ window.hatchApp = function () {
     allScripts: [],
     currentScripts: [],
 
+    dragSrcPath: null,
+    dragOverPath: null,
+    sortMode: false,
+    _dragScrollY: 0,
+    _dragScrollRAF: null,
+    _dragScrollHandler: null,
+
     query: '',
     page: 1,
     pageSize: 15,
@@ -162,6 +169,20 @@ window.hatchApp = function () {
     // Codex usage status
     codexStatus: null,
     codexStatusLoading: false,
+
+    // Claude Code model + effort config
+    claudeCodeConfig: { model: '', effortLevel: '' },
+    claudeCodeConfigSaving: false,
+    claudeCodePresets: [],
+    claudeCodePresetForm: { id: '', name: '', model: '', effortLevel: '' },
+    claudeCodePresetOpen: false,  // inline add/edit form visible
+
+    // Codex model + reasoning effort config
+    codexModelConfig: { model: '', effortLevel: '' },
+    codexModelConfigSaving: false,
+    codexPresets: [],
+    codexPresetForm: { id: '', name: '', model: '', effortLevel: '' },
+    codexPresetOpen: false,
 
     // Config file editors
     claudeSettingsOpen: false,
@@ -296,6 +317,7 @@ window.hatchApp = function () {
     },
 
     get pagedScripts() {
+      if (this.sortMode) return this.filteredScripts;
       const start = (this.page - 1) * this.pageSize;
       return this.filteredScripts.slice(start, start + this.pageSize);
     },
@@ -432,6 +454,100 @@ window.hatchApp = function () {
         if (idx === -1) this.scanAll();
       } catch (e) { this.showError(`扫描目录失败: ${e}`);   }
       finally { this.loading = false; }
+    },
+
+    // ── Drag-to-reorder ────────────────────────────────────────────────
+    enterSortMode() {
+      this.query = '';
+      this.page = 1;
+      this.sortMode = true;
+      this._dragScrollHandler = (e) => { this._dragScrollY = e.clientY; };
+      document.addEventListener('dragover', this._dragScrollHandler);
+    },
+
+    exitSortMode() {
+      this.sortMode = false;
+      this.dragSrcPath = null;
+      this.dragOverPath = null;
+      this._stopDragScroll();
+      if (this._dragScrollHandler) {
+        document.removeEventListener('dragover', this._dragScrollHandler);
+        this._dragScrollHandler = null;
+      }
+    },
+
+    scriptDragStart(e, path) {
+      this.dragSrcPath = path;
+      e.dataTransfer.effectAllowed = 'move';
+      this._startDragScroll();
+    },
+
+    scriptDragOver(e, path) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (path !== this.dragSrcPath) this.dragOverPath = path;
+    },
+
+    scriptDragLeave(e) {
+      if (!e.currentTarget.contains(e.relatedTarget)) {
+        this.dragOverPath = null;
+      }
+    },
+
+    async scriptDrop(e, targetPath) {
+      e.preventDefault();
+      this._stopDragScroll();
+      const src = this.dragSrcPath;
+      this.dragSrcPath = null;
+      this.dragOverPath = null;
+      if (!src || src === targetPath) return;
+
+      const scripts = [...this.currentScripts];
+      const si = scripts.findIndex(s => s.path === src);
+      const ti = scripts.findIndex(s => s.path === targetPath);
+      if (si === -1 || ti === -1) return;
+      const [item] = scripts.splice(si, 1);
+      scripts.splice(ti, 0, item);
+      this.currentScripts = scripts;
+
+      try {
+        await window['go']['main']['App']['SaveScriptOrder'](
+          this.selectedDir.path,
+          scripts.map(s => s.path)
+        );
+      } catch (err) { this.showError(`保存排序失败: ${err}`); }
+    },
+
+    scriptDragEnd() {
+      this.dragSrcPath = null;
+      this.dragOverPath = null;
+      this._stopDragScroll();
+    },
+
+    _startDragScroll() {
+      const ZONE = 100;
+      const MAX_SPEED = 20;
+      const loop = () => {
+        if (!this.dragSrcPath) return;
+        const y = this._dragScrollY;
+        const h = window.innerHeight;
+        let speed = 0;
+        if (y < ZONE) {
+          speed = -MAX_SPEED * (1 - y / ZONE);
+        } else if (y > h - ZONE) {
+          speed = MAX_SPEED * (1 - (h - y) / ZONE);
+        }
+        if (speed !== 0) window.scrollBy(0, speed);
+        this._dragScrollRAF = requestAnimationFrame(loop);
+      };
+      this._dragScrollRAF = requestAnimationFrame(loop);
+    },
+
+    _stopDragScroll() {
+      if (this._dragScrollRAF) {
+        cancelAnimationFrame(this._dragScrollRAF);
+        this._dragScrollRAF = null;
+      }
     },
 
     // ── Events ─────────────────────────────────────────────────────────
@@ -1356,6 +1472,192 @@ window.hatchApp = function () {
       if (!this.claudeStatus) this.loadClaudeStatus();
       if (!this.codexStatus) this.loadCodexStatus();
       if (!this.skills.length) this.loadSkills();
+      this.loadClaudeCodeConfig();
+      this.loadClaudeCodePresets();
+      this.loadCodexModelConfig();
+      this.loadCodexPresets();
+    },
+
+    async loadClaudeCodeConfig() {
+      try {
+        this.claudeCodeConfig = await window['go']['main']['App']['GetClaudeCodeConfig']();
+      } catch (e) { /* silent */ }
+    },
+
+    async saveClaudeCodeConfig() {
+      this.claudeCodeConfigSaving = true;
+      try {
+        await window['go']['main']['App']['SetClaudeCodeConfig'](
+          this.claudeCodeConfig.model || '',
+          this.claudeCodeConfig.effortLevel || ''
+        );
+        this.showSuccess('Claude Code 配置已保存');
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.claudeCodeConfigSaving = false;
+      }
+    },
+
+    async loadClaudeCodePresets() {
+      try {
+        this.claudeCodePresets = await window['go']['main']['App']['GetClaudeCodePresets']() || [];
+      } catch (e) { /* silent */ }
+    },
+
+    openNewPreset() {
+      this.claudeCodePresetForm = {
+        id: '',
+        name: '',
+        model: this.claudeCodeConfig.model || '',
+        effortLevel: this.claudeCodeConfig.effortLevel || '',
+      };
+      this.claudeCodePresetOpen = true;
+    },
+
+    openEditPreset(preset) {
+      this.claudeCodePresetForm = { ...preset };
+      this.claudeCodePresetOpen = true;
+    },
+
+    async saveClaudeCodePreset() {
+      if (!this.claudeCodePresetForm.name.trim()) {
+        this.showError('预设名称不能为空');
+        return;
+      }
+      try {
+        await window['go']['main']['App']['SaveClaudeCodePreset'](this.claudeCodePresetForm);
+        this.claudeCodePresetOpen = false;
+        await this.loadClaudeCodePresets();
+        this.showSuccess('预设已保存');
+      } catch (e) {
+        this.showError(`保存预设失败: ${e}`);
+      }
+    },
+
+    async deleteClaudeCodePreset(id) {
+      try {
+        await window['go']['main']['App']['DeleteClaudeCodePreset'](id);
+        await this.loadClaudeCodePresets();
+        this.showSuccess('预设已删除');
+      } catch (e) {
+        this.showError(`删除预设失败: ${e}`);
+      }
+    },
+
+    async applyClaudeCodePreset(preset) {
+      this.claudeCodeConfig = { model: preset.model, effortLevel: preset.effortLevel };
+      await this.saveClaudeCodeConfig();
+    },
+
+    async loadCodexModelConfig() {
+      try {
+        this.codexModelConfig = await window['go']['main']['App']['GetCodexModelConfig']();
+      } catch (e) { /* silent */ }
+    },
+
+    async saveCodexModelConfig() {
+      this.codexModelConfigSaving = true;
+      try {
+        await window['go']['main']['App']['SetCodexModelConfig'](
+          this.codexModelConfig.model || '',
+          this.codexModelConfig.effortLevel || ''
+        );
+        this.showSuccess('Codex 配置已保存');
+        if (this.codexConfigOpen) await this.openCodexConfig();
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.codexModelConfigSaving = false;
+      }
+    },
+
+    async loadCodexPresets() {
+      try {
+        this.codexPresets = await window['go']['main']['App']['GetCodexPresets']() || [];
+      } catch (e) { /* silent */ }
+    },
+
+    openNewCodexPreset() {
+      this.codexPresetForm = {
+        id: '',
+        name: '',
+        model: this.codexModelConfig.model || '',
+        effortLevel: this.codexModelConfig.effortLevel || '',
+      };
+      this.codexPresetOpen = true;
+    },
+
+    openEditCodexPreset(preset) {
+      this.codexPresetForm = { ...preset };
+      this.codexPresetOpen = true;
+    },
+
+    async saveCodexPreset() {
+      if (!this.codexPresetForm.name.trim()) {
+        this.showError('预设名称不能为空');
+        return;
+      }
+      try {
+        await window['go']['main']['App']['SaveCodexPreset'](this.codexPresetForm);
+        this.codexPresetOpen = false;
+        await this.loadCodexPresets();
+        this.showSuccess('预设已保存');
+      } catch (e) {
+        this.showError(`保存预设失败: ${e}`);
+      }
+    },
+
+    async deleteCodexPreset(id) {
+      try {
+        await window['go']['main']['App']['DeleteCodexPreset'](id);
+        await this.loadCodexPresets();
+        this.showSuccess('预设已删除');
+      } catch (e) {
+        this.showError(`删除预设失败: ${e}`);
+      }
+    },
+
+    async applyCodexPreset(preset) {
+      this.codexModelConfig = { model: preset.model, effortLevel: preset.effortLevel };
+      await this.saveCodexModelConfig();
+    },
+
+    effortLabel(level) {
+      return { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }[level] || '系统默认';
+    },
+
+    // xhigh: Opus + Sonnet 支持（官方文档：extended thinking 要求）
+    effortSupportsXhigh(model) {
+      if (!model) return true; // 不知道模型时不限制
+      return model.includes('opus') || model.includes('sonnet');
+    },
+
+    // max: 仅 Opus 支持
+    effortSupportsMax(model) {
+      if (!model) return true; // 不知道模型时不限制
+      return model.includes('opus');
+    },
+
+    modelLabel(model) {
+      const map = {
+        'claude-opus-4-7': 'Opus 4.7',
+        'claude-sonnet-4-6': 'Sonnet 4.6',
+        'claude-haiku-4-5': 'Haiku 4.5',
+        'claude-opus-4-5': 'Opus 4.5',
+      };
+      return map[model] || model || '默认';
+    },
+
+    codexModelLabel(model) {
+      const map = {
+        'gpt-5.5': 'GPT-5.5',
+        'gpt-5.4': 'GPT-5.4',
+        'gpt-5.4-mini': 'GPT-5.4 mini',
+        'gpt-5.3-codex': 'GPT-5.3 Codex',
+        'gpt-5.2': 'GPT-5.2',
+      };
+      return map[model] || model || '默认';
     },
 
     async loadClaudeStatus() {

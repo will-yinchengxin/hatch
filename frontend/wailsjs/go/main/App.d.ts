@@ -29,6 +29,10 @@ export function CreateScriptFile(arg1:string,arg2:string,arg3:string):Promise<st
 
 export function CreateSkillTemplate(arg1:string):Promise<string>;
 
+export function DeleteClaudeCodePreset(arg1:string):Promise<void>;
+
+export function DeleteCodexPreset(arg1:string):Promise<void>;
+
 export function DeleteRun(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteScriptMeta(arg1:string):Promise<void>;
@@ -53,11 +57,19 @@ export function GetAppDataPaths():Promise<main.AppDataPaths>;
 
 export function GetAutoLaunchEnabled():Promise<boolean>;
 
+export function GetClaudeCodeConfig():Promise<main.ClaudeCodeConfig>;
+
+export function GetClaudeCodePresets():Promise<Array<config.ClaudeCodePreset>>;
+
 export function GetClaudeCodeStatus():Promise<main.ClaudeCodeStatus>;
 
 export function GetClaudeSettings():Promise<string>;
 
 export function GetCodexConfig():Promise<string>;
+
+export function GetCodexModelConfig():Promise<main.CodexModelConfig>;
+
+export function GetCodexPresets():Promise<Array<config.CodexPreset>>;
 
 export function GetCodexUsageStatus():Promise<main.CodexUsageStatus>;
 
@@ -137,9 +149,13 @@ export function SaveAIProviders(arg1:Array<config.AIProvider>,arg2:string):Promi
 
 export function SaveAppDataPaths(arg1:string,arg2:string):Promise<void>;
 
+export function SaveClaudeCodePreset(arg1:config.ClaudeCodePreset):Promise<void>;
+
 export function SaveClaudeSettings(arg1:string):Promise<void>;
 
 export function SaveCodexConfig(arg1:string):Promise<void>;
+
+export function SaveCodexPreset(arg1:config.CodexPreset):Promise<void>;
 
 export function SaveDocLinks(arg1:Array<config.DocLink>):Promise<void>;
 
@@ -150,6 +166,8 @@ export function SavePromptTemplates(arg1:Record<string, string>):Promise<void>;
 export function SaveRetentionPolicy(arg1:number,arg2:number,arg3:number):Promise<void>;
 
 export function SaveScriptMeta(arg1:config.ScriptMeta):Promise<void>;
+
+export function SaveScriptOrder(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function SaveSkillContent(arg1:string,arg2:string):Promise<void>;
 
@@ -166,6 +184,10 @@ export function ScanAll():Promise<Array<config.ScriptMeta>>;
 export function ServiceAction(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SetAutoLaunchEnabled(arg1:boolean):Promise<void>;
+
+export function SetClaudeCodeConfig(arg1:string,arg2:string):Promise<void>;
+
+export function SetCodexModelConfig(arg1:string,arg2:string):Promise<void>;
 
 export function SetSkillSync(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 

@@ -54,7 +54,31 @@
       "Bash(grep -n \"^  },$\\\\|^  }$\" /Users/yinchengxin/MyHub/hatch/frontend/src/main.js)",
       "Bash(go get *)",
       "Bash(curl -sf --unix-socket /tmp/verge/verge-mihomo.sock http://localhost/proxies)",
-      "Bash(curl -sf --unix-socket /tmp/verge/verge-mihomo.sock http://localhost/configs)"
+      "Bash(curl -sf --unix-socket /tmp/verge/verge-mihomo.sock http://localhost/configs)",
+      "Bash(claude --model sonnet -p \"hi\" --output-format json)",
+      "Bash(claude model *)",
+      "Bash(claude --print-config)",
+      "Bash(make dev *)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(npx vite *)",
+      "Bash(cat /tmp/vite.log)",
+      "Bash(jobs)",
+      "Bash(pkill -f \"wails dev\")",
+      "Bash(node *)",
+      "Bash(npx playwright@latest screenshot --browser chromium \"http://localhost:34115\" /tmp/hatch-home.png)",
+      "Bash(screencapture -x /tmp/hatch-screen.png)",
+      "Bash(osascript -e 'tell application \"Hatch\" to activate')",
+      "Bash(screencapture -x /tmp/hatch-focused.png)",
+      "Bash(npm list *)",
+      "Bash(pip show *)",
+      "Bash(osascript *)",
+      "Bash(curl -s http://localhost:34115)",
+      "Bash(open -a Safari \"http://localhost:34115\")",
+      "Bash(screencapture -x /tmp/hatch-browser.png)",
+      "Bash(npm init *)",
+      "Bash(screencapture -x /tmp/hatch-chrome.png)",
+      "Bash(screencapture -x /tmp/hatch-chrome2.png)",
+      "Bash(screencapture -x /tmp/hatch-native.png)"
     ]
   }
 }

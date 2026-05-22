@@ -68,8 +68,8 @@ type AIConfig struct {
 
 // DataRetention controls automatic cleanup of generated data.
 type DataRetention struct {
-	RunsRetainDays   int `json:"runsRetainDays,omitempty"`   // 0 → default (14)
-	RunsKeepPerName  int `json:"runsKeepPerName,omitempty"`  // 0 → default (50)
+	RunsRetainDays  int `json:"runsRetainDays,omitempty"`  // 0 → default (14)
+	RunsKeepPerName int `json:"runsKeepPerName,omitempty"` // 0 → default (50)
 }
 
 // AIProvider represents one named AI backend connection.
@@ -87,22 +87,43 @@ type DocLink struct {
 	Label string `json:"label"`
 }
 
+// ClaudeCodePreset is a named combination of model + effort level for Claude Code.
+type ClaudeCodePreset struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Model       string `json:"model"`
+	EffortLevel string `json:"effortLevel"`
+}
+
+// CodexPreset is a named combination of model + reasoning effort for Codex.
+type CodexPreset struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Model       string `json:"model"`
+	EffortLevel string `json:"effortLevel"`
+}
+
 type Config struct {
-	Directories      []Directory           `json:"directories"`
-	Exports          []ExportVar           `json:"exports"`
-	OverrideMeta     map[string]ScriptMeta `json:"overrideMeta"`
-	ZshrcAnnotations map[string]string     `json:"zshrcAnnotations,omitempty"`
-	AI               AIConfig              `json:"ai,omitempty"`
-	AutoLaunch       bool                  `json:"autoLaunch,omitempty"`
-	TraceLogDir      string                `json:"traceLogDir,omitempty"`  // AI call log dir, default: <configDir>/Hatch/traces
-	SkillsDir        string                `json:"skillsDir,omitempty"`    // skills master dir, default: <configDir>/Hatch/skills
-	DocLinks         []DocLink             `json:"docLinks,omitempty"`
-	AIProviders      []AIProvider          `json:"aiProviders,omitempty"`
-	ActiveProviderID string                `json:"activeProviderId,omitempty"`
-	PromptTemplates  map[string]string     `json:"promptTemplates,omitempty"` // v1.2: op -> override system prompt
-	Retention        DataRetention         `json:"retention,omitempty"`       // v1.3+: data cleanup policy
-	VPNAppDir        string                `json:"vpnAppDir,omitempty"`       // Clash Verge Rev data dir (default: auto-detect)
-	VPNBackupDir     string                `json:"vpnBackupDir,omitempty"`    // VPN backup dir (default: Hatch/vpn-backups)
+	Directories        []Directory           `json:"directories"`
+	Exports            []ExportVar           `json:"exports"`
+	OverrideMeta       map[string]ScriptMeta `json:"overrideMeta"`
+	ZshrcAnnotations   map[string]string     `json:"zshrcAnnotations,omitempty"`
+	AI                 AIConfig              `json:"ai,omitempty"`
+	AutoLaunch         bool                  `json:"autoLaunch,omitempty"`
+	TraceLogDir        string                `json:"traceLogDir,omitempty"` // AI call log dir, default: <configDir>/Hatch/traces
+	SkillsDir          string                `json:"skillsDir,omitempty"`   // skills master dir, default: <configDir>/Hatch/skills
+	DocLinks           []DocLink             `json:"docLinks,omitempty"`
+	AIProviders        []AIProvider          `json:"aiProviders,omitempty"`
+	ActiveProviderID   string                `json:"activeProviderId,omitempty"`
+	PromptTemplates    map[string]string     `json:"promptTemplates,omitempty"`    // v1.2: op -> override system prompt
+	Retention          DataRetention         `json:"retention,omitempty"`          // v1.3+: data cleanup policy
+	VPNAppDir          string                `json:"vpnAppDir,omitempty"`          // Clash Verge Rev data dir (default: auto-detect)
+	VPNBackupDir       string                `json:"vpnBackupDir,omitempty"`       // VPN backup dir (default: Hatch/vpn-backups)
+	ClaudeCodePresets       []ClaudeCodePreset `json:"claudeCodePresets,omitempty"`       // saved model+effort presets
+	ClaudeCodePresetsSeeded bool               `json:"claudeCodePresetsSeeded,omitempty"` // true after first default preset seed
+	CodexPresets            []CodexPreset      `json:"codexPresets,omitempty"`            // saved model+effort presets
+	CodexPresetsSeeded      bool               `json:"codexPresetsSeeded,omitempty"`      // true after first default preset seed
+	ScriptOrders            map[string][]string `json:"scriptOrders,omitempty"`            // dirPath -> ordered script paths
 }
 
 func defaultPath() (string, error) {

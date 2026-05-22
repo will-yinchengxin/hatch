@@ -2986,7 +2986,7 @@ code {
   padding-right: 14px;
   border-right: 1px solid var(--border);
   position: sticky;
-  top: 72px; /* below header */
+  top: 76px; /* below header */
 }
 
 .ai-sidenav-item {
@@ -4719,4 +4719,410 @@ details[open] .export-preview-toggle::before {
   border: 1px solid rgba(79,107,123,0.22);
   border-radius: var(--radius-xs);
   padding: 3px 8px;
+}
+
+/* ── Claude Code: model + effort config block ─────────────────────────── */
+.cc-config-block {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cc-config-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.cc-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 120px;
+}
+.cc-config-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cc-config-select {
+  height: var(--control-height-sm);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  appearance: auto;
+}
+.cc-config-select:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+.cc-config-save {
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+
+/* ── Presets ───────────────────────────────────────────────────────────── */
+.cc-presets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cc-presets-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cc-presets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cc-preset-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  transition: border-color 0.15s;
+}
+.cc-preset-card:hover {
+  border-color: var(--border-light);
+}
+.cc-preset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cc-preset-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-preset-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.cc-preset-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.cc-effort-badge { font-size: 11px; }
+.cc-effort-low   { background: rgba(79,123,88,0.12); color: var(--green); border-color: rgba(79,123,88,0.25); }
+.cc-effort-medium { background: rgba(167,119,46,0.12); color: var(--yellow); border-color: rgba(167,119,46,0.25); }
+.cc-effort-high  { background: rgba(193,95,60,0.12); color: var(--primary); border-color: rgba(193,95,60,0.25); }
+
+.cc-presets-empty { margin: 0; padding: 4px 0; }
+
+/* ── Preset add / edit inline form ───────────────────────────────────────── */
+.cc-preset-form {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cc-preset-form-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cc-preset-form-body {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cc-preset-name-input {
+  flex: 1;
+  min-width: 120px;
+  height: var(--control-height-sm);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.cc-preset-name-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+.cc-preset-form-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ── cc-current-row: 当前配置状态展示行 ─────────────────────────────────── */
+.cc-current-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.cc-current-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.cc-model-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(193,95,60,0.08);
+  color: var(--primary);
+  border-color: rgba(193,95,60,0.2);
+}
+/* xhigh / max effort badge colors */
+.cc-effort-xhigh { background: rgba(123,92,125,0.12); color: var(--purple); border-color: rgba(123,92,125,0.25); }
+.cc-effort-max   { background: rgba(185,76,63,0.15); color: var(--red); border-color: rgba(185,76,63,0.3); }
+.cc-effort-default { background: var(--surface-3); color: var(--text-dim); }
+
+/* ── Codex: model + reasoning effort config block ─────────────────────── */
+.codex-model-config-block {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.codex-model-config-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.codex-model-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 120px;
+}
+.codex-model-config-label,
+.codex-presets-title,
+.codex-preset-form-title,
+.codex-current-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.codex-model-config-select {
+  height: var(--control-height-sm);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  appearance: auto;
+}
+.codex-model-config-select:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+.codex-model-config-save {
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+.codex-current-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.codex-current-label {
+  flex-shrink: 0;
+}
+.codex-model-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(79,111,123,0.1);
+  color: var(--cyan);
+  border-color: rgba(79,111,123,0.24);
+}
+.codex-effort-badge {
+  font-size: 11px;
+}
+.codex-effort-low { background: rgba(79,123,88,0.12); color: var(--green); border-color: rgba(79,123,88,0.25); }
+.codex-effort-medium { background: rgba(167,119,46,0.12); color: var(--yellow); border-color: rgba(167,119,46,0.25); }
+.codex-effort-high { background: rgba(193,95,60,0.12); color: var(--primary); border-color: rgba(193,95,60,0.25); }
+.codex-effort-xhigh { background: rgba(123,92,125,0.12); color: var(--purple); border-color: rgba(123,92,125,0.25); }
+.codex-effort-default { background: var(--surface-3); color: var(--text-dim); }
+.codex-presets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.codex-presets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.codex-preset-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  transition: border-color 0.15s;
+}
+.codex-preset-card:hover {
+  border-color: var(--border-light);
+}
+.codex-preset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.codex-preset-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.codex-preset-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.codex-preset-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.codex-presets-empty {
+  margin: 0;
+  padding: 4px 0;
+}
+.codex-preset-form {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.codex-preset-form-body {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.codex-preset-name-input {
+  flex: 1;
+  min-width: 120px;
+  height: var(--control-height-sm);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.codex-preset-name-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-glow);
+}
+.codex-preset-form-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cc-default-hint {
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--surface-4);
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+}
+
+/* ── Drag-to-reorder ──────────────────────────────────────────────────── */
+.drag-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 15px;
+  padding: 0 2px 0 0;
+  user-select: none;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.script-card:hover .drag-handle {
+  opacity: 1;
+}
+.script-card.is-dragging {
+  opacity: 0.35;
+  box-shadow: none;
+}
+.script-card.drag-over-top {
+  border-top: 2px solid var(--primary) !important;
+  margin-top: -2px;
+}
+
+.btn-sort-done {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.btn-sort-done:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+.sort-mode-card {
+  cursor: grab;
+}
+.sort-mode-card:active {
+  cursor: grabbing;
 }
