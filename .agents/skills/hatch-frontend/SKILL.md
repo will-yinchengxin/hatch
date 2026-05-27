@@ -45,7 +45,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 
 - 脚本运行：`statuses`、`runningSet`、`scriptLogs`、`scriptExitCodes`、`logTarget`。
 - 编辑抽屉：`editTarget`、`editForm`、`editSaving`，所有 per-script 行为都从这里配置。
-- AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`。
+- AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、`claudeCodeConfig`、`codexModelConfig`。
 - Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`。
 - Data：`dataPaths`、`dataInventory`、`retention`。
 - VPN：`vpnStatus`、`vpnCurrentIP`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnSettingsForm`。
@@ -62,7 +62,7 @@ header, nav, main, footer, section, article, aside { padding: 0; margin: 0; }
 - 覆盖 `--pico-primary-*` 到 Hatch clay 色。
 - 覆盖 `button[aria-busy="true"]`，否则 Pico 会变蓝。
 - 重置非按钮 `[role="button"]` 卡片样式。
-- AI/VPN 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局。
+- AI/VPN 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局；AI Tools 的 Codex 快捷配置含 model、effort 和 Goals 开关。
 - 新 v1.1+ 功能类放在 `style.css` 末尾对应分区，保持命名可读。
 
 ## Alpine 注意事项

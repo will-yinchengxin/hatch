@@ -366,8 +366,8 @@ export function SetClaudeCodeConfig(arg1, arg2) {
   return window['go']['main']['App']['SetClaudeCodeConfig'](arg1, arg2);
 }
 
-export function SetCodexModelConfig(arg1, arg2) {
-  return window['go']['main']['App']['SetCodexModelConfig'](arg1, arg2);
+export function SetCodexModelConfig(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetCodexModelConfig'](arg1, arg2, arg3);
 }
 
 export function SetSkillSync(arg1, arg2, arg3) {

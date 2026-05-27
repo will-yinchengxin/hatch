@@ -32,7 +32,7 @@ hatch/
 ├── app_zshrc.go            # zshrc parse / annotate / AI organize
 ├── app_ai.go               # AI providers / Suggest* / callAIOp / trace emit
 ├── app_observability.go    # Claude/Codex status / trace persistence / macOS notify
-├── app_files.go            # Script files / AppDataPaths / AutoLaunch / DocLinks
+├── app_files.go            # Script files / AppDataPaths / AutoLaunch / DocLinks / Codex config
 ├── app_v12.go              # v1.2: scheduler / health-check / prompt templates / stream
 ├── app_v13.go              # v1.3: PATH health / backup-restore / pre-script chain
 ├── app_datadir.go          # Data-dir inventory + cleanup + retention + Skill AI
@@ -68,6 +68,7 @@ hatch/
 | Login autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
 | Claude usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
+| Codex config | `~/.codex/config.toml` (AI Tools can edit model, reasoning effort, and `[features].goals`) |
 | Backup exports | `~/Desktop/hatch-backup-<ts>.zip` (default) |
 | VPN config | `~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/` (configurable) |
 | VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` (configurable) |

@@ -177,8 +177,8 @@ window.hatchApp = function () {
     claudeCodePresetForm: { id: '', name: '', model: '', effortLevel: '' },
     claudeCodePresetOpen: false,  // inline add/edit form visible
 
-    // Codex model + reasoning effort config
-    codexModelConfig: { model: '', effortLevel: '' },
+    // Codex model + reasoning effort + goal-mode config
+    codexModelConfig: { model: '', effortLevel: '', goalsEnabled: false },
     codexModelConfigSaving: false,
     codexPresets: [],
     codexPresetForm: { id: '', name: '', model: '', effortLevel: '' },
@@ -1563,7 +1563,8 @@ window.hatchApp = function () {
       try {
         await window['go']['main']['App']['SetCodexModelConfig'](
           this.codexModelConfig.model || '',
-          this.codexModelConfig.effortLevel || ''
+          this.codexModelConfig.effortLevel || '',
+          !!this.codexModelConfig.goalsEnabled
         );
         this.showSuccess('Codex 配置已保存');
         if (this.codexConfigOpen) await this.openCodexConfig();
@@ -1621,7 +1622,11 @@ window.hatchApp = function () {
     },
 
     async applyCodexPreset(preset) {
-      this.codexModelConfig = { model: preset.model, effortLevel: preset.effortLevel };
+      this.codexModelConfig = {
+        ...this.codexModelConfig,
+        model: preset.model,
+        effortLevel: preset.effortLevel,
+      };
       await this.saveCodexModelConfig();
     },
 

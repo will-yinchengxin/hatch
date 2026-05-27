@@ -51,9 +51,13 @@ func TestCodexModelConfigTOMLHelpersOnlyTouchTopLevelKeys(t *testing.T) {
 model = "gpt-5.4"
 model_reasoning_effort = "high"
 
+[features]
+goals = false
+
 [profiles.deep]
 model = "do-not-touch"
 model_reasoning_effort = "do-not-touch"
+goals = false
 `
 
 	if got := readTOMLStringKey(content, "model"); got != "gpt-5.4" {
@@ -62,9 +66,13 @@ model_reasoning_effort = "do-not-touch"
 	if got := readTOMLStringKey(content, "model_reasoning_effort"); got != "high" {
 		t.Fatalf("effort = %q", got)
 	}
+	if got := readTOMLSectionBoolKey(content, "features", "goals"); got {
+		t.Fatalf("goals = %v", got)
+	}
 
 	updated := setTOMLStringKey(content, "model_reasoning_effort", "xhigh")
 	updated = setTOMLStringKey(updated, "model", "gpt-5.5")
+	updated = setTOMLSectionBoolKey(updated, "features", "goals", true)
 
 	if got := readTOMLStringKey(updated, "model"); got != "gpt-5.5" {
 		t.Fatalf("updated model = %q", got)
@@ -72,7 +80,24 @@ model_reasoning_effort = "do-not-touch"
 	if got := readTOMLStringKey(updated, "model_reasoning_effort"); got != "xhigh" {
 		t.Fatalf("updated effort = %q", got)
 	}
+	if got := readTOMLSectionBoolKey(updated, "features", "goals"); !got {
+		t.Fatalf("updated goals = %v", got)
+	}
 	if !strings.Contains(updated, `[profiles.deep]`) || !strings.Contains(updated, `model = "do-not-touch"`) {
 		t.Fatalf("nested section was modified:\n%s", updated)
+	}
+	if !strings.Contains(updated, `goals = false`) {
+		t.Fatalf("nested goals setting was modified:\n%s", updated)
+	}
+}
+
+func TestSetTOMLSectionBoolKeyCreatesFeaturesSection(t *testing.T) {
+	updated := setTOMLSectionBoolKey(`model = "gpt-5.5"`+"\n", "features", "goals", true)
+
+	if !strings.Contains(updated, "[features]\ngoals = true\n") {
+		t.Fatalf("features.goals section not created:\n%s", updated)
+	}
+	if got := readTOMLSectionBoolKey(updated, "features", "goals"); !got {
+		t.Fatalf("goals = %v", got)
 	}
 }

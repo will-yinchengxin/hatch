@@ -1244,6 +1244,7 @@
                   <span class="codex-current-label">当前配置</span>
                   <span class="badge codex-model-badge" x-text="codexModelConfig.model ? codexModelLabel(codexModelConfig.model) : '系统默认模型'"></span>
                   <span class="badge codex-effort-badge" :class="'codex-effort-'+(codexModelConfig.effortLevel||'default')" x-text="effortLabel(codexModelConfig.effortLevel)"></span>
+                  <span class="badge codex-goals-badge" :class="codexModelConfig.goalsEnabled ? 'is-on' : 'is-off'" x-text="codexModelConfig.goalsEnabled ? 'Goals 开启' : 'Goals 关闭'"></span>
                 </div>
 
                 <div class="codex-model-config-row">
@@ -1268,6 +1269,14 @@
                       <option value="xhigh">xhigh · 超深推理</option>
                     </select>
                   </div>
+                  <label class="codex-goals-toggle" :class="{active: codexModelConfig.goalsEnabled}">
+                    <input type="checkbox" x-model="codexModelConfig.goalsEnabled" />
+                    <span class="codex-goals-toggle-track"></span>
+                    <span class="codex-goals-toggle-text">
+                      <strong>Goals</strong>
+                      <small x-text="codexModelConfig.goalsEnabled ? '写入 [features] goals = true' : '写入 [features] goals = false'"></small>
+                    </span>
+                  </label>
                   <button class="btn-sm active codex-model-config-save" @click="saveCodexModelConfig()" :aria-busy="codexModelConfigSaving">保存</button>
                 </div>
 

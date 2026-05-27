@@ -187,7 +187,7 @@ export function SetAutoLaunchEnabled(arg1:boolean):Promise<void>;
 
 export function SetClaudeCodeConfig(arg1:string,arg2:string):Promise<void>;
 
-export function SetCodexModelConfig(arg1:string,arg2:string):Promise<void>;
+export function SetCodexModelConfig(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SetSkillSync(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 

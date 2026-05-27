@@ -26,6 +26,7 @@ editTarget != null      -> edit drawer overlay
 | `editTarget / editForm / editSaving` | Edit drawer state |
 | `aiForm / aiProviders / activeProviderID / quickAIOpen / quickAITraceID` | Provider config and header quick-AI popover |
 | `aiSubTab / traceLog / traceLogDate / promptTemplates / promptDefaults` | AI page subviews |
+| `claudeCodeConfig / codexModelConfig` | AI Tools model/effort shortcuts; Codex also includes `goalsEnabled` |
 | `skills / skillsStats / skillSearch / skillFilter / filteredSkills` | Skill list and filter UI |
 | `skillAIInstruction / skillAIBusy` | Skill AI optimize bar |
 | `dataPaths / dataPathsForm / dataInventory / retention` | Data paths, inventory, retention |
@@ -73,7 +74,7 @@ Core tokens:
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI: overview, connect/providers/traces, skills, tools/status, prompts, data/retention.
+- AI: overview, connect/providers/traces, skills, tools/status, Codex goals toggle, prompts, data/retention.
 - VPN: overview/status hero, config editor, profiles editor, backup/restore, enhance rules/hosts/DNS view.
 
 ## CSS And Alpine Pitfalls

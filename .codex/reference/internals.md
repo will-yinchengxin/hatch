@@ -84,6 +84,7 @@ Positional keys change when the file is edited.
 - Trace JSONL is written under `TraceLogDir/<YYYY-MM-DD>.jsonl` and pruned by retention.
 - Streaming protocol emits `ai:stream`; current implementation may still send one chunk.
 - Skill AI returns full `SKILL.md` content without markdown fences.
+- AI Tools writes Codex shortcuts into `~/.codex/config.toml`: top-level `model`, top-level `model_reasoning_effort`, and `[features] goals = true/false`. The merge helpers only touch those keys and preserve nested profiles.
 
 ## Data Retention And Backup
 

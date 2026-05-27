@@ -623,6 +623,7 @@ export namespace main {
 	export class CodexModelConfig {
 	    model: string;
 	    effortLevel: string;
+	    goalsEnabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CodexModelConfig(source);
@@ -632,6 +633,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.model = source["model"];
 	        this.effortLevel = source["effortLevel"];
+	        this.goalsEnabled = source["goalsEnabled"];
 	    }
 	}
 	export class CodexUsageWindow {

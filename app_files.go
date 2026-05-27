@@ -144,8 +144,8 @@ func (a *App) SaveClaudeSettings(content string) error {
 // ClaudeCodeConfig holds the two user-facing knobs written to ~/.claude/settings.json,
 // plus EffectiveModel which reflects what Claude Code is actually running (via `claude model`).
 type ClaudeCodeConfig struct {
-	Model         string `json:"model"`         // explicit setting in settings.json, "" means default
-	EffortLevel   string `json:"effortLevel"`   // explicit setting in settings.json
+	Model          string `json:"model"`          // explicit setting in settings.json, "" means default
+	EffortLevel    string `json:"effortLevel"`    // explicit setting in settings.json
 	EffectiveModel string `json:"effectiveModel"` // actual model in use (from `claude model`)
 }
 
@@ -295,13 +295,14 @@ func (a *App) SaveCodexConfig(content string) error {
 
 // ── Codex model + reasoning effort config ───────────────────────────────────
 
-// CodexModelConfig holds the two user-facing knobs written to ~/.codex/config.toml.
+// CodexModelConfig holds the user-facing knobs written to ~/.codex/config.toml.
 type CodexModelConfig struct {
-	Model       string `json:"model"`
-	EffortLevel string `json:"effortLevel"`
+	Model        string `json:"model"`
+	EffortLevel  string `json:"effortLevel"`
+	GoalsEnabled bool   `json:"goalsEnabled"`
 }
 
-// GetCodexModelConfig reads model and model_reasoning_effort from ~/.codex/config.toml.
+// GetCodexModelConfig reads Codex model, reasoning effort, and features.goals.
 func (a *App) GetCodexModelConfig() CodexModelConfig {
 	home, _ := os.UserHomeDir()
 	data, err := os.ReadFile(home + "/.codex/config.toml")
@@ -310,14 +311,15 @@ func (a *App) GetCodexModelConfig() CodexModelConfig {
 	}
 	content := string(data)
 	return CodexModelConfig{
-		Model:       readTOMLStringKey(content, "model"),
-		EffortLevel: readTOMLStringKey(content, "model_reasoning_effort"),
+		Model:        readTOMLStringKey(content, "model"),
+		EffortLevel:  readTOMLStringKey(content, "model_reasoning_effort"),
+		GoalsEnabled: readTOMLSectionBoolKey(content, "features", "goals"),
 	}
 }
 
-// SetCodexModelConfig merges model and model_reasoning_effort into
+// SetCodexModelConfig merges model, reasoning effort, and features.goals into
 // ~/.codex/config.toml without touching unrelated settings.
-func (a *App) SetCodexModelConfig(model, effortLevel string) error {
+func (a *App) SetCodexModelConfig(model, effortLevel string, goalsEnabled bool) error {
 	home, _ := os.UserHomeDir()
 	path := home + "/.codex/config.toml"
 
@@ -327,6 +329,7 @@ func (a *App) SetCodexModelConfig(model, effortLevel string) error {
 	}
 	content = setTOMLStringKey(content, "model_reasoning_effort", effortLevel)
 	content = setTOMLStringKey(content, "model", model)
+	content = setTOMLSectionBoolKey(content, "features", "goals", goalsEnabled)
 
 	if err := backupIfExists(path); err != nil {
 		return err
@@ -360,6 +363,37 @@ func readTOMLStringKey(content, key string) string {
 	return ""
 }
 
+func readTOMLSectionBoolKey(content, section, key string) bool {
+	inSection := false
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if isTOMLSectionLine(line, section) {
+			inSection = true
+			continue
+		}
+		if inSection && strings.HasPrefix(trimmed, "[") {
+			return false
+		}
+		if !inSection || !isTOMLKeyLine(line, key) {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			return false
+		}
+		fields := strings.Fields(strings.TrimSpace(parts[1]))
+		if len(fields) == 0 {
+			return false
+		}
+		value, err := strconv.ParseBool(fields[0])
+		if err != nil {
+			return false
+		}
+		return value
+	}
+	return false
+}
+
 func setTOMLStringKey(content, key, value string) string {
 	preamble, rest := splitTOMLPreamble(content)
 	var kept []string
@@ -378,6 +412,54 @@ func setTOMLStringKey(content, key, value string) string {
 		return line
 	}
 	return line + "\n" + ensureTrailingNewline(content)
+}
+
+func setTOMLSectionBoolKey(content, section, key string, value bool) string {
+	keyLine := key + " = " + strconv.FormatBool(value) + "\n"
+	lines := strings.SplitAfter(content, "\n")
+	var out []string
+	inSection := false
+	foundSection := false
+	wroteKey := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") {
+			if inSection && !wroteKey {
+				out = append(out, keyLine)
+				wroteKey = true
+			}
+			inSection = false
+			if isTOMLSectionLine(line, section) {
+				inSection = true
+				foundSection = true
+			}
+		}
+		if inSection && isTOMLKeyLine(line, key) {
+			if !wroteKey {
+				out = append(out, keyLine)
+				wroteKey = true
+			}
+			continue
+		}
+		out = append(out, line)
+	}
+
+	if inSection && !wroteKey {
+		out = append(out, keyLine)
+	}
+
+	updated := strings.Join(out, "")
+	if foundSection {
+		return ensureTrailingNewline(updated)
+	}
+
+	updated = ensureTrailingNewline(updated)
+	if strings.TrimSpace(updated) != "" {
+		updated += "\n"
+	}
+	updated += "[" + section + "]\n" + keyLine
+	return ensureTrailingNewline(updated)
 }
 
 func splitTOMLPreamble(content string) (string, string) {
@@ -399,6 +481,10 @@ func isTOMLKeyLine(line, key string) bool {
 	}
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, key))
 	return strings.HasPrefix(rest, "=")
+}
+
+func isTOMLSectionLine(line, section string) bool {
+	return strings.TrimSpace(line) == "["+section+"]"
 }
 
 func quotedTOMLStringPrefix(s string) string {
