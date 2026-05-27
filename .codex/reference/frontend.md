@@ -74,7 +74,7 @@ Core tokens:
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI: overview, connect/providers/traces, skills, tools/status, Codex goals toggle, prompts, data/retention.
+- AI: overview, connect/providers/traces, skills, tools/status, prompts, data/retention. Claude Code and Codex model shortcuts share the `agent-*` config layout classes; Codex adds the Goals toggle in the shared action row.
 - VPN: overview/status hero, config editor, profiles editor, backup/restore, enhance rules/hosts/DNS view.
 
 ## CSS And Alpine Pitfalls

@@ -1064,9 +1064,9 @@
                 </div>
               </template>
               <!-- Model + EffortLevel 快捷配置 -->
-              <div class="cc-config-block">
+              <div class="cc-config-block agent-model-config">
                 <!-- 当前配置 status 展示行 -->
-                <div class="cc-current-row">
+                <div class="cc-current-row agent-current-row">
                   <span class="cc-current-label">当前配置</span>
                   <span class="badge cc-model-badge" x-text="claudeCodeConfig.effectiveModel ? modelLabel(claudeCodeConfig.effectiveModel) : (claudeCodeConfig.model ? modelLabel(claudeCodeConfig.model) : '加载中…')"></span>
                   <span class="badge cc-effort-badge" :class="'cc-effort-'+(claudeCodeConfig.effortLevel||'default')" x-text="effortLabel(claudeCodeConfig.effortLevel)"></span>
@@ -1074,10 +1074,10 @@
                 </div>
 
                 <!-- 编辑区 -->
-                <div class="cc-config-row">
-                  <div class="cc-config-field">
-                    <label class="cc-config-label">模型</label>
-                    <select class="cc-config-select" x-model="claudeCodeConfig.model">
+                <div class="cc-config-row agent-config-row">
+                  <div class="cc-config-field agent-config-field">
+                    <label class="cc-config-label agent-config-label">模型</label>
+                    <select class="cc-config-select agent-config-select" x-model="claudeCodeConfig.model">
                       <option value="">系统默认</option>
                       <option value="claude-opus-4-7">claude-opus-4-7</option>
                       <option value="claude-opus-4-6">claude-opus-4-6</option>
@@ -1086,9 +1086,9 @@
                       <option value="claude-opus-4-5">claude-opus-4-5</option>
                     </select>
                   </div>
-                  <div class="cc-config-field">
-                    <label class="cc-config-label">努力程度</label>
-                    <select class="cc-config-select" x-model="claudeCodeConfig.effortLevel">
+                  <div class="cc-config-field agent-config-field">
+                    <label class="cc-config-label agent-config-label">努力程度</label>
+                    <select class="cc-config-select agent-config-select" x-model="claudeCodeConfig.effortLevel">
                       <option value="">系统默认</option>
                       <option value="low">low · 快速响应</option>
                       <option value="medium">medium · 均衡</option>
@@ -1097,7 +1097,10 @@
                       <option value="max" :disabled="!effortSupportsMax(claudeCodeConfig.model)" x-text="effortSupportsMax(claudeCodeConfig.model) ? 'max · 极限思考' : 'max · 仅 Opus'"></option>
                     </select>
                   </div>
-                  <button class="btn-sm active cc-config-save" @click="saveClaudeCodeConfig()" :aria-busy="claudeCodeConfigSaving">保存</button>
+                </div>
+                <div class="cc-model-actions-row agent-config-actions">
+                  <span class="agent-config-action-spacer" aria-hidden="true"></span>
+                  <button class="btn-sm active cc-config-save agent-config-save" @click="saveClaudeCodeConfig()" :aria-busy="claudeCodeConfigSaving">保存</button>
                 </div>
 
                 <!-- 快捷预设 -->
@@ -1239,18 +1242,18 @@
                 </div>
               </template>
               <!-- Model + Reasoning Effort 快捷配置 -->
-              <div class="codex-model-config-block">
-                <div class="codex-current-row">
+              <div class="codex-model-config-block agent-model-config">
+                <div class="codex-current-row agent-current-row">
                   <span class="codex-current-label">当前配置</span>
                   <span class="badge codex-model-badge" x-text="codexModelConfig.model ? codexModelLabel(codexModelConfig.model) : '系统默认模型'"></span>
                   <span class="badge codex-effort-badge" :class="'codex-effort-'+(codexModelConfig.effortLevel||'default')" x-text="effortLabel(codexModelConfig.effortLevel)"></span>
                   <span class="badge codex-goals-badge" :class="codexModelConfig.goalsEnabled ? 'is-on' : 'is-off'" x-text="codexModelConfig.goalsEnabled ? 'Goals 开启' : 'Goals 关闭'"></span>
                 </div>
 
-                <div class="codex-model-config-row">
-                  <div class="codex-model-config-field">
-                    <label class="codex-model-config-label">模型</label>
-                    <select class="codex-model-config-select" x-model="codexModelConfig.model">
+                <div class="codex-model-config-row agent-config-row">
+                  <div class="codex-model-config-field agent-config-field">
+                    <label class="codex-model-config-label agent-config-label">模型</label>
+                    <select class="codex-model-config-select agent-config-select" x-model="codexModelConfig.model">
                       <option value="">系统默认</option>
                       <option value="gpt-5.5">gpt-5.5</option>
                       <option value="gpt-5.4">gpt-5.4</option>
@@ -1259,9 +1262,9 @@
                       <option value="gpt-5.2">gpt-5.2</option>
                     </select>
                   </div>
-                  <div class="codex-model-config-field">
-                    <label class="codex-model-config-label">努力程度</label>
-                    <select class="codex-model-config-select" x-model="codexModelConfig.effortLevel">
+                  <div class="codex-model-config-field agent-config-field">
+                    <label class="codex-model-config-label agent-config-label">努力程度</label>
+                    <select class="codex-model-config-select agent-config-select" x-model="codexModelConfig.effortLevel">
                       <option value="">系统默认</option>
                       <option value="low">low · 快速响应</option>
                       <option value="medium">medium · 均衡</option>
@@ -1269,15 +1272,17 @@
                       <option value="xhigh">xhigh · 超深推理</option>
                     </select>
                   </div>
+                </div>
+                <div class="codex-model-actions-row agent-config-actions">
                   <label class="codex-goals-toggle" :class="{active: codexModelConfig.goalsEnabled}">
                     <input type="checkbox" x-model="codexModelConfig.goalsEnabled" />
                     <span class="codex-goals-toggle-track"></span>
                     <span class="codex-goals-toggle-text">
-                      <strong>Goals</strong>
-                      <small x-text="codexModelConfig.goalsEnabled ? '写入 [features] goals = true' : '写入 [features] goals = false'"></small>
+                      <strong>Goals 模式</strong>
+                      <small x-text="codexModelConfig.goalsEnabled ? '已开启' : '已关闭'"></small>
                     </span>
                   </label>
-                  <button class="btn-sm active codex-model-config-save" @click="saveCodexModelConfig()" :aria-busy="codexModelConfigSaving">保存</button>
+                  <button class="btn-sm active codex-model-config-save agent-config-save" @click="saveCodexModelConfig()" :aria-busy="codexModelConfigSaving">保存</button>
                 </div>
 
                 <div class="codex-presets-header">
