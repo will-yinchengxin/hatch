@@ -39,6 +39,8 @@ export function DeleteScriptMeta(arg1:string):Promise<void>;
 
 export function DeleteSkill(arg1:string):Promise<void>;
 
+export function DeleteSkillEverywhere(arg1:string):Promise<void>;
+
 export function ExportBackup(arg1:string):Promise<main.BackupResult>;
 
 export function ExportVPNBackup():Promise<main.VPNBackupResult>;
@@ -138,6 +140,8 @@ export function ReadScriptFile(arg1:string):Promise<string>;
 export function RemoveDirectory(arg1:string):Promise<void>;
 
 export function RemoveSchedule(arg1:string):Promise<void>;
+
+export function ResolveSkillImportConflict(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function RunScript(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 

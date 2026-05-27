@@ -70,6 +70,10 @@ export function DeleteSkill(arg1) {
   return window['go']['main']['App']['DeleteSkill'](arg1);
 }
 
+export function DeleteSkillEverywhere(arg1) {
+  return window['go']['main']['App']['DeleteSkillEverywhere'](arg1);
+}
+
 export function ExportBackup(arg1) {
   return window['go']['main']['App']['ExportBackup'](arg1);
 }
@@ -268,6 +272,10 @@ export function RemoveDirectory(arg1) {
 
 export function RemoveSchedule(arg1) {
   return window['go']['main']['App']['RemoveSchedule'](arg1);
+}
+
+export function ResolveSkillImportConflict(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ResolveSkillImportConflict'](arg1, arg2, arg3);
 }
 
 export function RunScript(arg1, arg2, arg3) {

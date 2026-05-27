@@ -39,8 +39,10 @@ const GetSkillsStats        = ()                            => window['go']['mai
 const GetSkillContent       = (name)                        => window['go']['main']['App']['GetSkillContent'](name);
 const SaveSkillContent      = (name, content)               => window['go']['main']['App']['SaveSkillContent'](name, content);
 const DeleteSkill           = (name)                        => window['go']['main']['App']['DeleteSkill'](name);
+const DeleteSkillEverywhere = (name)                        => window['go']['main']['App']['DeleteSkillEverywhere'](name);
 const SetSkillSync          = (name, target, enabled)       => window['go']['main']['App']['SetSkillSync'](name, target, enabled);
 const ImportSkillsFrom      = (source)                      => window['go']['main']['App']['ImportSkillsFrom'](source);
+const ResolveSkillImportConflict = (name, source, useSource) => window['go']['main']['App']['ResolveSkillImportConflict'](name, source, useSource);
 const CreateSkillTemplate   = (name)                        => window['go']['main']['App']['CreateSkillTemplate'](name);
 const GetAppDataPaths       = ()                            => window['go']['main']['App']['GetAppDataPaths']();
 const SaveAppDataPaths      = (traceDir, skillsDir)         => window['go']['main']['App']['SaveAppDataPaths'](traceDir, skillsDir);
@@ -226,6 +228,7 @@ window.hatchApp = function () {
     skillSyncBusy: {},       // { "name:target": true }
     skillImporting: null,    // null | "claude" | "codex"
     skillImportResult: null,
+    skillConflictBusy: {},   // { "source:name": true }
 
     // AI sub-navigation
     aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'tools'
@@ -1229,10 +1232,24 @@ window.hatchApp = function () {
 
     async deleteSkill(name) {
       try {
+        const skill = this.skills.find(s => s.name === name);
         await DeleteSkill(name);
         if (this.skillEditTarget === name) this.closeSkillEditor();
         await this.loadSkills();
-        this.showSuccess(`Skill「${name}」已删除`);
+        const kept = [];
+        if (skill?.inClaude) kept.push('Claude');
+        if (skill?.inCodex) kept.push('Codex');
+        const keepNote = kept.length ? `，${kept.join(' / ')} 保留不变` : '';
+        this.showSuccess(`Skill「${name}」已从 Hatch 删除${keepNote}`);
+      } catch (e) { this.showError(`删除 Skill 失败: ${e}`); }
+    },
+
+    async deleteSkillEverywhere(name) {
+      try {
+        await DeleteSkillEverywhere(name);
+        if (this.skillEditTarget === name) this.closeSkillEditor();
+        await this.loadSkills();
+        this.showSuccess(`Skill「${name}」已从 Hatch / Claude / Codex 删除`);
       } catch (e) { this.showError(`删除 Skill 失败: ${e}`); }
     },
 
@@ -1268,10 +1285,42 @@ window.hatchApp = function () {
         this.skillImportResult = r;
         await this.loadSkills();
         const n = (r?.imported || []).length;
-        if (n > 0) this.showSuccess(`已从 ${source === 'claude' ? 'Claude' : 'Codex'} 导入 ${n} 个 Skill`);
-        else this.showSuccess('无新 Skill 可导入（已全部存在）');
+        const c = (r?.conflicts || []).length;
+        const label = source === 'claude' ? 'Claude' : 'Codex';
+        if (n > 0 || c > 0) {
+          const parts = [];
+          if (n > 0) parts.push(`导入 ${n} 个`);
+          if (c > 0) parts.push(`发现冲突 ${c} 个`);
+          this.showSuccess(`已从 ${label} ${parts.join('，')}`);
+        } else {
+          this.showSuccess('无变化');
+        }
       } catch (e) { this.showError(`导入失败: ${e}`); }
       finally { this.skillImporting = null; }
+    },
+
+    skillSourceLabel(source) {
+      return source === 'claude' ? 'Claude' : 'Codex';
+    },
+
+    async resolveSkillConflict(conflict, useSource) {
+      if (!conflict?.name || !conflict?.source) return;
+      const key = conflict.source + ':' + conflict.name;
+      this.skillConflictBusy = { ...this.skillConflictBusy, [key]: true };
+      try {
+        await ResolveSkillImportConflict(conflict.name, conflict.source, useSource);
+        const rest = (this.skillImportResult?.conflicts || []).filter(c => !(c.name === conflict.name && c.source === conflict.source));
+        this.skillImportResult = { ...(this.skillImportResult || {}), conflicts: rest };
+        await this.loadSkills();
+        const label = this.skillSourceLabel(conflict.source);
+        this.showSuccess(useSource ? `Skill「${conflict.name}」已使用 ${label} 版本` : `Skill「${conflict.name}」已保留 Hatch 版本`);
+      } catch (e) {
+        this.showError(`处理冲突失败: ${e}`);
+      } finally {
+        const b = { ...this.skillConflictBusy };
+        delete b[key];
+        this.skillConflictBusy = b;
+      }
     },
 
     // ── AI providers ──────────────────────────────────────────────────

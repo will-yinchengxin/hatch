@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,8 +27,19 @@ type SkillEntry struct {
 
 // SkillImportResult reports what was imported.
 type SkillImportResult struct {
-	Imported []string `json:"imported"`
-	Skipped  []string `json:"skipped"`
+	Imported  []string              `json:"imported"`
+	Skipped   []string              `json:"skipped"`
+	Conflicts []SkillImportConflict `json:"conflicts"`
+}
+
+// SkillImportConflict reports a same-name skill whose source and master content differ.
+type SkillImportConflict struct {
+	Name          string `json:"name"`
+	Source        string `json:"source"`
+	MasterModTime int64  `json:"masterModTime"`
+	SourceModTime int64  `json:"sourceModTime"`
+	MasterPath    string `json:"masterPath"`
+	SourcePath    string `json:"sourcePath"`
 }
 
 const (
@@ -126,6 +139,53 @@ func copyDirAll(src, dst string) error {
 	})
 }
 
+func skillNameInvalid(name string) bool {
+	return strings.Contains(name, "..") || strings.Contains(name, "/") || strings.TrimSpace(name) == ""
+}
+
+func skillDirFingerprint(dir string) (string, int64, error) {
+	var files []string
+	var latest int64
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, rel)
+		if mt := info.ModTime().Unix(); mt > latest {
+			latest = mt
+		}
+		return nil
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	sort.Strings(files)
+	h := md5.New()
+	for _, rel := range files {
+		data, err := os.ReadFile(filepath.Join(dir, rel))
+		if err != nil {
+			return "", 0, err
+		}
+		h.Write([]byte(rel))
+		h.Write([]byte{0})
+		h.Write(data)
+		h.Write([]byte{0})
+	}
+	if len(files) == 0 {
+		if fi, err := os.Stat(dir); err == nil {
+			latest = fi.ModTime().Unix()
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)), latest, nil
+}
+
 // GetSkills returns all skills in the master store with their sync status.
 func (a *App) GetSkills() ([]SkillEntry, error) {
 	master, err := a.masterSkillsDir()
@@ -174,7 +234,7 @@ func (a *App) GetSkills() ([]SkillEntry, error) {
 
 // GetSkillContent returns the SKILL.md content for one skill in the master store.
 func (a *App) GetSkillContent(name string) (string, error) {
-	if strings.Contains(name, "..") || strings.Contains(name, "/") {
+	if skillNameInvalid(name) {
 		return "", fmt.Errorf("invalid skill name")
 	}
 	master, err := a.masterSkillsDir()
@@ -191,7 +251,7 @@ func (a *App) GetSkillContent(name string) (string, error) {
 // SaveSkillContent creates or updates the SKILL.md in the master store.
 // If the skill dir doesn't exist it is created. Existing sub-dirs are preserved.
 func (a *App) SaveSkillContent(name, content string) error {
-	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.TrimSpace(name) == "" {
+	if skillNameInvalid(name) {
 		return fmt.Errorf("invalid skill name")
 	}
 	master, err := a.masterSkillsDir()
@@ -208,7 +268,7 @@ func (a *App) SaveSkillContent(name, content string) error {
 // DeleteSkill removes a skill from the master store.
 // It does NOT touch ~/.claude/skills or ~/.codex/skills.
 func (a *App) DeleteSkill(name string) error {
-	if strings.Contains(name, "..") || strings.Contains(name, "/") {
+	if skillNameInvalid(name) {
 		return fmt.Errorf("invalid skill name")
 	}
 	master, err := a.masterSkillsDir()
@@ -218,10 +278,36 @@ func (a *App) DeleteSkill(name string) error {
 	return os.RemoveAll(filepath.Join(master, name))
 }
 
+// DeleteSkillEverywhere removes a skill from the master store and both sync targets.
+func (a *App) DeleteSkillEverywhere(name string) error {
+	if skillNameInvalid(name) {
+		return fmt.Errorf("invalid skill name")
+	}
+	master, err := a.masterSkillsDir()
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(filepath.Join(master, name)); err != nil {
+		return err
+	}
+	claudeDir, err := claudeSkillsDir()
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(filepath.Join(claudeDir, name)); err != nil {
+		return err
+	}
+	codexDir, err := codexSkillsDir()
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(filepath.Join(codexDir, name))
+}
+
 // SetSkillSync syncs (or removes) one skill to/from the specified target ("claude" | "codex").
 // enabled=true copies master/name → target/name; enabled=false removes target/name.
 func (a *App) SetSkillSync(name, target string, enabled bool) error {
-	if strings.Contains(name, "..") || strings.Contains(name, "/") {
+	if skillNameInvalid(name) {
 		return fmt.Errorf("invalid skill name")
 	}
 	master, err := a.masterSkillsDir()
@@ -255,8 +341,9 @@ func (a *App) SetSkillSync(name, target string, enabled bool) error {
 	return copyDirAll(src, dst)
 }
 
-// ImportSkillsFrom copies all skill dirs from source ("claude" | "codex") into
-// the master store. Skills already present in master are skipped (not overwritten).
+// ImportSkillsFrom copies new skill dirs from source ("claude" | "codex") into
+// the master store. Same-name skills are fingerprinted; matching content is
+// skipped, while differing content is returned as a conflict for user choice.
 func (a *App) ImportSkillsFrom(source string) (SkillImportResult, error) {
 	var srcBase string
 	var err error
@@ -289,7 +376,29 @@ func (a *App) ImportSkillsFrom(source string) (SkillImportResult, error) {
 		}
 		dst := filepath.Join(master, e.Name())
 		if dirExists(dst) {
-			result.Skipped = append(result.Skipped, e.Name())
+			src := filepath.Join(srcBase, e.Name())
+			srcHash, srcMod, err := skillDirFingerprint(src)
+			if err != nil {
+				result.Skipped = append(result.Skipped, e.Name()+" (error: "+err.Error()+")")
+				continue
+			}
+			dstHash, dstMod, err := skillDirFingerprint(dst)
+			if err != nil {
+				result.Skipped = append(result.Skipped, e.Name()+" (error: "+err.Error()+")")
+				continue
+			}
+			if srcHash == dstHash {
+				result.Skipped = append(result.Skipped, e.Name())
+				continue
+			}
+			result.Conflicts = append(result.Conflicts, SkillImportConflict{
+				Name:          e.Name(),
+				Source:        source,
+				MasterModTime: dstMod,
+				SourceModTime: srcMod,
+				MasterPath:    dst,
+				SourcePath:    src,
+			})
 			continue
 		}
 		if err := copyDirAll(filepath.Join(srcBase, e.Name()), dst); err != nil {
@@ -299,6 +408,42 @@ func (a *App) ImportSkillsFrom(source string) (SkillImportResult, error) {
 		result.Imported = append(result.Imported, e.Name())
 	}
 	return result, nil
+}
+
+// ResolveSkillImportConflict applies or dismisses one conflict returned by ImportSkillsFrom.
+func (a *App) ResolveSkillImportConflict(name, source string, useSource bool) error {
+	if skillNameInvalid(name) {
+		return fmt.Errorf("invalid skill name")
+	}
+	var srcBase string
+	var err error
+	switch source {
+	case skillTargetClaude:
+		srcBase, err = claudeSkillsDir()
+	case skillTargetCodex:
+		srcBase, err = codexSkillsDir()
+	default:
+		return fmt.Errorf("unknown source: %s", source)
+	}
+	if err != nil {
+		return err
+	}
+	if !useSource {
+		return nil
+	}
+	master, err := a.masterSkillsDir()
+	if err != nil {
+		return err
+	}
+	src := filepath.Join(srcBase, name)
+	if _, err := os.Stat(src); err != nil {
+		return fmt.Errorf("skill not found in %s: %s", source, name)
+	}
+	dst := filepath.Join(master, name)
+	if err := os.RemoveAll(dst); err != nil {
+		return err
+	}
+	return copyDirAll(src, dst)
 }
 
 // CreateSkillTemplate returns a starter SKILL.md template for a new skill.

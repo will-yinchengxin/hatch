@@ -16,9 +16,9 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `SaveExports / CheckZshrc / ParseZshrc / SaveZshrcAnnotation` | Shell config |
 | `SuggestZshrcOrganization / ApplyZshrcOrganization` | AI zshrc preview + backup/write |
 | `GetAutoLaunchEnabled / SetAutoLaunchEnabled` | Login autostart |
-| `GetClaudeCodeStatus / GetCodexUsageStatus` | Status cards |
-| `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / GetSkillsStats` | Skill CRUD |
-| `SetSkillSync / ImportSkillsFrom / CreateSkillTemplate` | Skill sync + import |
+| AI tool status methods | Status cards |
+| `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / DeleteSkillEverywhere / GetSkillsStats` | Skill CRUD |
+| `SetSkillSync / ImportSkillsFrom / ResolveSkillImportConflict / CreateSkillTemplate` | Skill sync + import conflict handling |
 | `SuggestSkillContent / SuggestSkillFromDescription` | Skill AI optimize/generation |
 | `GetAppDataPaths / SaveAppDataPaths` | Trace + skills dir config |
 | `GetAITraces / ClearAITraces / GetAITraceStorageInfo` | AI trace inspect |
@@ -31,9 +31,9 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `ExportBackup / ImportBackup` | Config/store/skills zip backup |
 | `RunWithPreScripts` | Explicit chain runner |
 | `GetAppDataInventory / CleanupDataDir / GetRetentionPolicy / SaveRetentionPolicy` | Data dashboard |
-| `GetClaudeSettings / SaveClaudeSettings / GetClaudeCodeConfig / SetClaudeCodeConfig` | Claude config editors |
+| AI tool settings and model config editors | Tool config editors |
 | `GetCodexConfig / SaveCodexConfig / GetCodexModelConfig / SetCodexModelConfig` | Codex config editors, including model, reasoning effort, and `[features].goals` |
-| `GetClaudeCodePresets / SaveClaudeCodePreset / DeleteClaudeCodePreset` | Claude preset management |
+| AI tool preset methods | Preset management |
 | `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | Codex preset management |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
 | `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |

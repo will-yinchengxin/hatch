@@ -6,7 +6,6 @@ Target: Apple Silicon macOS. Distribution is outside the App Store and does not 
 
 ## Source Of Truth
 
-- `CLAUDE.md` is the upstream Claude Code project reference. Keep it in sync when project behavior changes.
 - `AGENTS.md` is the Codex entry point. Keep it concise and route detailed workflows to `.codex/reference/**` and `.codex/skills/**`.
 - `.codex/reference/data-model.md` records current config, script metadata, retention, and VPN data types.
 - `.codex/reference/bound-methods.md` records Wails-bound Go methods and emitted events.
@@ -56,13 +55,13 @@ hatch/
 ├── app_executor.go         # RunScript, ServiceAction, run history, per-script env/notify
 ├── app_zshrc.go            # zshrc parse, annotations, AI organization, apply backup/write
 ├── app_ai.go               # OpenAI-compatible providers, Suggest*, callAIOp, trace emit
-├── app_observability.go    # Claude/Codex status, AI trace persistence, macOS notify
+├── app_observability.go    # AI tool status, AI trace persistence, macOS notify
 ├── app_files.go            # Script files, data paths, autostart, doc links, config editors
 ├── app_v12.go              # Scheduler, health checks, prompt templates, stream protocol
 ├── app_v13.go              # PATH health, backup/restore, pre-script chain
 ├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI
 ├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
-├── skills.go               # SKILL.md master store and Claude/Codex sync
+├── skills.go               # SKILL.md master store and sync
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```
@@ -82,7 +81,6 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | zshrc managed block | `~/.zshrc` Hatch block only |
 | zshrc backups | `~/.zshrc.hatch-backup-<YYYYMMDD-HHMMSS>` |
 | App autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
-| Claude usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
 | Backup export | `~/Desktop/hatch-backup-<ts>.zip` by default |
 | VPN config | Clash Verge Rev app dir, auto-detected unless configured |
@@ -115,8 +113,8 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 
 When code changes affect stable behavior, update the smallest relevant docs:
 
-- Bound methods or event payloads: `.codex/reference/bound-methods.md` and `CLAUDE.md`.
-- Config structs or script metadata: `.codex/reference/data-model.md` and `CLAUDE.md`.
+- Bound methods or event payloads: `.codex/reference/bound-methods.md`.
+- Config structs or script metadata: `.codex/reference/data-model.md`.
 - Frontend state, layout, or CSS classes: `.codex/reference/frontend.md` and `.codex/skills/hatch-frontend/SKILL.md`.
 - Scanner, executor, scheduler, AI, data retention, backup, or VPN internals: `.codex/reference/internals.md`.
 - Non-obvious bugs or integration pitfalls: `.codex/reference/gotchas.md`.

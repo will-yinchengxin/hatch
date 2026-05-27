@@ -881,7 +881,32 @@
                 <template x-if="skillImportResult.skipped && skillImportResult.skipped.length">
                   <span class="badge">已跳过 <span x-text="skillImportResult.skipped.length"></span> 个（已存在）</span>
                 </template>
-                <button class="btn-sm" @click="skillImportResult=null" style="margin-left:8px">×</button>
+                <template x-if="skillImportResult.conflicts && skillImportResult.conflicts.length">
+                  <span class="badge badge-warn">冲突 <span x-text="skillImportResult.conflicts.length"></span> 个</span>
+                </template>
+                <button class="btn-sm skill-import-close" @click="skillImportResult=null">×</button>
+              </div>
+            </template>
+
+            <template x-if="skillImportResult && skillImportResult.conflicts && skillImportResult.conflicts.length">
+              <div class="skill-conflict-list">
+                <template x-for="c in skillImportResult.conflicts" :key="c.source + ':' + c.name">
+                  <div class="skill-conflict-item">
+                    <div class="skill-conflict-info">
+                      <span class="skill-name" x-text="c.name"></span>
+                      <div class="skill-conflict-times">
+                        <span>Hatch：<strong x-text="formatTime(c.masterModTime) || '未知'"></strong></span>
+                        <span><span x-text="skillSourceLabel(c.source)"></span>：<strong x-text="formatTime(c.sourceModTime) || '未知'"></strong></span>
+                      </div>
+                    </div>
+                    <div class="skill-conflict-actions">
+                      <button class="btn-sm" :aria-busy="!!skillConflictBusy[c.source+':'+c.name]" :disabled="!!skillConflictBusy[c.source+':'+c.name]" @click="resolveSkillConflict(c, false)">保留 Hatch</button>
+                      <button class="btn-sm btn-primary" :aria-busy="!!skillConflictBusy[c.source+':'+c.name]" :disabled="!!skillConflictBusy[c.source+':'+c.name]" @click="resolveSkillConflict(c, true)">
+                        使用 <span x-text="skillSourceLabel(c.source)"></span> 版本
+                      </button>
+                    </div>
+                  </div>
+                </template>
               </div>
             </template>
 
@@ -940,7 +965,8 @@
                     <div class="skill-actions">
                       <button class="btn-sm" @click="skillEditTarget===s.name ? closeSkillEditor() : openSkillEditor(s.name)"
                         x-text="skillEditTarget===s.name ? '收起' : '编辑'"></button>
-                      <button class="btn-sm btn-danger" @click="deleteSkill(s.name)">删除</button>
+                      <button class="btn-sm btn-danger" @click="deleteSkill(s.name)">仅删 Hatch</button>
+                      <button class="btn-sm btn-danger" @click="deleteSkillEverywhere(s.name)">全删</button>
                     </div>
                   </div>
                   <div x-show="skillEditTarget === s.name" class="skill-editor-panel">

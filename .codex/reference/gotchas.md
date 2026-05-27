@@ -25,6 +25,9 @@
 - The retention ticker is tied to App context; do not start duplicate tickers elsewhere.
 - Run-history directories group by `filepath.Base(scriptPath)`, so same-name scripts in different dirs share a bucket.
 - Pre-scripts intentionally do not emit standalone events; they appear in the main script log.
-- `saveSkillContent()` auto-resyncs to enabled Claude/Codex targets after master save.
+- `saveSkillContent()` auto-resyncs to enabled skill targets after master save.
+- `DeleteSkill()` is Hatch-local only; it removes the master store copy and must not remove `~/.claude/skills` or `~/.codex/skills`.
+- `DeleteSkillEverywhere()` is the explicit destructive path for removing a skill from Hatch, Claude, and Codex.
+- Skill import uses content fingerprints for same-name skills; differing content returns UI conflicts and must not overwrite Hatch master until the user chooses a side.
 - `switchQuickAIProvider()` must keep provider storage and `aiForm` in sync.
 - New feature markup should avoid inline styles; add named classes in `style.css`.

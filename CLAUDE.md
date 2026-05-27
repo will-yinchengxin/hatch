@@ -1,89 +1,123 @@
 # Hatch — Project Reference
 
-Hatch is a **macOS script management dashboard** built with Wails v2 (Go backend + WKWebView frontend).
-Target: Apple Silicon, no App Store, no Apple Developer account.
+Hatch is a macOS script-management dashboard built with Wails v2: Go backend, WKWebView shell, Alpine.js frontend, Pico CSS base, and Vite bundling.
+
+Target: Apple Silicon macOS. Distribution is outside the App Store and does not require an Apple Developer account.
+
+## Source Of Truth
+
+- `CLAUDE.md` is the Claude Code project reference. Keep it in sync when project behavior changes.
+- `.claude/reference/data-model.md` records current config, script metadata, retention, and VPN data types.
+- `.claude/reference/bound-methods.md` records Wails-bound Go methods and emitted events.
+- `.claude/docs/frontend.md` records Alpine state, UI layout, CSS tokens, and frontend component conventions.
+- `.claude/docs/internals.md` records scanner, executor, scheduler, zshrc, AI, data retention, backup, and pre-script behavior.
+- `.claude/docs/gotchas.md` records non-obvious integration pitfalls.
+- `.claude/skills/hatch-frontend/SKILL.md` must be used before editing `frontend/index.html`, `frontend/src/main.js`, or `frontend/src/style.css`.
+- `.claude/skills/hatch-docs-update/SKILL.md` must be used when project docs need to be synchronized after feature, API, or architecture changes.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Desktop shell | Wails v2 — embeds Go binary + WKWebView |
+| Desktop shell | Wails v2 embedding a Go binary + WKWebView |
 | Backend | Go 1.23+ |
-| Frontend | Alpine.js + Pico.css v2 + Vite |
-| Styling | Custom CSS variables, Anthropic-inspired warm light theme |
+| Frontend | Alpine.js v3 + Pico CSS v2 + Vite |
+| Styling | Custom CSS variables, warm Anthropic-inspired light theme, no Tailwind |
 | Config | JSON at `~/Library/Application Support/Hatch/config.json` |
+| Runtime store | JSON at `~/Library/Application Support/Hatch/scripts.json` |
 
 ## Commands
 
-```
-Build:  $(go env GOPATH)/bin/wails build -platform darwin/arm64
-Dev:    $(go env GOPATH)/bin/wails dev
-Tests:  go test ./...   (or: go test ./internal/... -v after app.go changes)
-Make:   dev / test / build / build-clean / sign / dmg / release / install / open
+```bash
+$(go env GOPATH)/bin/wails dev
+$(go env GOPATH)/bin/wails build -platform darwin/arm64
+go test ./...
+go test ./internal/... -v
+make dev
+make test
+make build
+make build-clean
+make sign
+make dmg
+make release
+make install
+make open
 ```
 
-## Repository Layout
+Use `go test ./...` whenever a Wails-bound method, root package file, or generated binding surface may be affected. `go test ./internal/... -v` is enough for isolated internal package changes.
 
-```
+## Repository Shape
+
+```text
 hatch/
-├── app.go                  # App struct + startup
-├── app_scripts.go          # Directory CRUD + scanning + SaveScriptMeta
-├── app_executor.go         # RunScript / ServiceAction / run history / scriptEnv
-├── app_zshrc.go            # zshrc parse / annotate / AI organize
-├── app_ai.go               # AI providers / Suggest* / callAIOp / trace emit
-├── app_observability.go    # Claude/Codex status / trace persistence / macOS notify
-├── app_files.go            # Script files / AppDataPaths / AutoLaunch / DocLinks / Codex config
-├── app_v12.go              # v1.2: scheduler / health-check / prompt templates / stream
-├── app_v13.go              # v1.3: PATH health / backup-restore / pre-script chain
-├── app_datadir.go          # Data-dir inventory + cleanup + retention + Skill AI
-├── app_vpn.go              # VPN module: Clash Verge Rev config/profile/backup + IP probe
-├── skills.go               # SKILL.md store + claude/codex sync
-├── main.go                 # Wails entry
-├── internal/
-│   ├── config/             # Config + ScriptMeta + Save/Load
-│   ├── scanner/            # ScanDir + @hatch.* annotation parser
-│   ├── executor/           # oneshot.go / service.go / stream.go / cmd.go / history.go
-│   ├── scheduler/          # tiny @every / @daily / @hourly scheduler (no deps)
-│   ├── autostart/          # macOS LaunchAgent
-│   ├── store/              # scripts.json cache
-│   └── zshrc/              # managed block + parser
-└── frontend/
-    ├── index.html          # Alpine.js declarative markup (all UI)
-    └── src/
-        ├── main.js         # Alpine component: state + methods
-        └── style.css       # Full custom CSS (sections per feature)
+├── app.go                  # App startup, service restore, active AI config
+├── app_scripts.go          # Directory CRUD, scanning, script metadata save/reset/order
+├── app_executor.go         # RunScript, ServiceAction, run history, per-script env/notify
+├── app_zshrc.go            # zshrc parse, annotations, AI organization, apply backup/write
+├── app_ai.go               # OpenAI-compatible providers, Suggest*, callAIOp, trace emit
+├── app_observability.go    # AI tool status, AI trace persistence, macOS notify
+├── app_files.go            # Script files, data paths, autostart, doc links, config editors
+├── app_v12.go              # Scheduler, health checks, prompt templates, stream protocol
+├── app_v13.go              # PATH health, backup/restore, pre-script chain
+├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI
+├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
+├── skills.go               # SKILL.md master store and sync
+├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
+└── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```
 
-## Runtime Data Paths
+Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails dev` or `wails build`.
+
+## Runtime Data
 
 | Purpose | Path |
 |---|---|
 | Config | `~/Library/Application Support/Hatch/config.json` |
 | Script cache | `~/Library/Application Support/Hatch/scripts.json` |
-| AI trace logs | `~/Library/Application Support/Hatch/traces/<date>.jsonl` (configurable) |
+| AI traces | `~/Library/Application Support/Hatch/traces/<date>.jsonl` by default |
 | Run history | `~/Library/Application Support/Hatch/runs/<script>/<id>.{log,json}` |
-| Skills master | `~/Library/Application Support/Hatch/skills/` (default; configurable) |
-| PID files | `/tmp/hatch/<name>.pid` |
-| Zshrc managed block | `~/.zshrc` (Hatch block only) |
-| Login autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
+| Master skills | `~/Library/Application Support/Hatch/skills/` by default |
+| PID files | `/tmp/hatch/<script-name>.pid` |
+| zshrc managed block | `~/.zshrc` Hatch block only |
+| zshrc backups | `~/.zshrc.hatch-backup-<YYYYMMDD-HHMMSS>` |
+| App autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
 | Claude usage cache | `~/.cache/will-statusline/last.json` |
-| Codex sessions | `~/.codex/sessions/` |
-| Codex config | `~/.codex/config.toml` (AI Tools can edit model, reasoning effort, and `[features].goals`) |
-| Backup exports | `~/Desktop/hatch-backup-<ts>.zip` (default) |
-| VPN config | `~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/` (configurable) |
-| VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` (configurable) |
+| Backup export | `~/Desktop/hatch-backup-<ts>.zip` by default |
+| VPN config | Clash Verge Rev app dir, auto-detected unless configured |
+| VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` by default |
 
-Retention runs on startup + hourly ticker (`ApplyRetention`): trace days, runs days, runs-per-script cap.
+Retention is applied on startup and hourly: AI trace days, run-history days, and run-history per-script cap.
 
-## Reference
+## Backend Rules
 
-| Topic | File |
-|---|---|
-| Core data model (`ScriptMeta` / `Config` structs) | [.claude/reference/data-model.md](.claude/reference/data-model.md) |
-| All bound Go methods + real-time events | [.claude/reference/bound-methods.md](.claude/reference/bound-methods.md) |
-| Frontend: Alpine state, UI tokens, CSS classes | [.claude/docs/frontend.md](.claude/docs/frontend.md) |
-| Internals: scanner, executor, zshrc, scheduler | [.claude/docs/internals.md](.claude/docs/internals.md) |
-| Known gotchas & Pico CSS notes | [.claude/docs/gotchas.md](.claude/docs/gotchas.md) |
-| VPN module: Clash Verge Rev details | [implementation-notes.md](implementation-notes.md) |
-| Frontend skill (component patterns) | [.claude/skills/hatch-frontend/SKILL.md](.claude/skills/hatch-frontend/SKILL.md) |
-| Upgrade log (v1.1 → v1.3) | [UPGRADE_LOG.md](UPGRADE_LOG.md) |
+- `ScriptMeta.Args == nil` means show the args input. `[]ArgDef{}` means explicitly hide it.
+- `mergeOverride` only applies non-zero override fields; use `DeleteScriptMeta` to fully reset auto-detection.
+- Service detection requires both `start` and `stop` in the first 200 lines.
+- Oneshot scripts run through `/bin/zsh -l -c` and explicitly `source ~/.zshrc` before `exec`, because Finder/Dock launches do not get an interactive shell.
+- Service processes use `Setpgid: true`; stop sends SIGTERM to the service process group.
+- `findCLI()` should be used for user-installed tools that may only exist in login shell PATH.
+- AI suggestions populate UI for user confirmation; they must not silently persist metadata, notes, prompts, skills, or zshrc changes.
+- AI API keys are stored as local plaintext config; never print them in logs or expose them in screenshots.
+
+## Frontend Rules
+
+- Use the `hatch-frontend` skill before frontend edits.
+- `frontend/src/main.js` imports Pico first and `./style.css` second. `frontend/index.html` must not link `/src/style.css`.
+- Preserve the warm off-white, charcoal text, muted clay accent visual direction. Do not switch back to cold blue or dark neon styling unless explicitly requested.
+- New feature markup should not use inline `style="..."`; add named CSS classes in `frontend/src/style.css`.
+- Before using newly added Go methods through generated imports, run Wails regeneration. Until then call `window['go']['main']['App']['MethodName'](...)`.
+- `setupEvents()` must clear prior Wails listeners with `EventsOff` before re-registering to avoid HMR duplicate handlers.
+- In nested Alpine `x-for`, avoid "set reactive key then read it inside a method" flows; use an inline click handler for preset runs.
+- AI Tools model shortcut panels share `agent-*` layout classes; the Goals toggle sits in the shared action row.
+
+## Documentation Discipline
+
+When code changes affect stable behavior, update the smallest relevant docs:
+
+- Bound methods or event payloads: `.claude/reference/bound-methods.md` and `CLAUDE.md`.
+- Config structs or script metadata: `.claude/reference/data-model.md` and `CLAUDE.md`.
+- Frontend state, layout, or CSS classes: `.claude/docs/frontend.md` and `.claude/skills/hatch-frontend/SKILL.md`.
+- Scanner, executor, scheduler, AI, data retention, backup, or VPN internals: `.claude/docs/internals.md`.
+- Non-obvious bugs or integration pitfalls: `.claude/docs/gotchas.md`.
+
+Do not create hooks, custom agents, subagents, or background automation without explicit user approval.

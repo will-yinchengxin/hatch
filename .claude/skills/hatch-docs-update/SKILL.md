@@ -1,74 +1,55 @@
 ---
 name: hatch-docs-update
-version: 1.0.0
-description: "更新 Hatch 项目文档。当需要同步 CLAUDE.md 和 .claude/docs/ 以反映新功能、重构或 API 变更时使用。"
+version: 1.1.0
+description: "更新 Hatch 项目文档。当新功能、重构、配置字段、Wails API、前端状态或已知坑变化时，同步 CLAUDE.md、.claude docs/reference 和 Hatch skills。"
 ---
 
-# Hatch 文档更新
+# Hatch 文档更新工作流
+
+使用条件：需要让项目文档反映新功能、API 变更、数据结构变更、前端状态变化、内部行为变化、构建/测试规则变化或已知坑。
 
 ## 文档结构
 
-```
-CLAUDE.md                          # 主参考文档 (目标 <200 行，保持精简)
-.claude/docs/frontend.md           # 前端架构、UI 设计、Alpine 状态字段
-.claude/docs/internals.md          # 内部包：scanner、executor、zshrc、AI 调用
-.claude/docs/gotchas.md            # 已知坑 + Pico CSS 集成注意事项
-.claude/skills/hatch-frontend/SKILL.md  # 前端组件模式 + CSS class 规范
+```text
+CLAUDE.md                                  # Claude Code 主参考，保持同步
+.claude/reference/data-model.md            # Config / ScriptMeta / VPN 类型
+.claude/reference/bound-methods.md         # Wails methods + events
+.claude/docs/frontend.md                   # Alpine state, layout, CSS conventions
+.claude/docs/internals.md                  # scanner/executor/scheduler/zshrc/AI/data/VPN
+.claude/docs/gotchas.md                    # 非显而易见的坑
+.claude/skills/hatch-frontend/SKILL.md     # 前端修改前必读 workflow
+.claude/skills/hatch-docs-update/SKILL.md  # 本 workflow
 ```
 
-## 更新流程
+## 分析变更
 
-### 1. 分析变更
+优先查看：
 
 ```bash
-git diff main..HEAD -- app.go internal/ frontend/src/main.js frontend/index.html
-git log main..HEAD --oneline
+git diff -- app*.go skills.go internal/ frontend/src/main.js frontend/index.html frontend/src/style.css
+rg "func \\(a \\*App\\)" -n *.go
 ```
 
-重点关注：
-- `app.go` 新增/删除/修改的 bound 方法 → 更新 CLAUDE.md 的 Methods 表
-- `internal/config/config.go` 数据结构变更 → 更新 CLAUDE.md 的 Core Data Model
-- `frontend/src/main.js` 新状态字段 → 更新 `.claude/docs/frontend.md` 的 State Fields 表
-- UI 布局变更 → 更新 `.claude/docs/frontend.md`
+重点：
 
-### 2. 更新原则
+- 新增/删除/修改 Wails-bound methods -> 更新 `.claude/reference/bound-methods.md` 和 `CLAUDE.md`。
+- `internal/config/config.go` 数据结构变更 -> 更新 `.claude/reference/data-model.md` 和 `CLAUDE.md`。
+- `frontend/src/main.js` 新状态字段 -> 更新 `.claude/docs/frontend.md` 和 `.claude/skills/hatch-frontend/SKILL.md`。
+- 新 UI 布局、CSS class、交互模式 -> 更新 `.claude/docs/frontend.md` 和 `.claude/skills/hatch-frontend/SKILL.md`。
+- scanner/executor/scheduler/zshrc/AI/data/VPN 行为变化 -> 更新 `.claude/docs/internals.md`。
+- 非显而易见的问题 -> 更新 `.claude/docs/gotchas.md`。
 
-**CLAUDE.md** (精简主文档):
-- 保持 < 200 行
-- Methods 表：每行一个方法，只写用途，不写实现
-- 数据模型：只写 Go struct，不写行为说明（行为在 internals.md）
-- 新模块添加到 Tab Navigation 或相应 section
+## 更新原则
 
-**`.claude/docs/` 详细文档**:
-- `frontend.md` — 状态字段、UI 设计 token、布局、组件
-- `internals.md` — 执行模型、文件操作、AI 调用细节
-- `gotchas.md` — 非显而易见的坑（只写代码读不出来的东西）
+- `CLAUDE.md` 只放高频规则、source of truth、命令、边界和文档路由。
+- 细节进入 `.claude/docs/**` 和 `.claude/reference/**`，不要把入口文档重新变成完整手册。
+- Skill 只保留可执行工作流和任务前检查，不承载所有参考内容。
+- 不创建 hooks、agents、subagents 或后台自动化，除非用户明确同意。
 
-**`hatch-frontend` skill**:
-- 新 CSS 类添加到 Components 或 Layout 章节
-- 新 Alpine 状态字段加入 State Machine 章节
+## 检查标准
 
-### 3. 检查标准
-
-更新完成后验证：
-- [ ] CLAUDE.md 方法表与 `app.go` 所有 `func (a *App)` 方法一致
-- [ ] 新的 `not yet in wailsjs` 方法已列出
-- [ ] Config struct 字段与 `internal/config/config.go` 一致
-- [ ] 行数检查：`wc -l CLAUDE.md`（目标 < 200）
-
-```bash
-grep "^func (a \*App)" app.go | sed 's/func (a \*App) //' | sed 's/(.*$//'
-wc -l CLAUDE.md
-```
-
-## 常见变更场景
-
-| 变更类型 | 需更新的文件 |
-|---------|------------|
-| 新 Go bound 方法 | CLAUDE.md Methods 表 |
-| Config struct 新字段 | CLAUDE.md Core Data Model |
-| 新 Alpine 状态字段 | `.claude/docs/frontend.md` State Fields |
-| 新 CSS 类/组件 | `.claude/docs/frontend.md` + `hatch-frontend` skill |
-| 新 UI 交互模式 | `.claude/docs/frontend.md` 对应 section |
-| 非显而易见的 bug/坑 | `.claude/docs/gotchas.md` |
-| 新内部包行为 | `.claude/docs/internals.md` |
+- `rg "func \\(a \\*App\\)" -n *.go` 的方法表与 bound-methods 文档没有明显遗漏。
+- Config / ScriptMeta 字段与 data-model 文档没有明显漂移。
+- 前端状态字段、sub-tab、主要页面结构与 frontend 文档没有明显漂移。
+- `CLAUDE.md` 不包含过长实现细节，能路由到对应 reference 或 skill。
+- 读回改动文件，确认 markdown frontmatter 和表格完整。

@@ -26,8 +26,9 @@ editTarget != null      -> edit drawer overlay
 | `editTarget / editForm / editSaving` | Edit drawer state |
 | `aiForm / aiProviders / activeProviderID / quickAIOpen / quickAITraceID` | Provider config and header quick-AI popover |
 | `aiSubTab / traceLog / traceLogDate / promptTemplates / promptDefaults` | AI page subviews |
-| `claudeCodeConfig / codexModelConfig` | AI Tools model/effort shortcuts; Codex also includes `goalsEnabled` |
+| AI tool model config state | Model/effort shortcuts; the CLI config state also tracks `goalsEnabled` |
 | `skills / skillsStats / skillSearch / skillFilter / filteredSkills` | Skill list and filter UI |
+| `skillImportResult / skillConflictBusy` | Skill import results and per-conflict action state |
 | `skillAIInstruction / skillAIBusy` | Skill AI optimize bar |
 | `dataPaths / dataPathsForm / dataInventory / retention` | Data paths, inventory, retention |
 | `zshrcEntries / zshrcFilter` | Parsed zshrc |
@@ -74,7 +75,7 @@ Core tokens:
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI: overview, connect/providers/traces, skills, tools/status, prompts, data/retention. Claude Code and Codex model shortcuts share the `agent-*` config layout classes; Codex adds the Goals toggle in the shared action row.
+- AI: overview, connect/providers/traces, skills, tools/status, prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. Model shortcut panels share the `agent-*` config layout classes; the Goals toggle sits in the shared action row.
 - VPN: overview/status hero, config editor, profiles editor, backup/restore, enhance rules/hosts/DNS view.
 
 ## CSS And Alpine Pitfalls

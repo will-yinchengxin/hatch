@@ -2633,6 +2633,55 @@ code {
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
+.skill-import-close {
+  margin-left: 4px;
+}
+
+.skill-conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.skill-conflict-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid rgba(167,119,46,0.28);
+  border-radius: var(--radius);
+  background: rgba(251,191,36,0.08);
+}
+
+.skill-conflict-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.skill-conflict-times {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.skill-conflict-times strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.skill-conflict-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
 
 .skill-new-row {
   display: flex;
