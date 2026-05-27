@@ -17,8 +17,8 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `SuggestZshrcOrganization / ApplyZshrcOrganization` | AI zshrc preview + backup/write |
 | `GetAutoLaunchEnabled / SetAutoLaunchEnabled` | Login autostart |
 | `GetClaudeCodeStatus / GetCodexUsageStatus` | Status cards |
-| `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / GetSkillsStats` | Skill CRUD |
-| `SetSkillSync / ImportSkillsFrom / CreateSkillTemplate` | Skill sync + import |
+| `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / DeleteSkillEverywhere / GetSkillsStats` | Skill CRUD |
+| `SetSkillSync / ImportSkillsFrom / ResolveSkillImportConflict / CreateSkillTemplate` | Skill sync + import conflict handling |
 | `SuggestSkillContent / SuggestSkillFromDescription` | Skill AI optimize/generation |
 | `GetAppDataPaths / SaveAppDataPaths` | Trace + skills dir config |
 | `GetAITraces / ClearAITraces / GetAITraceStorageInfo` | AI trace inspect |
@@ -32,9 +32,9 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `RunWithPreScripts` | Explicit chain runner |
 | `GetAppDataInventory / CleanupDataDir / GetRetentionPolicy / SaveRetentionPolicy` | Data dashboard |
 | `GetClaudeSettings / SaveClaudeSettings / GetClaudeCodeConfig / SetClaudeCodeConfig` | Claude config editors |
-| `GetCodexConfig / SaveCodexConfig / GetCodexModelConfig / SetCodexModelConfig` | CLI config editors, including model, reasoning effort, and `[features].goals` |
+| `GetCodexConfig / SaveCodexConfig / GetCodexModelConfig / SetCodexModelConfig` | Codex config editors, including model, reasoning effort, and `[features].goals` |
 | `GetClaudeCodePresets / SaveClaudeCodePreset / DeleteClaudeCodePreset` | Claude preset management |
-| `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | CLI preset management |
+| `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | Codex preset management |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
 | `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |
 | `GetVPNEnhanceData` | Parse merge/rules profiles into prepend rules, hosts, DNS fake-IP filters |

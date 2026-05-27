@@ -82,6 +82,7 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | zshrc backups | `~/.zshrc.hatch-backup-<YYYYMMDD-HHMMSS>` |
 | App autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
 | Claude usage cache | `~/.cache/will-statusline/last.json` |
+| Codex sessions | `~/.codex/sessions/` |
 | Backup export | `~/Desktop/hatch-backup-<ts>.zip` by default |
 | VPN config | Clash Verge Rev app dir, auto-detected unless configured |
 | VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` by default |
@@ -108,7 +109,6 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 - Before using newly added Go methods through generated imports, run Wails regeneration. Until then call `window['go']['main']['App']['MethodName'](...)`.
 - `setupEvents()` must clear prior Wails listeners with `EventsOff` before re-registering to avoid HMR duplicate handlers.
 - In nested Alpine `x-for`, avoid "set reactive key then read it inside a method" flows; use an inline click handler for preset runs.
-- AI Tools model shortcut panels share `agent-*` layout classes; the Goals toggle sits in the shared action row.
 
 ## Documentation Discipline
 

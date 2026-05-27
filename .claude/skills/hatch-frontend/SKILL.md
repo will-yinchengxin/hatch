@@ -45,8 +45,8 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 
 - 脚本运行：`statuses`、`runningSet`、`scriptLogs`、`scriptExitCodes`、`logTarget`。
 - 编辑抽屉：`editTarget`、`editForm`、`editSaving`，所有 per-script 行为都从这里配置。
-- AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、`claudeCodeConfig`、`codexModelConfig`。
-- Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`。
+- AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、AI tool model config state。
+- Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`、`skillImportResult`、`skillConflictBusy`。
 - Data：`dataPaths`、`dataInventory`、`retention`。
 - VPN：`vpnStatus`、`vpnCurrentIP`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnSettingsForm`。
 - Workspace：`wsShellOpen`、`wsDirsOpen`、`wsEnvOpen`、`wsZshrcOpen`。
