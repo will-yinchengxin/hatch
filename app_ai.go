@@ -353,3 +353,108 @@ func extractJSONObject(s string) string {
 	}
 	return s
 }
+
+// ─── AI streaming ────────────────────────────────────────────────────────────
+
+// SuggestScriptContentStream streams script content suggestions back via events.
+// Emits "ai:stream" events with {id, chunk, done} payload.
+// The current implementation calls the non-streaming endpoint and emits the
+// result as one chunk — a placeholder that keeps the streaming API stable
+// while leaving room to swap in true SSE later.
+func (a *App) SuggestScriptContentStream(id, path, currentContent, instruction string) {
+	go func() {
+		text, err := a.SuggestScriptContent(path, currentContent, instruction)
+		if err != nil {
+			a.emitStream(id, "", true, err.Error())
+			return
+		}
+		a.emitStream(id, text, true, "")
+	}()
+}
+
+// emitStream sends one chunk to the frontend.
+func (a *App) emitStream(id, chunk string, done bool, errMsg string) {
+	if a.ctx == nil {
+		return
+	}
+	payload := map[string]any{
+		"id":    id,
+		"chunk": chunk,
+		"done":  done,
+		"error": errMsg,
+	}
+	wailsEmitStream(a.ctx, payload)
+}
+
+// ─── Prompt templates ────────────────────────────────────────────────────────
+
+// GetPromptTemplates returns the current prompt templates map.
+func (a *App) GetPromptTemplates() map[string]string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	out := make(map[string]string, len(a.cfg.PromptTemplates))
+	for k, v := range a.cfg.PromptTemplates {
+		out[k] = v
+	}
+	return out
+}
+
+// GetDefaultPrompts returns the built-in system prompts for every op so the UI
+// can show the user exactly what's being overridden.
+func (a *App) GetDefaultPrompts() map[string]string {
+	return map[string]string{
+		"TestAIConfig": "你是 Hatch 的配置检测助手。请只回复 pong。",
+
+		"SuggestScriptMeta": `你是 macOS 脚本管理工具 Hatch 的脚本分析助手。请根据脚本内容生成适合直接展示给用户的元信息。
+只输出一个 JSON 对象，不要 Markdown，不要解释。字段：
+name: 简短中文显示名；
+desc: 一句话说明脚本做什么；
+type: "oneshot" 或 "service"；
+commands: service 子命令数组，没有则 []；
+pidFile: service 的 pid 文件建议，没有则 ""；
+needsArgs: oneshot 运行时是否需要参数输入；
+tags: 1-5 个短标签；
+presets: 常用命令预设数组，元素为 {"name":"", "args":""}，没有可靠建议则 []。`,
+
+		"SuggestScriptContent": "你是 macOS shell 脚本编写助手。根据用户指令直接输出完整的脚本内容。\n" +
+			"要求：\n" +
+			"1. 只输出脚本文本，不要任何解释，不要 Markdown 代码块（不要用三个反引号包裹输出）。\n" +
+			"2. 脚本必须以合适的 shebang 开头（如 #!/bin/zsh 或 #!/usr/bin/env python3）。\n" +
+			"3. 保留已有内容中有价值的逻辑，除非指令要求完全重写。",
+
+		"SuggestZshrcAnnotation": `你是 shell 配置解释助手。请为一条 zshrc 配置生成简短中文备注，说明它的作用、影响或风险。
+只输出备注正文，不要 Markdown，不要加引号，控制在 60 个中文字符以内。`,
+
+		"SuggestZshrcOrganization": `你是谨慎的 zsh 配置整理助手。请重排 ~/.zshrc，使其结构清晰，同时保持语义等价。
+只输出 JSON 对象，不要 Markdown，不要解释。字段：
+summary: 字符串数组，列出主要整理动作；
+content: 完整的新 ~/.zshrc 文件内容。
+硬性要求：
+1. 不要删除、改写或伪造任何命令、路径、token、key、alias、函数体、source、eval、conda/nvm/pyenv/go/ruby/node 初始化语句。
+2. 可以移动相关配置到同一分组，添加简短中文分组注释。
+3. Hatch managed block 必须原样保留为一个连续块，不要拆开、不要改 block 内内容。
+4. 函数体内部内容和行序必须保持原样。
+5. 如果不确定某行用途，放到"其他/未分类"分组，保留原文。
+6. 输出 content 必须是可直接写回的完整文件。`,
+	}
+}
+
+// SavePromptTemplates replaces the prompt templates map.
+func (a *App) SavePromptTemplates(tpl map[string]string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.PromptTemplates = tpl
+	return a.cfg.Save()
+}
+
+// effectivePrompt returns the user override (if any) for an op, else the built-in default.
+func (a *App) effectivePrompt(op, defaultPrompt string) string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.cfg.PromptTemplates != nil {
+		if v, ok := a.cfg.PromptTemplates[op]; ok && strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return defaultPrompt
+}

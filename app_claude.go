@@ -5,119 +5,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"hatch/internal/autostart"
 	"hatch/internal/config"
 	"hatch/internal/zshrc"
 )
 
-// AppDataPaths holds all configurable directory paths.
-type AppDataPaths struct {
-	TraceLogDir      string `json:"traceLogDir"`
-	TraceLogDirIsSet bool   `json:"traceLogDirIsSet"`
-	SkillsDir        string `json:"skillsDir"`
-	SkillsDirIsSet   bool   `json:"skillsDirIsSet"`
-	DefaultTraceDir  string `json:"defaultTraceDir"`
-	DefaultSkillsDir string `json:"defaultSkillsDir"`
-}
+// ─── Claude Code settings ────────────────────────────────────────────────────
 
-// GetAppDataPaths returns current path configuration with effective values.
-func (a *App) GetAppDataPaths() AppDataPaths {
-	a.mu.RLock()
-	traceCfg := a.cfg.TraceLogDir
-	skillsCfg := a.cfg.SkillsDir
-	a.mu.RUnlock()
-
-	defTrace := defaultTraceDir()
-	defSkills := defaultSkillsDir()
-
-	return AppDataPaths{
-		TraceLogDir:      orDefault(traceCfg, defTrace),
-		TraceLogDirIsSet: traceCfg != "",
-		SkillsDir:        orDefault(skillsCfg, defSkills),
-		SkillsDirIsSet:   skillsCfg != "",
-		DefaultTraceDir:  defTrace,
-		DefaultSkillsDir: defSkills,
-	}
-}
-
-func orDefault(v, fallback string) string {
-	if v != "" {
-		return v
-	}
-	return fallback
-}
-
-// SaveAppDataPaths saves custom directory overrides (empty string = reset to default).
-func (a *App) SaveAppDataPaths(traceLogDir, skillsDir string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.cfg.TraceLogDir = strings.TrimSpace(traceLogDir)
-	a.cfg.SkillsDir = strings.TrimSpace(skillsDir)
-	return a.cfg.Save()
-}
-
-func (a *App) GetAutoLaunchEnabled() bool {
-	return autostart.Enabled()
-}
-
-func (a *App) SetAutoLaunchEnabled(enabled bool) error {
-	if err := autostart.SetEnabled(enabled); err != nil {
-		return err
-	}
-	a.mu.Lock()
-	a.cfg.AutoLaunch = enabled
-	err := a.cfg.Save()
-	a.mu.Unlock()
-	return err
-}
-
-// ─── Script file I/O ─────────────────────────────────────────────────────────
-
-// ReadScriptFile returns the raw text content of a script file.
-func (a *App) ReadScriptFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-// WriteScriptFile writes new content to an existing script file.
-func (a *App) WriteScriptFile(path, content string) error {
-	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
-		return err
-	}
-	a.autoSource()
-	return nil
-}
-
-// CreateScriptFile creates a new script file inside dirPath.
-func (a *App) CreateScriptFile(dirPath, filename, content string) (string, error) {
-	fullPath := filepath.Join(dirPath, filename)
-	if _, err := os.Stat(fullPath); err == nil {
-		return "", fmt.Errorf("文件已存在: %s", fullPath)
-	}
-	if err := os.WriteFile(fullPath, []byte(content), 0755); err != nil {
-		return "", err
-	}
-	a.autoSource()
-	return fullPath, nil
-}
-
-// autoSource runs `source ~/.zshrc` in a background login shell.
-func (a *App) autoSource() {
-	go func() {
-		_ = exec.Command("/bin/zsh", "-l", "-c", "source ~/.zshrc 2>/dev/null || true").Run()
-	}()
-}
-
-// ─── Config file management ───────────────────────────────────────────────────
-
+// GetClaudeSettings returns the raw JSON content of ~/.claude/settings.json.
 func (a *App) GetClaudeSettings() string {
 	home, _ := os.UserHomeDir()
 	data, err := os.ReadFile(home + "/.claude/settings.json")
@@ -127,6 +25,7 @@ func (a *App) GetClaudeSettings() string {
 	return string(data)
 }
 
+// SaveClaudeSettings validates and writes ~/.claude/settings.json.
 func (a *App) SaveClaudeSettings(content string) error {
 	if !json.Valid([]byte(content)) {
 		return fmt.Errorf("invalid JSON")
@@ -138,8 +37,6 @@ func (a *App) SaveClaudeSettings(content string) error {
 	}
 	return os.WriteFile(path, []byte(content), 0644)
 }
-
-// ── Claude Code model + effort config ─────────────────────────────────────────
 
 // ClaudeCodeConfig holds the two user-facing knobs written to ~/.claude/settings.json,
 // plus EffectiveModel which reflects what Claude Code is actually running (via `claude model`).
@@ -218,8 +115,9 @@ func (a *App) SetClaudeCodeConfig(model, effortLevel string) error {
 	return os.WriteFile(path, out, 0644)
 }
 
-// ── Claude Code presets ────────────────────────────────────────────────────────
+// ─── Claude Code presets ──────────────────────────────────────────────────────
 
+// GetClaudeCodePresets returns the Claude Code preset list, seeding defaults on first use.
 func (a *App) GetClaudeCodePresets() []config.ClaudeCodePreset {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -275,69 +173,14 @@ func defaultClaudeCodePresets() []config.ClaudeCodePreset {
 	}
 }
 
-func (a *App) GetCodexConfig() string {
-	home, _ := os.UserHomeDir()
-	data, err := os.ReadFile(home + "/.codex/config.toml")
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
+// ─── Shared TOML helpers (used by app_claude.go and app_codex.go) ─────────────
 
-func (a *App) SaveCodexConfig(content string) error {
-	home, _ := os.UserHomeDir()
-	path := home + "/.codex/config.toml"
-	if err := backupIfExists(path); err != nil {
-		return err
+func backupIfExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
 	}
-	return os.WriteFile(path, []byte(content), 0644)
-}
-
-// ── Codex model + reasoning effort config ───────────────────────────────────
-
-// CodexModelConfig holds the user-facing knobs written to ~/.codex/config.toml.
-type CodexModelConfig struct {
-	Model        string `json:"model"`
-	EffortLevel  string `json:"effortLevel"`
-	GoalsEnabled bool   `json:"goalsEnabled"`
-}
-
-// GetCodexModelConfig reads Codex model, reasoning effort, and features.goals.
-func (a *App) GetCodexModelConfig() CodexModelConfig {
-	home, _ := os.UserHomeDir()
-	data, err := os.ReadFile(home + "/.codex/config.toml")
-	if err != nil {
-		return CodexModelConfig{}
-	}
-	content := string(data)
-	return CodexModelConfig{
-		Model:        readTOMLStringKey(content, "model"),
-		EffortLevel:  readTOMLStringKey(content, "model_reasoning_effort"),
-		GoalsEnabled: readTOMLSectionBoolKey(content, "features", "goals"),
-	}
-}
-
-// SetCodexModelConfig merges model, reasoning effort, and features.goals into
-// ~/.codex/config.toml without touching unrelated settings.
-func (a *App) SetCodexModelConfig(model, effortLevel string, goalsEnabled bool) error {
-	home, _ := os.UserHomeDir()
-	path := home + "/.codex/config.toml"
-
-	content := ""
-	if data, err := os.ReadFile(path); err == nil {
-		content = string(data)
-	}
-	content = setTOMLStringKey(content, "model_reasoning_effort", effortLevel)
-	content = setTOMLStringKey(content, "model", model)
-	content = setTOMLSectionBoolKey(content, "features", "goals", goalsEnabled)
-
-	if err := backupIfExists(path); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(content), 0o644)
+	_, err := zshrc.Backup(path)
+	return err
 }
 
 func readTOMLStringKey(content, key string) string {
@@ -510,91 +353,4 @@ func ensureTrailingNewline(content string) string {
 		return content
 	}
 	return content + "\n"
-}
-
-// ── Codex presets ───────────────────────────────────────────────────────────
-
-func (a *App) GetCodexPresets() []config.CodexPreset {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if !a.cfg.CodexPresetsSeeded && len(a.cfg.CodexPresets) == 0 {
-		a.cfg.CodexPresets = defaultCodexPresets()
-		a.cfg.CodexPresetsSeeded = true
-		_ = a.cfg.Save()
-	}
-	out := make([]config.CodexPreset, len(a.cfg.CodexPresets))
-	copy(out, a.cfg.CodexPresets)
-	return out
-}
-
-// SaveCodexPreset creates or updates a preset (matched by ID).
-func (a *App) SaveCodexPreset(preset config.CodexPreset) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.cfg.CodexPresetsSeeded = true
-	if preset.ID == "" {
-		preset.ID = strconv.FormatInt(time.Now().UnixNano(), 36)
-	}
-	for i, p := range a.cfg.CodexPresets {
-		if p.ID == preset.ID {
-			a.cfg.CodexPresets[i] = preset
-			return a.cfg.Save()
-		}
-	}
-	a.cfg.CodexPresets = append(a.cfg.CodexPresets, preset)
-	return a.cfg.Save()
-}
-
-// DeleteCodexPreset removes a preset by ID.
-func (a *App) DeleteCodexPreset(id string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.cfg.CodexPresetsSeeded = true
-	keep := a.cfg.CodexPresets[:0]
-	for _, p := range a.cfg.CodexPresets {
-		if p.ID != id {
-			keep = append(keep, p)
-		}
-	}
-	a.cfg.CodexPresets = keep
-	return a.cfg.Save()
-}
-
-func defaultCodexPresets() []config.CodexPreset {
-	return []config.CodexPreset{
-		{ID: "default-fast", Name: "快速日常", Model: "gpt-5.4-mini", EffortLevel: "low"},
-		{ID: "default-balanced", Name: "均衡编码", Model: "gpt-5.5", EffortLevel: "medium"},
-		{ID: "default-deep", Name: "复杂任务", Model: "gpt-5.5", EffortLevel: "high"},
-		{ID: "default-frontier", Name: "最强推理", Model: "gpt-5.5", EffortLevel: "xhigh"},
-	}
-}
-
-func backupIfExists(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil
-	}
-	_, err := zshrc.Backup(path)
-	return err
-}
-
-// ── Doc links ──────────────────────────────────────────────────────────────
-
-func (a *App) GetDocLinks() []config.DocLink {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	out := make([]config.DocLink, len(a.cfg.DocLinks))
-	copy(out, a.cfg.DocLinks)
-	return out
-}
-
-func (a *App) SaveDocLinks(links []config.DocLink) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.cfg.DocLinks = links
-	return a.cfg.Save()
-}
-
-// OpenFile opens a file with the system default application (macOS `open`).
-func (a *App) OpenFile(path string) error {
-	return exec.Command("open", path).Start()
 }

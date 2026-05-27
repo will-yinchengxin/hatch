@@ -52,16 +52,19 @@ Use `go test ./...` whenever a Wails-bound method, root package file, or generat
 hatch/
 ├── app.go                  # App startup, service restore, active AI config
 ├── app_scripts.go          # Directory CRUD, scanning, script metadata save/reset/order
-├── app_executor.go         # RunScript, ServiceAction, run history, per-script env/notify
-├── app_zshrc.go            # zshrc parse, annotations, AI organization, apply backup/write
-├── app_ai.go               # OpenAI-compatible providers, Suggest*, callAIOp, trace emit
+├── app_executor.go         # RunScript, ServiceAction, RunWithPreScripts, run history, env/notify
+├── app_scheduler.go        # Cron scheduling: ApplyAllSchedules, ListSchedules, RemoveSchedule
+├── app_diagnostics.go      # CheckScriptHealth, CheckCommandAvailable, CheckPathHealth
+├── app_backup.go           # ExportBackup, ImportBackup
+├── app_zshrc.go            # zshrc parse, annotations, AI organization, ListAliasInventory
+├── app_ai.go               # OpenAI-compatible providers, Suggest*, callAIOp, streaming, prompts
 ├── app_observability.go    # AI tool status, AI trace persistence, macOS notify
-├── app_files.go            # Script files, data paths, autostart, doc links, config editors
-├── app_v12.go              # Scheduler, health checks, prompt templates, stream protocol
-├── app_v13.go              # PATH health, backup/restore, pre-script chain
-├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI
+├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI, paths, autolaunch, doc links
+├── app_fileio.go           # ReadScriptFile, WriteScriptFile, CreateScriptFile, OpenFile
+├── app_claude.go           # Claude Code settings, presets, TOML helpers
+├── app_codex.go            # Codex settings, presets
 ├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
-├── skills.go               # SKILL.md master store and sync
+├── app_skills.go           # SKILL.md master store and sync
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```

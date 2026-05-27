@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"hatch/internal/config"
@@ -159,6 +160,54 @@ func (a *App) ApplyZshrcOrganization(content string) (ZshrcApplyResult, error) {
 	}
 	return ZshrcApplyResult{ZshrcPath: p, BackupPath: backup}, nil
 }
+
+// ─── Alias inventory ─────────────────────────────────────────────────────────
+
+// AliasGroup is a group of ~/.zshrc entries sharing the same kind.
+type AliasGroup struct {
+	Kind    string   `json:"kind"`    // alias / export / source / function / other
+	Entries []string `json:"entries"` // raw lines
+}
+
+// ListAliasInventory reads ~/.zshrc and groups entries by kind for quick review.
+func (a *App) ListAliasInventory() []AliasGroup {
+	entries, err := a.ParseZshrc()
+	if err != nil {
+		return nil
+	}
+	buckets := map[string][]string{}
+	for _, e := range entries {
+		// Entry struct exposes Kind/Raw in zshrc package; we use json round-trip to access fields generically.
+		var anon struct {
+			Kind string `json:"kind"`
+			Raw  string `json:"raw"`
+			Key  string `json:"key"`
+		}
+		data, _ := json.Marshal(e)
+		_ = json.Unmarshal(data, &anon)
+		kind := anon.Kind
+		if kind == "" {
+			kind = "other"
+		}
+		line := anon.Raw
+		if line == "" {
+			line = anon.Key
+		}
+		buckets[kind] = append(buckets[kind], line)
+	}
+	keys := make([]string, 0, len(buckets))
+	for k := range buckets {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]AliasGroup, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, AliasGroup{Kind: k, Entries: buckets[k]})
+	}
+	return out
+}
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
 // syncZshrc rebuilds the managed block from cfg.Exports. Caller must hold mu.
 func (a *App) syncZshrc() error {

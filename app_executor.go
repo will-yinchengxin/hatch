@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"hatch/internal/executor"
 )
@@ -134,6 +135,38 @@ func (a *App) scriptEnv(path string) map[string]string {
 	}
 	return nil
 }
+
+// ─── Pre-script orchestration ────────────────────────────────────────────────
+
+// RunWithPreScripts executes pre-scripts in order, then the target.
+// pre-scripts are paths to oneshot scripts that must exit 0 before continuing.
+// Emits a "[hatch] pre: " log line at the beginning of each step.
+func (a *App) RunWithPreScripts(id, path string, args []string, preScripts []string) {
+	go func() {
+		em := executor.NewEmitter(a.ctx)
+		for _, pre := range preScripts {
+			pre = strings.TrimSpace(pre)
+			if pre == "" {
+				continue
+			}
+			em.Log(id, "[hatch] pre: "+pre, "stdout")
+			res, err := executor.RunOneshotWithEnv(pre, pre, nil, a.scriptEnv(pre), nil, nil)
+			if err != nil || res == nil || res.ExitCode != 0 {
+				code := -1
+				if res != nil {
+					code = res.ExitCode
+				}
+				em.Log(id, fmt.Sprintf("[hatch] pre failed: %s (exit %d)", pre, code), "stderr")
+				em.Done(id, 99)
+				em.Status(id, "error")
+				return
+			}
+		}
+		_, _ = executor.RunOneshotWithEnv(id, path, args, a.scriptEnv(path), em, a.notifyHook(path))
+	}()
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
 
 // notifyHook returns a callback that fires after a oneshot finishes — used for
 // macOS native notifications when the script meta has NotifyOnDone=true.

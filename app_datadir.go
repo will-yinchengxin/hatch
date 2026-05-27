@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"hatch/internal/autostart"
+	"hatch/internal/config"
 	"hatch/internal/executor"
 )
 
@@ -348,3 +350,87 @@ func (a *App) ListRecentRunsSorted(limit int) []executor.RunRecord {
 
 // _ ensures time is imported (used in some retention helpers above)
 var _ = time.Now
+
+// ─── App data paths ──────────────────────────────────────────────────────────
+
+// AppDataPaths holds all configurable directory paths.
+type AppDataPaths struct {
+	TraceLogDir      string `json:"traceLogDir"`
+	TraceLogDirIsSet bool   `json:"traceLogDirIsSet"`
+	SkillsDir        string `json:"skillsDir"`
+	SkillsDirIsSet   bool   `json:"skillsDirIsSet"`
+	DefaultTraceDir  string `json:"defaultTraceDir"`
+	DefaultSkillsDir string `json:"defaultSkillsDir"`
+}
+
+// GetAppDataPaths returns current path configuration with effective values.
+func (a *App) GetAppDataPaths() AppDataPaths {
+	a.mu.RLock()
+	traceCfg := a.cfg.TraceLogDir
+	skillsCfg := a.cfg.SkillsDir
+	a.mu.RUnlock()
+
+	defTrace := defaultTraceDir()
+	defSkills := defaultSkillsDir()
+
+	return AppDataPaths{
+		TraceLogDir:      orDefault(traceCfg, defTrace),
+		TraceLogDirIsSet: traceCfg != "",
+		SkillsDir:        orDefault(skillsCfg, defSkills),
+		SkillsDirIsSet:   skillsCfg != "",
+		DefaultTraceDir:  defTrace,
+		DefaultSkillsDir: defSkills,
+	}
+}
+
+func orDefault(v, fallback string) string {
+	if v != "" {
+		return v
+	}
+	return fallback
+}
+
+// SaveAppDataPaths saves custom directory overrides (empty string = reset to default).
+func (a *App) SaveAppDataPaths(traceLogDir, skillsDir string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.TraceLogDir = strings.TrimSpace(traceLogDir)
+	a.cfg.SkillsDir = strings.TrimSpace(skillsDir)
+	return a.cfg.Save()
+}
+
+// GetAutoLaunchEnabled reports whether Hatch is configured to launch at login.
+func (a *App) GetAutoLaunchEnabled() bool {
+	return autostart.Enabled()
+}
+
+// SetAutoLaunchEnabled enables or disables Hatch auto-launch at login.
+func (a *App) SetAutoLaunchEnabled(enabled bool) error {
+	if err := autostart.SetEnabled(enabled); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	a.cfg.AutoLaunch = enabled
+	err := a.cfg.Save()
+	a.mu.Unlock()
+	return err
+}
+
+// ─── Doc links ───────────────────────────────────────────────────────────────
+
+// GetDocLinks returns the configured quick-access doc links.
+func (a *App) GetDocLinks() []config.DocLink {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	out := make([]config.DocLink, len(a.cfg.DocLinks))
+	copy(out, a.cfg.DocLinks)
+	return out
+}
+
+// SaveDocLinks persists the doc links list.
+func (a *App) SaveDocLinks(links []config.DocLink) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg.DocLinks = links
+	return a.cfg.Save()
+}
