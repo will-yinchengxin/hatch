@@ -1,0 +1,30 @@
+# Hatch — Known Gotchas
+
+- New Go methods are not available in `frontend/wailsjs/go/main/App.js` until `wails dev` or `wails build` regenerates bindings. Use `window['go']['main']['App']['Method'](...)` meanwhile.
+- `mergeOverride` applies non-zero fields only. `Commands: []` does not clear auto-detected commands; use `DeleteScriptMeta`.
+- `Args nil` shows the args input. `[]ArgDef{}` hides it.
+- `Presets` are fully replaced on each `SaveScriptMeta`.
+- `buildBlock` appends exported directory vars to PATH and sorts keys for stable output.
+- zshrc annotation keys for positional entries (`source:N`, `other:N`, `comment:N`) change when the file is edited.
+- Service detection requires both `start` and `stop` in the first 200 lines.
+- Wails GUI launches do not get an interactive shell. Scripts need the explicit `source ~/.zshrc` in the executor.
+- Services use `Setpgid: true`; stop targets the service process group.
+- Corrupt store JSON silently resets to empty.
+- `safeId(path)` replaces `btoa(path)` to avoid non-Latin-1 path errors.
+- AI keys are plaintext in `config.json`; do not log or screenshot them.
+- AI suggestions are not auto-saved.
+- OpenAI-compatible base URL accepts either provider base or full `/chat/completions`.
+- Use `findCLI()` for tools installed into login-shell-only PATH locations.
+- Alpine `<template x-if>` must wrap an element; do not put bare text directly inside it.
+- Nested Alpine `x-for` can fail when a method immediately reads a reactive key just set by the same click; use inline preset handlers.
+- Pico CSS must load before custom CSS through `main.js`; do not add a `style.css` link in `index.html`.
+- Do not use `display: revert` in the semantic element reset.
+- `aria-busy` buttons and non-button `[role="button"]` elements need explicit Hatch overrides or Pico will apply blue primary styling.
+- v1.2/v1.3 bound methods are often called dynamically until bindings regenerate.
+- Default prompt changes must be mirrored between the hard-coded suggestion methods and `GetDefaultPrompts()`.
+- The retention ticker is tied to App context; do not start duplicate tickers elsewhere.
+- Run-history directories group by `filepath.Base(scriptPath)`, so same-name scripts in different dirs share a bucket.
+- Pre-scripts intentionally do not emit standalone events; they appear in the main script log.
+- `saveSkillContent()` auto-resyncs to enabled Claude/Codex targets after master save.
+- `switchQuickAIProvider()` must keep provider storage and `aiForm` in sync.
+- New feature markup should avoid inline styles; add named classes in `style.css`.

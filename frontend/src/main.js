@@ -273,6 +273,8 @@ window.hatchApp = function () {
     docLinks: [],
     docLinkForm: { path: '', label: '' },
     docLinksSaving: false,
+    editingDocLinkIdx: -1,
+    editingDocLinkForm: { path: '', label: '' },
 
     // Global search / replace overlay
     searchOpen: false,
@@ -1952,6 +1954,29 @@ window.hatchApp = function () {
 
     async removeDocLink(idx) {
       this.docLinks = this.docLinks.filter((_, i) => i !== idx);
+      await this.saveDocLinks();
+    },
+
+    startEditDocLink(idx) {
+      const link = this.docLinks[idx];
+      this.editingDocLinkIdx = idx;
+      this.editingDocLinkForm = { path: link.path, label: link.label };
+    },
+
+    cancelEditDocLink() {
+      this.editingDocLinkIdx = -1;
+      this.editingDocLinkForm = { path: '', label: '' };
+    },
+
+    async saveEditDocLink() {
+      const path = (this.editingDocLinkForm.path || '').trim();
+      if (!path) return;
+      const label = (this.editingDocLinkForm.label || '').trim() || path.split('/').pop();
+      const newLinks = [...this.docLinks];
+      newLinks[this.editingDocLinkIdx] = { path, label };
+      this.docLinks = newLinks;
+      this.editingDocLinkIdx = -1;
+      this.editingDocLinkForm = { path: '', label: '' };
       await this.saveDocLinks();
     },
 

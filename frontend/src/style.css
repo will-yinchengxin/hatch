@@ -3764,6 +3764,39 @@ details[open] .export-preview-toggle::before {
   min-width: 100px;
 }
 
+/* 编辑模式行 */
+.doc-link-row.is-editing {
+  border-color: var(--primary);
+  background: var(--surface-2);
+  align-items: flex-start;
+  padding: 10px 12px;
+}
+
+.doc-link-edit-form {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.doc-link-edit-form .doc-link-path-input {
+  flex: 2;
+  min-width: 160px;
+}
+
+.doc-link-edit-form .doc-link-label-input {
+  flex: 1;
+  min-width: 110px;
+}
+
+.doc-link-edit-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    v1.1 – v1.3 additions
    ─────────────────────────────────────────────────────────────────────── */

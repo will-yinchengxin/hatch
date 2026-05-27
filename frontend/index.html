@@ -1349,18 +1349,44 @@
 
             <div class="doc-links-list" x-show="docLinks.length > 0">
               <template x-for="(link, idx) in docLinks" :key="idx">
-                <div class="doc-link-row">
-                  <span class="doc-link-icon" x-text="docLinkIcon(link.path)"></span>
-                  <div class="doc-link-info">
+                <div class="doc-link-row" :class="editingDocLinkIdx === idx ? 'is-editing' : ''">
+
+                  <!-- ── 查看模式 ── -->
+                  <span class="doc-link-icon" x-show="editingDocLinkIdx !== idx" x-text="docLinkIcon(link.path)"></span>
+                  <div class="doc-link-info" x-show="editingDocLinkIdx !== idx">
                     <span class="doc-link-label" x-text="link.label || link.path.split('/').pop()"></span>
                     <span class="doc-link-path muted text-xs" x-text="link.path"></span>
                   </div>
-                  <div class="doc-link-actions">
+                  <div class="doc-link-actions" x-show="editingDocLinkIdx !== idx">
                     <button class="btn-sm btn-primary doc-link-open" @click="openDocFile(link.path)" title="用默认程序打开">
                       ↗ 打开
                     </button>
+                    <button class="icon-btn" @click="startEditDocLink(idx)" title="编辑名称或路径">✎</button>
                     <button class="icon-btn danger" @click="removeDocLink(idx)" title="移除">✕</button>
                   </div>
+
+                  <!-- ── 编辑模式（内联） ── -->
+                  <div class="doc-link-edit-form" x-show="editingDocLinkIdx === idx">
+                    <input
+                      class="field-input doc-link-label-input"
+                      x-model="editingDocLinkForm.label"
+                      placeholder="显示名称（可选）"
+                      @keyup.enter="editingDocLinkForm.path.trim() && saveEditDocLink()"
+                      @keyup.escape="cancelEditDocLink()"
+                    />
+                    <input
+                      class="field-input doc-link-path-input"
+                      x-model="editingDocLinkForm.path"
+                      placeholder="文件路径"
+                      @keyup.enter="saveEditDocLink()"
+                      @keyup.escape="cancelEditDocLink()"
+                    />
+                    <div class="doc-link-edit-actions">
+                      <button class="btn-sm btn-primary" @click="saveEditDocLink()" :disabled="!editingDocLinkForm.path.trim()" :aria-busy="docLinksSaving">保存</button>
+                      <button class="btn-sm" @click="cancelEditDocLink()">取消</button>
+                    </div>
+                  </div>
+
                 </div>
               </template>
             </div>
