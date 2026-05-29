@@ -169,7 +169,7 @@ func defaultClaudeCodePresets() []config.ClaudeCodePreset {
 		{ID: "cc-fast", Name: "快速响应", Model: "claude-haiku-4-5", EffortLevel: "low"},
 		{ID: "cc-balanced", Name: "均衡编码", Model: "claude-sonnet-4-6", EffortLevel: "medium"},
 		{ID: "cc-deep", Name: "复杂分析", Model: "claude-sonnet-4-6", EffortLevel: "high"},
-		{ID: "cc-frontier", Name: "深度推理", Model: "claude-opus-4-7", EffortLevel: "xhigh"},
+		{ID: "cc-frontier", Name: "深度推理", Model: "claude-opus-4-8", EffortLevel: "xhigh"},
 	}
 }
 
