@@ -36,6 +36,8 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetClaudeCodePresets / SaveClaudeCodePreset / DeleteClaudeCodePreset` | Claude preset management |
 | `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | Codex preset management |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
+| `UninstallMCPFromDisk(id)` | Remove from Hatch registry + Claude/Codex configs + delete local dir (git/local only) |
+| `UpdateMCPFromGit(id)` | `git pull` in local dir, re-infer command/args, resync to enabled targets |
 | `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |
 | `GetVPNEnhanceData` | Parse merge/rules profiles into prepend rules, hosts, DNS fake-IP filters |
 | `GetVPNConfigFile / SaveVPNConfigFile / GetVPNProfileContent / SaveVPNProfileContent` | VPN config/profile edit |

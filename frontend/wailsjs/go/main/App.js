@@ -458,8 +458,16 @@ export function TestMCPConnection(arg1, arg2) {
   return window['go']['main']['App']['TestMCPConnection'](arg1, arg2);
 }
 
+export function UninstallMCPFromDisk(arg1) {
+  return window['go']['main']['App']['UninstallMCPFromDisk'](arg1);
+}
+
 export function UpdateDirectoryExport(arg1, arg2) {
   return window['go']['main']['App']['UpdateDirectoryExport'](arg1, arg2);
+}
+
+export function UpdateMCPFromGit(arg1) {
+  return window['go']['main']['App']['UpdateMCPFromGit'](arg1);
 }
 
 export function WriteScriptFile(arg1, arg2) {

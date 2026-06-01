@@ -233,6 +233,10 @@ export function TestAIConfig(arg1:config.AIConfig):Promise<string>;
 
 export function TestMCPConnection(arg1:string,arg2:string):Promise<config.MCPTestResult>;
 
+export function UninstallMCPFromDisk(arg1:string):Promise<void>;
+
 export function UpdateDirectoryExport(arg1:string,arg2:string):Promise<void>;
+
+export function UpdateMCPFromGit(arg1:string):Promise<config.MCPServer>;
 
 export function WriteScriptFile(arg1:string,arg2:string):Promise<void>;

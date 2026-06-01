@@ -1095,17 +1095,18 @@
               </div>
             </template>
 
+            <!-- Toolbar row -->
             <div class="section-header-row mcp-step-head">
-              <div>
-                <span class="mcp-step-kicker">步骤 1</span>
-                <h3>获取 / 安装 MCP</h3>
-              </div>
+              <h3>MCP 管理</h3>
               <div class="mcp-header-actions">
-                <button class="btn-sm" @click="openMCPServerEditor()">+ 新建</button>
+                <button class="btn-sm btn-primary" @click="openMCPAddModal('git')">+ 添加 MCP</button>
+                <button class="btn-sm" @click="openMCPTemplateGallery()">模板库</button>
+                <button class="btn-sm" @click="openMCPServerEditor()">手动新建</button>
                 <button class="btn-sm" @click="loadMCP()" :aria-busy="mcpLoading">↻</button>
               </div>
             </div>
 
+            <!-- MCP dir config row -->
             <div class="mcp-settings-row">
               <div class="mcp-settings-info">
                 <span class="data-path-label">管理目录</span>
@@ -1117,44 +1118,132 @@
               <button class="btn-sm btn-primary" @click="saveMCPSettings()" :aria-busy="mcpSettingsSaving">保存</button>
             </div>
 
-            <div class="mcp-flow-section">
-              <div class="mcp-add-grid">
-                <div class="mcp-add-card">
-                  <div class="mcp-add-title">A. 本地目录导入</div>
-                  <span class="muted text-xs">已有 MCP 项目时使用，只登记到 Hatch，不写 Claude/Codex。</span>
-                  <input class="field-input" x-model="mcpLocalPath" placeholder="/Users/yinchengxin/MyHub/mcp/mysql-mcp-server" />
-                  <button class="btn-sm btn-primary" @click="importMCPLocal()" :aria-busy="mcpImportBusy==='local'">导入到 Hatch</button>
-                </div>
-                <div class="mcp-add-card">
-                  <div class="mcp-add-title">B. GitHub 克隆安装</div>
-                  <span class="muted text-xs">从 GitHub 下载到管理目录，只完成本地安装。</span>
-                  <input class="field-input" x-model="mcpGitURL" placeholder="https://github.com/org/server.git" />
-                  <input class="field-input" x-model="mcpGitName" placeholder="名称 / ID（可选）" />
-                  <button class="btn-sm btn-primary" @click="installMCPGit()" :aria-busy="mcpImportBusy==='git'">克隆到本地</button>
-                </div>
-                <div class="mcp-add-card">
-                  <div class="mcp-add-title">C. npm / npx 登记</div>
-                  <span class="muted text-xs">公开 npm 包无需下载源码，保存运行命令即可。</span>
-                  <input class="field-input" x-model="mcpNpmPackage" placeholder="@scope/mcp-server" />
-                  <input class="field-input" x-model="mcpNpmName" placeholder="显示名称（可选）" />
-                  <button class="btn-sm btn-primary" @click="addNpmMCP()" :aria-busy="mcpImportBusy==='npm'">添加到 Hatch</button>
-                </div>
-              </div>
+            <!-- Add MCP modal -->
+            <template x-if="mcpAddModalOpen">
+              <div class="modal-backdrop" @click.self="closeMCPAddModal()" @keydown.escape.window="closeMCPAddModal()">
+                <div class="modal-panel mcp-add-modal" role="dialog" aria-modal="true" aria-labelledby="mcpAddTitle">
+                  <div class="modal-head">
+                    <h3 id="mcpAddTitle">添加 MCP</h3>
+                    <button class="icon-btn" @click="closeMCPAddModal()" title="关闭">✕</button>
+                  </div>
+                  <div class="mcp-modal-content">
+                    <div class="mcp-add-modal-tabs">
+                      <button class="mcp-tab-btn" :class="mcpAddTab==='git' ? 'active' : ''" @click="mcpAddTab='git'">Git 克隆</button>
+                      <button class="mcp-tab-btn" :class="mcpAddTab==='npm' ? 'active' : ''" @click="mcpAddTab='npm'">npm / npx</button>
+                      <button class="mcp-tab-btn" :class="mcpAddTab==='local' ? 'active' : ''" @click="mcpAddTab='local'">本地目录</button>
+                    </div>
 
-              <div class="mcp-template-row" x-show="mcpTemplates.length > 0">
-                <span class="mcp-template-label">推荐模板</span>
-                <template x-for="tpl in mcpTemplates" :key="tpl.id">
-                  <button class="mcp-template-chip" @click="openMCPTemplate(tpl)" x-text="tpl.name || tpl.id"></button>
-                </template>
+                    <div x-show="mcpAddTab==='git'" class="mcp-add-modal-body">
+                      <p class="muted text-sm">从 GitHub 克隆到管理目录，Hatch 自动识别 command 和 args。克隆完成后再打开 Claude / Codex 开关即可使用。</p>
+                      <label class="field-stack">
+                        <span>Git URL</span>
+                        <input class="field-input" x-model="mcpGitURL" placeholder="https://github.com/org/mcp-server.git" @keydown.enter.prevent="installMCPGit()" />
+                      </label>
+                      <label class="field-stack">
+                        <span>自定义 ID / 名称（可选）</span>
+                        <input class="field-input" x-model="mcpGitName" placeholder="留空自动从仓库名推断" />
+                      </label>
+                      <div class="mcp-modal-actions">
+                        <button class="btn-primary" @click="installMCPGit()" :aria-busy="mcpImportBusy==='git'">克隆到本地</button>
+                        <button class="btn-sm" @click="closeMCPAddModal()">取消</button>
+                      </div>
+                    </div>
+
+                    <div x-show="mcpAddTab==='npm'" class="mcp-add-modal-body">
+                      <p class="muted text-sm">公开 npm 包，Hatch 记录包名，运行时由 npx 按需下载。不占本地磁盘，但需要网络和 Node。</p>
+                      <label class="field-stack">
+                        <span>npm 包名</span>
+                        <input class="field-input" x-model="mcpNpmPackage" placeholder="@modelcontextprotocol/server-filesystem" @keydown.enter.prevent="addNpmMCP()" />
+                      </label>
+                      <label class="field-stack">
+                        <span>显示名称（可选）</span>
+                        <input class="field-input" x-model="mcpNpmName" placeholder="Filesystem" />
+                      </label>
+                      <div class="mcp-modal-actions">
+                        <button class="btn-primary" @click="addNpmMCP()" :aria-busy="mcpImportBusy==='npm'">添加到 Hatch</button>
+                        <button class="btn-sm" @click="closeMCPAddModal()">取消</button>
+                      </div>
+                    </div>
+
+                    <div x-show="mcpAddTab==='local'" class="mcp-add-modal-body">
+                      <p class="muted text-sm">已有本地 MCP 项目，只登记路径到 Hatch，Hatch 不会复制或移动文件。</p>
+                      <label class="field-stack">
+                        <span>本地目录绝对路径</span>
+                        <input class="field-input" x-model="mcpLocalPath" placeholder="/Users/you/MyHub/mcp/mysql-mcp-server" @keydown.enter.prevent="importMCPLocal()" />
+                      </label>
+                      <div class="mcp-modal-actions">
+                        <button class="btn-primary" @click="importMCPLocal()" :aria-busy="mcpImportBusy==='local'">导入到 Hatch</button>
+                        <button class="btn-sm" @click="closeMCPAddModal()">取消</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            </template>
+
+            <!-- Template gallery modal -->
+            <template x-if="mcpTemplateGalleryOpen">
+              <div class="modal-backdrop" @click.self="closeMCPTemplateGallery()" @keydown.escape.window="closeMCPTemplateGallery()">
+                <div class="modal-panel mcp-gallery-modal" role="dialog" aria-modal="true" aria-labelledby="mcpGalleryTitle">
+                  <div class="modal-head">
+                    <h3 id="mcpGalleryTitle">MCP 模板库</h3>
+                    <button class="icon-btn" @click="closeMCPTemplateGallery()" title="关闭">✕</button>
+                  </div>
+                  <div class="mcp-gallery-content">
+                    <p class="muted text-sm mcp-gallery-hint">选择模板后进入编辑器填写环境变量等配置，保存后再开启同步。</p>
+                    <div class="mcp-gallery-grid">
+                      <template x-for="tpl in mcpTemplates" :key="tpl.id">
+                        <div class="mcp-gallery-card" role="button" tabindex="0"
+                          @click="closeMCPTemplateGallery(); openMCPTemplate(tpl)"
+                          @keydown.enter.prevent="closeMCPTemplateGallery(); openMCPTemplate(tpl)">
+                          <div class="mcp-gallery-card-head">
+                            <strong x-text="tpl.name || tpl.id"></strong>
+                            <span class="mcp-source-badge" :class="'mcp-src-' + (tpl.sourceType || 'npm')" x-text="tpl.sourceType || 'npm'"></span>
+                          </div>
+                          <p class="mcp-gallery-desc muted text-sm" x-text="tpl.description || tpl.packageName || tpl.url || ''"></p>
+                          <code class="mcp-gallery-cmd text-xs" x-show="tpl.command" x-text="tpl.command + ' ' + (tpl.args || []).join(' ')"></code>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Delete confirmation modal -->
+            <template x-if="mcpDeleteModal.open">
+              <div class="modal-backdrop" @click.self="closeMCPDeleteModal()" @keydown.escape.window="closeMCPDeleteModal()">
+                <div class="modal-panel mcp-delete-modal" role="dialog" aria-modal="true" aria-labelledby="mcpDeleteTitle">
+                  <div class="modal-head">
+                    <h3 id="mcpDeleteTitle">删除 MCP</h3>
+                    <button class="icon-btn" @click="closeMCPDeleteModal()" title="关闭">✕</button>
+                  </div>
+                  <div class="mcp-modal-content">
+                    <p class="mcp-delete-confirm-text">确定删除 <strong x-text="mcpDeleteModal.name"></strong>？<br><span class="muted text-sm">此操作会从 Hatch 注册表和 Claude/Codex 全局配置中移除。</span></p>
+                    <template x-if="mcpDeleteModal.canCleanDisk">
+                      <div class="mcp-delete-disk-info">
+                        <p class="muted text-sm">检测到本地文件目录，可同时删除（不使用不留残留）：</p>
+                        <code class="text-xs" x-text="mcpDeleteModal.localPath"></code>
+                      </div>
+                    </template>
+                    <div class="mcp-modal-actions mcp-delete-actions">
+                      <template x-if="mcpDeleteModal.canCleanDisk">
+                        <button class="btn-danger-fill" @click="confirmDeleteMCP(true)">删除 + 清理本地文件</button>
+                      </template>
+                      <button class="btn-sm btn-danger" @click="confirmDeleteMCP(false)">仅从 Hatch 删除</button>
+                      <button class="btn-sm" @click="closeMCPDeleteModal()">取消</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
 
             <div class="section-header-row mcp-step-head">
               <div>
-                <span class="mcp-step-kicker">步骤 2</span>
+                <span class="mcp-step-kicker">已注册</span>
                 <h3>配置并同步到 Claude Code / Codex</h3>
               </div>
-              <span class="muted text-xs">先保存本地配置，再用列表里的目标开关写入全局配置。</span>
+              <span class="muted text-xs">打开目标开关 → Hatch 写入全局配置，立即可用；关闭即移除。</span>
             </div>
 
             <div class="mcp-editor-panel" x-show="mcpForm" x-transition>
@@ -1286,14 +1375,16 @@
             <div x-show="!mcpLoading && mcpServers.length === 0" class="muted text-sm mcp-empty">暂无 MCP。可以从本地目录、Git 或 npm 添加。</div>
             <div class="mcp-list" x-show="!mcpLoading && filteredMCPServers.length > 0">
               <template x-for="s in filteredMCPServers" :key="s.id">
-                <div class="mcp-item">
+                <div class="mcp-item" :class="(s.enabledInClaude || s.enabledInCodex) ? 'mcp-item-active' : ''">
                   <div class="mcp-row">
                     <div class="mcp-info">
                       <div class="mcp-title-row">
                         <span class="skill-name" x-text="s.name || s.id"></span>
                         <code class="mcp-id" x-text="s.id"></code>
                         <span class="skill-badge" x-text="s.transport || 'stdio'"></span>
-                        <span class="skill-badge" x-text="s.sourceType || 'local'"></span>
+                        <span class="mcp-source-badge" :class="'mcp-src-' + (s.sourceType || 'local')" x-text="s.sourceType || 'local'"></span>
+                        <span class="mcp-enabled-badge" x-show="s.enabledInClaude">Claude ✓</span>
+                        <span class="mcp-enabled-badge mcp-enabled-codex" x-show="s.enabledInCodex">Codex ✓</span>
                       </div>
                       <span class="skill-desc muted text-sm" x-text="s.description || s.localPath || s.packageName || s.url || '无描述'"></span>
                       <div class="mcp-config-lines" x-show="mcpConfigLines(s).length > 0">
@@ -1324,10 +1415,11 @@
                       </label>
                     </div>
                     <div class="mcp-actions">
-                      <button class="btn-sm" @click="testMCP(s.id, 'claude')" :disabled="!s.enabledInClaude || !!mcpTestBusy[s.id+':claude']" :aria-busy="!!mcpTestBusy[s.id+':claude']">测 Claude</button>
-                      <button class="btn-sm" @click="testMCP(s.id, 'codex')" :disabled="!s.enabledInCodex || !!mcpTestBusy[s.id+':codex']" :aria-busy="!!mcpTestBusy[s.id+':codex']">测 Codex</button>
+                      <button class="btn-sm" @click="testMCP(s.id, 'claude')" :disabled="!s.enabledInClaude || !!mcpTestBusy[s.id+':claude']" :aria-busy="!!mcpTestBusy[s.id+':claude']" title="需先开启 Claude 同步">测 Claude</button>
+                      <button class="btn-sm" @click="testMCP(s.id, 'codex')" :disabled="!s.enabledInCodex || !!mcpTestBusy[s.id+':codex']" :aria-busy="!!mcpTestBusy[s.id+':codex']" title="需先开启 Codex 同步">测 Codex</button>
+                      <button class="btn-sm" x-show="s.sourceType === 'git'" @click="updateMCPFromGit(s.id)" :aria-busy="!!mcpUpdateBusy[s.id]" title="git pull 更新">更新</button>
                       <button class="btn-sm" @click="openMCPServerEditor(s)">编辑</button>
-                      <button class="btn-sm btn-danger" @click="deleteMCP(s.id)">删除</button>
+                      <button class="btn-sm btn-danger" @click="openMCPDeleteModal(s)">删除</button>
                     </div>
                   </div>
                 </div>

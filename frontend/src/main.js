@@ -81,6 +81,8 @@ const SaveNpmMCPServer      = (pkg, name)                   => window['go']['mai
 const SetMCPEnabled         = (id, target, enabled)         => window['go']['main']['App']['SetMCPEnabled'](id, target, enabled);
 const TestMCPConnection     = (id, target)                  => window['go']['main']['App']['TestMCPConnection'](id, target);
 const GetMCPTemplates       = ()                            => window['go']['main']['App']['GetMCPTemplates']();
+const UninstallMCPFromDisk  = (id)                          => window['go']['main']['App']['UninstallMCPFromDisk'](id);
+const UpdateMCPFromGit      = (id)                          => window['go']['main']['App']['UpdateMCPFromGit'](id);
 
 window.hatchApp = function () {
   return {
@@ -261,6 +263,11 @@ window.hatchApp = function () {
     mcpNpmName: '',
     mcpImportBusy: '',
     mcpManualOpen: false,
+    mcpAddModalOpen: false,
+    mcpAddTab: 'git',            // 'git' | 'npm' | 'local'
+    mcpDeleteModal: { open: false, id: '', name: '', canCleanDisk: false, localPath: '' },
+    mcpTemplateGalleryOpen: false,
+    mcpUpdateBusy: {},           // { id: true }
 
     // AI sub-navigation
     aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'mcp' | 'tools'
@@ -1528,6 +1535,65 @@ window.hatchApp = function () {
       }
     },
 
+    openMCPDeleteModal(s) {
+      const canCleanDisk = (s.sourceType === 'git' || s.sourceType === 'local') && !!s.localPath;
+      this.mcpDeleteModal = { open: true, id: s.id, name: s.name || s.id, canCleanDisk, localPath: s.localPath || '' };
+    },
+
+    closeMCPDeleteModal() {
+      this.mcpDeleteModal = { open: false, id: '', name: '', canCleanDisk: false, localPath: '' };
+    },
+
+    async confirmDeleteMCP(cleanupDisk) {
+      const { id } = this.mcpDeleteModal;
+      this.closeMCPDeleteModal();
+      try {
+        if (cleanupDisk) {
+          await UninstallMCPFromDisk(id);
+          this.showSuccess(`MCP「${id}」已从 Hatch 删除并清理本地文件`);
+        } else {
+          await DeleteMCPServer(id);
+          this.showSuccess(`MCP「${id}」已从 Hatch 删除`);
+        }
+        if (this.mcpEditTarget === id) this.closeMCPEditor();
+        await this.loadMCP();
+      } catch (e) {
+        this.showError(`删除 MCP 失败: ${e}`);
+      }
+    },
+
+    openMCPAddModal(tab) {
+      this.mcpAddTab = tab || 'git';
+      this.mcpAddModalOpen = true;
+    },
+
+    closeMCPAddModal() {
+      this.mcpAddModalOpen = false;
+    },
+
+    async updateMCPFromGit(id) {
+      this.mcpUpdateBusy = { ...this.mcpUpdateBusy, [id]: true };
+      try {
+        await UpdateMCPFromGit(id);
+        await this.loadMCP();
+        this.showSuccess(`MCP「${id}」已从 Git 更新`);
+      } catch (e) {
+        this.showError(`更新 MCP 失败: ${e}`);
+      } finally {
+        const b = { ...this.mcpUpdateBusy };
+        delete b[id];
+        this.mcpUpdateBusy = b;
+      }
+    },
+
+    openMCPTemplateGallery() {
+      this.mcpTemplateGalleryOpen = true;
+    },
+
+    closeMCPTemplateGallery() {
+      this.mcpTemplateGalleryOpen = false;
+    },
+
     async deleteMCP(id) {
       try {
         await DeleteMCPServer(id);
@@ -1546,6 +1612,7 @@ window.hatchApp = function () {
       try {
         const server = await ImportMCPFromLocalDir(path);
         this.mcpLocalPath = '';
+        this.closeMCPAddModal();
         await this.loadMCP();
         this.showSuccess(`已导入 MCP「${server.name || server.id}」`);
       } catch (e) {
@@ -1563,6 +1630,7 @@ window.hatchApp = function () {
         const server = await InstallMCPFromGit(url, (this.mcpGitName || '').trim());
         this.mcpGitURL = '';
         this.mcpGitName = '';
+        this.closeMCPAddModal();
         await this.loadMCP();
         this.showSuccess(`已安装 MCP「${server.name || server.id}」`);
       } catch (e) {
@@ -1580,6 +1648,7 @@ window.hatchApp = function () {
         const server = await SaveNpmMCPServer(pkg, (this.mcpNpmName || '').trim());
         this.mcpNpmPackage = '';
         this.mcpNpmName = '';
+        this.closeMCPAddModal();
         await this.loadMCP();
         this.showSuccess(`已添加 npm MCP「${server.name || server.id}」`);
       } catch (e) {

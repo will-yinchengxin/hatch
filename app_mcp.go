@@ -158,6 +158,116 @@ func (a *App) DeleteMCPServer(id string) error {
 	return a.cfg.Save()
 }
 
+// UninstallMCPFromDisk removes the MCP from Hatch registry and synced configs,
+// then deletes the local directory (only for git/local source types with a localPath).
+func (a *App) UninstallMCPFromDisk(id string) error {
+	if !validMCPID(id) {
+		return fmt.Errorf("invalid MCP id")
+	}
+	a.mu.Lock()
+	var removed config.MCPServer
+	found := false
+	for _, s := range a.cfg.MCPServers {
+		if s.ID == id {
+			removed = s
+			found = true
+			break
+		}
+	}
+	a.mu.Unlock()
+	if !found {
+		return nil
+	}
+	if removed.EnabledInClaude {
+		if err := writeClaudeMCPConfig(removed, false); err != nil {
+			return err
+		}
+	}
+	if removed.EnabledInCodex {
+		if err := writeCodexMCPConfig(removed, false); err != nil {
+			return err
+		}
+	}
+	a.mu.Lock()
+	keep := a.cfg.MCPServers[:0]
+	for _, s := range a.cfg.MCPServers {
+		if s.ID != id {
+			keep = append(keep, s)
+		}
+	}
+	a.cfg.MCPServers = keep
+	if err := a.cfg.Save(); err != nil {
+		a.mu.Unlock()
+		return err
+	}
+	a.mu.Unlock()
+	if removed.LocalPath != "" && (removed.SourceType == "git" || removed.SourceType == "local") {
+		if err := os.RemoveAll(removed.LocalPath); err != nil {
+			return fmt.Errorf("从 Hatch 删除成功，但清理本地目录失败: %w", err)
+		}
+	}
+	return nil
+}
+
+// UpdateMCPFromGit runs git pull in the MCP's local directory (git source type only),
+// then re-infers the command configuration from the updated directory.
+func (a *App) UpdateMCPFromGit(id string) (config.MCPServer, error) {
+	if !validMCPID(id) {
+		return config.MCPServer{}, fmt.Errorf("invalid MCP id")
+	}
+	a.mu.RLock()
+	var server config.MCPServer
+	found := false
+	for _, s := range a.cfg.MCPServers {
+		if s.ID == id {
+			server = s
+			found = true
+			break
+		}
+	}
+	a.mu.RUnlock()
+	if !found {
+		return config.MCPServer{}, fmt.Errorf("MCP not found: %s", id)
+	}
+	if server.SourceType != "git" {
+		return config.MCPServer{}, fmt.Errorf("只有 git 来源的 MCP 支持更新")
+	}
+	if server.LocalPath == "" {
+		return config.MCPServer{}, fmt.Errorf("本地目录路径未设置")
+	}
+	if _, err := os.Stat(server.LocalPath); err != nil {
+		return config.MCPServer{}, fmt.Errorf("本地目录不存在: %s", server.LocalPath)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	cmd := mcpExecCommand(ctx, "git", "-C", server.LocalPath, "pull")
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if err := cmd.Run(); err != nil {
+		return config.MCPServer{}, fmt.Errorf("git pull 失败: %s", strings.TrimSpace(buf.String()))
+	}
+	updated := inferMCPServerFromDir(server.LocalPath)
+	updated.ID = server.ID
+	updated.Name = server.Name
+	updated.SourceType = server.SourceType
+	updated.SourceURL = server.SourceURL
+	updated.EnabledInClaude = server.EnabledInClaude
+	updated.EnabledInCodex = server.EnabledInCodex
+	updated.Tags = server.Tags
+	updated.LastTestResults = server.LastTestResults
+	if err := a.SaveMCPServer(updated); err != nil {
+		return config.MCPServer{}, err
+	}
+	if updated.EnabledInClaude {
+		_ = writeClaudeMCPConfig(updated, true)
+	}
+	if updated.EnabledInCodex {
+		_ = writeCodexMCPConfig(updated, true)
+	}
+	return updated, nil
+}
+
 func (a *App) ImportMCPFromLocalDir(path string) (config.MCPServer, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
