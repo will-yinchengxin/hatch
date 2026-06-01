@@ -58,6 +58,10 @@ export function DeleteCodexPreset(arg1) {
   return window['go']['main']['App']['DeleteCodexPreset'](arg1);
 }
 
+export function DeleteMCPServer(arg1) {
+  return window['go']['main']['App']['DeleteMCPServer'](arg1);
+}
+
 export function DeleteRun(arg1, arg2) {
   return window['go']['main']['App']['DeleteRun'](arg1, arg2);
 }
@@ -154,6 +158,14 @@ export function GetDocLinks() {
   return window['go']['main']['App']['GetDocLinks']();
 }
 
+export function GetMCPSettings() {
+  return window['go']['main']['App']['GetMCPSettings']();
+}
+
+export function GetMCPTemplates() {
+  return window['go']['main']['App']['GetMCPTemplates']();
+}
+
 export function GetPromptTemplates() {
   return window['go']['main']['App']['GetPromptTemplates']();
 }
@@ -218,6 +230,10 @@ export function ImportBackup(arg1) {
   return window['go']['main']['App']['ImportBackup'](arg1);
 }
 
+export function ImportMCPFromLocalDir(arg1) {
+  return window['go']['main']['App']['ImportMCPFromLocalDir'](arg1);
+}
+
 export function ImportSkillsFrom(arg1) {
   return window['go']['main']['App']['ImportSkillsFrom'](arg1);
 }
@@ -226,8 +242,16 @@ export function ImportVPNBackup(arg1) {
   return window['go']['main']['App']['ImportVPNBackup'](arg1);
 }
 
+export function InstallMCPFromGit(arg1, arg2) {
+  return window['go']['main']['App']['InstallMCPFromGit'](arg1, arg2);
+}
+
 export function ListAliasInventory() {
   return window['go']['main']['App']['ListAliasInventory']();
+}
+
+export function ListMCPServers() {
+  return window['go']['main']['App']['ListMCPServers']();
 }
 
 export function ListRecentRunsSorted(arg1) {
@@ -322,6 +346,18 @@ export function SaveExports(arg1) {
   return window['go']['main']['App']['SaveExports'](arg1);
 }
 
+export function SaveMCPServer(arg1) {
+  return window['go']['main']['App']['SaveMCPServer'](arg1);
+}
+
+export function SaveMCPSettings(arg1) {
+  return window['go']['main']['App']['SaveMCPSettings'](arg1);
+}
+
+export function SaveNpmMCPServer(arg1, arg2) {
+  return window['go']['main']['App']['SaveNpmMCPServer'](arg1, arg2);
+}
+
 export function SavePromptTemplates(arg1) {
   return window['go']['main']['App']['SavePromptTemplates'](arg1);
 }
@@ -378,6 +414,10 @@ export function SetCodexModelConfig(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetCodexModelConfig'](arg1, arg2, arg3);
 }
 
+export function SetMCPEnabled(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetMCPEnabled'](arg1, arg2, arg3);
+}
+
 export function SetSkillSync(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetSkillSync'](arg1, arg2, arg3);
 }
@@ -412,6 +452,10 @@ export function SuggestZshrcOrganization(arg1) {
 
 export function TestAIConfig(arg1) {
   return window['go']['main']['App']['TestAIConfig'](arg1);
+}
+
+export function TestMCPConnection(arg1, arg2) {
+  return window['go']['main']['App']['TestMCPConnection'](arg1, arg2);
 }
 
 export function UpdateDirectoryExport(arg1, arg2) {

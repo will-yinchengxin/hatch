@@ -33,6 +33,8 @@ export function DeleteClaudeCodePreset(arg1:string):Promise<void>;
 
 export function DeleteCodexPreset(arg1:string):Promise<void>;
 
+export function DeleteMCPServer(arg1:string):Promise<void>;
+
 export function DeleteRun(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteScriptMeta(arg1:string):Promise<void>;
@@ -81,6 +83,10 @@ export function GetDefaultPrompts():Promise<Record<string, string>>;
 
 export function GetDocLinks():Promise<Array<config.DocLink>>;
 
+export function GetMCPSettings():Promise<main.MCPSettings>;
+
+export function GetMCPTemplates():Promise<Array<config.MCPServer>>;
+
 export function GetPromptTemplates():Promise<Record<string, string>>;
 
 export function GetRetentionPolicy():Promise<main.RetentionView>;
@@ -113,11 +119,17 @@ export function GetVPNStatus():Promise<main.VPNStatus>;
 
 export function ImportBackup(arg1:string):Promise<string>;
 
+export function ImportMCPFromLocalDir(arg1:string):Promise<config.MCPServer>;
+
 export function ImportSkillsFrom(arg1:string):Promise<main.SkillImportResult>;
 
 export function ImportVPNBackup(arg1:string):Promise<string>;
 
+export function InstallMCPFromGit(arg1:string,arg2:string):Promise<config.MCPServer>;
+
 export function ListAliasInventory():Promise<Array<main.AliasGroup>>;
+
+export function ListMCPServers():Promise<Array<config.MCPServer>>;
 
 export function ListRecentRunsSorted(arg1:number):Promise<Array<executor.RunRecord>>;
 
@@ -165,6 +177,12 @@ export function SaveDocLinks(arg1:Array<config.DocLink>):Promise<void>;
 
 export function SaveExports(arg1:Array<config.ExportVar>):Promise<void>;
 
+export function SaveMCPServer(arg1:config.MCPServer):Promise<void>;
+
+export function SaveMCPSettings(arg1:string):Promise<void>;
+
+export function SaveNpmMCPServer(arg1:string,arg2:string):Promise<config.MCPServer>;
+
 export function SavePromptTemplates(arg1:Record<string, string>):Promise<void>;
 
 export function SaveRetentionPolicy(arg1:number,arg2:number,arg3:number):Promise<void>;
@@ -193,6 +211,8 @@ export function SetClaudeCodeConfig(arg1:string,arg2:string):Promise<void>;
 
 export function SetCodexModelConfig(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function SetMCPEnabled(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
 export function SetSkillSync(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SuggestScriptContent(arg1:string,arg2:string,arg3:string):Promise<string>;
@@ -210,6 +230,8 @@ export function SuggestZshrcAnnotation(arg1:zshrc.Entry):Promise<string>;
 export function SuggestZshrcOrganization(arg1:string):Promise<main.ZshrcOrganizationSuggestion>;
 
 export function TestAIConfig(arg1:config.AIConfig):Promise<string>;
+
+export function TestMCPConnection(arg1:string,arg2:string):Promise<config.MCPTestResult>;
 
 export function UpdateDirectoryExport(arg1:string,arg2:string):Promise<void>;
 

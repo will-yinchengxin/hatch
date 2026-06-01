@@ -1,0 +1,265 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"hatch/internal/config"
+)
+
+func TestWriteCodexMCPConfigUpdatesManagedBlock(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	codexDir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(codexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(codexDir, "config.toml")
+	initial := `model = "gpt-5.5"
+
+[mcp_servers.keep]
+command = "keep"
+
+# Managed by Hatch MCP
+[mcp_servers.mysql]
+command = "old"
+
+[mcp_servers.mysql.env]
+MYSQL_HOST = "old"
+`
+	if err := os.WriteFile(path, []byte(initial), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	server := config.MCPServer{
+		ID:        "mysql",
+		Transport: mcpTransportStdio,
+		Command:   "node",
+		Args:      []string{"/tmp/mysql/dist/index.js"},
+		Cwd:       "/tmp/mysql",
+		Env:       map[string]string{"MYSQL_HOST": "127.0.0.1", "MYSQL_PASS": "secret"},
+	}
+	if err := writeCodexMCPConfig(server, true); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, want := range []string{
+		`model = "gpt-5.5"`,
+		`[mcp_servers.keep]`,
+		`[mcp_servers.mysql]`,
+		`command = "node"`,
+		`args = ["/tmp/mysql/dist/index.js"]`,
+		`cwd = "/tmp/mysql"`,
+		`[mcp_servers.mysql.env]`,
+		`MYSQL_HOST = "127.0.0.1"`,
+		`MYSQL_PASS = "secret"`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("config missing %q:\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, `command = "old"`) {
+		t.Fatalf("stale managed block remained:\n%s", content)
+	}
+}
+
+func TestWriteClaudeMCPConfigUpdatesGlobalFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	path := filepath.Join(home, ".claude.json")
+	initial := `{"theme":"dark","mcpServers":{"keep":{"type":"stdio","command":"keep","args":[],"env":{}}}}`
+	if err := os.WriteFile(path, []byte(initial), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	server := config.MCPServer{
+		ID:        "consul",
+		Transport: mcpTransportStdio,
+		Command:   "node",
+		Args:      []string{"/tmp/consul/build/index.js"},
+		Cwd:       "/tmp/consul",
+		Env:       map[string]string{"CONSUL_HOST": "localhost"},
+	}
+	if err := writeClaudeMCPConfig(server, true); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, want := range []string{
+		`"theme": "dark"`,
+		`"keep"`,
+		`"consul"`,
+		`"type": "stdio"`,
+		`"command": "node"`,
+		`"/tmp/consul/build/index.js"`,
+		`"CONSUL_HOST": "localhost"`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("settings missing %q:\n%s", want, content)
+		}
+	}
+
+	if err := writeClaudeMCPConfig(server, false); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content = string(data)
+	if strings.Contains(content, `"consul"`) {
+		t.Fatalf("consul was not removed:\n%s", content)
+	}
+	if !strings.Contains(content, `"keep"`) {
+		t.Fatalf("unrelated server removed:\n%s", content)
+	}
+}
+
+func TestInferMCPServerFromPackageJSON(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "example-mcp-server")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{
+  "name": "@scope/example-mcp",
+  "bin": {"example-mcp": "dist/index.js"}
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	server := inferMCPServerFromDir(dir)
+	if server.ID != "example" {
+		t.Fatalf("unexpected id: %s", server.ID)
+	}
+	if server.Command != "node" {
+		t.Fatalf("command = %q", server.Command)
+	}
+	if len(server.Args) != 1 || !strings.HasSuffix(server.Args[0], "dist/index.js") {
+		t.Fatalf("args = %#v", server.Args)
+	}
+}
+
+func TestParseClaudeMCPTestOutputFailure(t *testing.T) {
+	out := `gbrain:
+  Scope: User config (available in all your projects)
+  Status: ✗ Failed to connect
+  Type: stdio`
+	result := parseMCPTestOutput(mcpTargetClaude, out, 0, nil)
+	if result.Status != "failed" {
+		t.Fatalf("status = %s", result.Status)
+	}
+	if !strings.Contains(result.Summary, "Failed to connect") {
+		t.Fatalf("summary = %q", result.Summary)
+	}
+}
+
+func TestSetMCPEnabledRejectsExistingClaudeEntry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{
+  "mcpServers": {
+    "mysql": {"type":"stdio","command":"existing","args":[],"env":{}}
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{cfg: &config.Config{OverrideMeta: map[string]config.ScriptMeta{}, MCPServers: []config.MCPServer{{
+		ID:        "mysql",
+		Name:      "MySQL",
+		Transport: mcpTransportStdio,
+		Command:   "node",
+	}}}}
+	err := a.SetMCPEnabled("mysql", mcpTargetClaude, true)
+	if err == nil || !strings.Contains(err.Error(), "already has MCP") {
+		t.Fatalf("expected conflict error, got %v", err)
+	}
+}
+
+func TestDeleteMCPServerRemovesSyncedTargets(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{
+  "mcpServers": {
+    "mysql": {"type":"stdio","command":"node","args":[],"env":{}},
+    "keep": {"type":"stdio","command":"keep","args":[],"env":{}}
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	codexDir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(codexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	codexConfig := `model = "gpt-5"
+
+# Managed by Hatch MCP
+[mcp_servers.mysql]
+command = "node"
+
+[mcp_servers.keep]
+command = "keep"
+`
+	if err := os.WriteFile(filepath.Join(codexDir, "config.toml"), []byte(codexConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{cfg: &config.Config{OverrideMeta: map[string]config.ScriptMeta{}, MCPServers: []config.MCPServer{{
+		ID:              "mysql",
+		Name:            "MySQL",
+		Transport:       mcpTransportStdio,
+		Command:         "node",
+		EnabledInClaude: true,
+		EnabledInCodex:  true,
+	}}}}
+	if err := a.DeleteMCPServer("mysql"); err != nil {
+		t.Fatal(err)
+	}
+	claudeData, err := os.ReadFile(filepath.Join(home, ".claude.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(claudeData), `"mysql"`) || !strings.Contains(string(claudeData), `"keep"`) {
+		t.Fatalf("unexpected claude config:\n%s", string(claudeData))
+	}
+	codexData, err := os.ReadFile(filepath.Join(codexDir, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(codexData), `[mcp_servers.mysql]`) || !strings.Contains(string(codexData), `[mcp_servers.keep]`) {
+		t.Fatalf("unexpected codex config:\n%s", string(codexData))
+	}
+	if len(a.cfg.MCPServers) != 0 {
+		t.Fatalf("server remained in registry: %#v", a.cfg.MCPServers)
+	}
+}
+
+func TestCloneMCPServersDeepCopiesMutableFields(t *testing.T) {
+	servers := []config.MCPServer{{
+		ID:              "mysql",
+		Args:            []string{"one"},
+		Tags:            []string{"db"},
+		Env:             map[string]string{"MYSQL_HOST": "127.0.0.1"},
+		HTTPHeaders:     map[string]string{"X-Test": "1"},
+		LastTestResults: map[string]config.MCPTestResult{"codex": {Status: "unknown"}},
+	}}
+	cloned := cloneMCPServers(servers)
+	cloned[0].Args[0] = "two"
+	cloned[0].Tags[0] = "cache"
+	cloned[0].Env["MYSQL_HOST"] = "localhost"
+	cloned[0].HTTPHeaders["X-Test"] = "2"
+	cloned[0].LastTestResults["codex"] = config.MCPTestResult{Status: "failed"}
+	if servers[0].Args[0] != "one" ||
+		servers[0].Tags[0] != "db" ||
+		servers[0].Env["MYSQL_HOST"] != "127.0.0.1" ||
+		servers[0].HTTPHeaders["X-Test"] != "1" ||
+		servers[0].LastTestResults["codex"].Status != "unknown" {
+		t.Fatalf("clone shared mutable fields: %#v", servers[0])
+	}
+}

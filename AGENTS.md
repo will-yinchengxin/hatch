@@ -61,6 +61,7 @@ hatch/
 ├── app_v13.go              # PATH health, backup/restore, pre-script chain
 ├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI
 ├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
+├── app_mcp.go              # MCP registry, global Claude/Codex sync, CLI checks
 ├── skills.go               # SKILL.md master store and sync
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
@@ -77,6 +78,9 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | AI traces | `~/Library/Application Support/Hatch/traces/<date>.jsonl` by default |
 | Run history | `~/Library/Application Support/Hatch/runs/<script>/<id>.{log,json}` |
 | Master skills | `~/Library/Application Support/Hatch/skills/` by default |
+| MCP source dir | `~/MyHub/mcp` by default |
+| Claude Code MCP config | `~/.claude.json` top-level `mcpServers` |
+| Codex MCP config | `~/.codex/config.toml` `[mcp_servers.*]` |
 | PID files | `/tmp/hatch/<script-name>.pid` |
 | zshrc managed block | `~/.zshrc` Hatch block only |
 | zshrc backups | `~/.zshrc.hatch-backup-<YYYYMMDD-HHMMSS>` |
@@ -98,6 +102,7 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 - `findCLI()` should be used for user-installed tools that may only exist in login shell PATH.
 - AI suggestions populate UI for user confirmation; they must not silently persist metadata, notes, prompts, skills, or zshrc changes.
 - AI API keys are stored as local plaintext config; never print them in logs or expose them in screenshots.
+- MCP env values are stored as local plaintext config; sync writes global Claude Code/Codex config but Hatch does not keep MCP services running.
 
 ## Frontend Rules
 

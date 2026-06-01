@@ -44,10 +44,42 @@ type Config struct {
     Retention        DataRetention
     VPNAppDir        string
     VPNBackupDir     string
+    MCPDir           string
+    MCPServers       []MCPServer
 }
 
 type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
 type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceRetainDays int }
+```
+
+## MCP Types
+
+`MCPDir` defaults to `~/MyHub/mcp`. `MCPServers` is Hatch's registry; syncing renders entries into Claude Code and Codex global config files, but Hatch does not keep MCP services running. Deleting a synced registry entry also removes its Hatch-managed target config entries.
+
+```go
+type MCPServer struct {
+    ID, Name, Description string
+    SourceType            string // local | git | npm | remote
+    SourceURL, LocalPath, PackageName string
+    Transport             string // stdio | http
+    Command               string
+    Args                  []string
+    Cwd, URL              string
+    Env, HTTPHeaders      map[string]string
+    BearerTokenEnvVar     string
+    StartupTimeoutSec, ToolTimeoutSec int
+    Tags                  []string
+    EnabledInClaude, EnabledInCodex bool
+    LastTestResults       map[string]MCPTestResult
+    UpdatedAt             int64
+}
+
+type MCPTestResult struct {
+    Target, Status, Summary, Detail string
+    ExitCode                         int
+    CheckedAt                        int64
+    Mode                            string // connection | config
+}
 ```
 
 ## VPN Types

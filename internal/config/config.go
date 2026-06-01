@@ -103,27 +103,67 @@ type CodexPreset struct {
 	EffortLevel string `json:"effortLevel"`
 }
 
+// MCPServer represents one MCP server managed by Hatch.
+type MCPServer struct {
+	ID                string                   `json:"id"`
+	Name              string                   `json:"name"`
+	Description       string                   `json:"description,omitempty"`
+	SourceType        string                   `json:"sourceType"` // local | git | npm | remote
+	SourceURL         string                   `json:"sourceUrl,omitempty"`
+	LocalPath         string                   `json:"localPath,omitempty"`
+	PackageName       string                   `json:"packageName,omitempty"`
+	Transport         string                   `json:"transport"` // stdio | http
+	Command           string                   `json:"command,omitempty"`
+	Args              []string                 `json:"args,omitempty"`
+	Cwd               string                   `json:"cwd,omitempty"`
+	URL               string                   `json:"url,omitempty"`
+	Env               map[string]string        `json:"env,omitempty"`
+	HTTPHeaders       map[string]string        `json:"httpHeaders,omitempty"`
+	BearerTokenEnvVar string                   `json:"bearerTokenEnvVar,omitempty"`
+	StartupTimeoutSec int                      `json:"startupTimeoutSec,omitempty"`
+	ToolTimeoutSec    int                      `json:"toolTimeoutSec,omitempty"`
+	Tags              []string                 `json:"tags,omitempty"`
+	EnabledInClaude   bool                     `json:"enabledInClaude,omitempty"`
+	EnabledInCodex    bool                     `json:"enabledInCodex,omitempty"`
+	LastTestResults   map[string]MCPTestResult `json:"lastTestResults,omitempty"`
+	UpdatedAt         int64                    `json:"updatedAt,omitempty"`
+}
+
+// MCPTestResult stores the last connection/config check for one MCP target.
+type MCPTestResult struct {
+	Target    string `json:"target"`
+	Status    string `json:"status"` // success | failed | unknown
+	Summary   string `json:"summary"`
+	Detail    string `json:"detail,omitempty"`
+	ExitCode  int    `json:"exitCode,omitempty"`
+	CheckedAt int64  `json:"checkedAt,omitempty"`
+	Mode      string `json:"mode,omitempty"` // connection | config
+}
+
 type Config struct {
-	Directories        []Directory           `json:"directories"`
-	Exports            []ExportVar           `json:"exports"`
-	OverrideMeta       map[string]ScriptMeta `json:"overrideMeta"`
-	ZshrcAnnotations   map[string]string     `json:"zshrcAnnotations,omitempty"`
-	AI                 AIConfig              `json:"ai,omitempty"`
-	AutoLaunch         bool                  `json:"autoLaunch,omitempty"`
-	TraceLogDir        string                `json:"traceLogDir,omitempty"` // AI call log dir, default: <configDir>/Hatch/traces
-	SkillsDir          string                `json:"skillsDir,omitempty"`   // skills master dir, default: <configDir>/Hatch/skills
-	DocLinks           []DocLink             `json:"docLinks,omitempty"`
-	AIProviders        []AIProvider          `json:"aiProviders,omitempty"`
-	ActiveProviderID   string                `json:"activeProviderId,omitempty"`
-	PromptTemplates    map[string]string     `json:"promptTemplates,omitempty"`    // v1.2: op -> override system prompt
-	Retention          DataRetention         `json:"retention,omitempty"`          // v1.3+: data cleanup policy
-	VPNAppDir          string                `json:"vpnAppDir,omitempty"`          // Clash Verge Rev data dir (default: auto-detect)
-	VPNBackupDir       string                `json:"vpnBackupDir,omitempty"`       // VPN backup dir (default: Hatch/vpn-backups)
-	ClaudeCodePresets       []ClaudeCodePreset `json:"claudeCodePresets,omitempty"`       // saved model+effort presets
-	ClaudeCodePresetsSeeded bool               `json:"claudeCodePresetsSeeded,omitempty"` // true after first default preset seed
-	CodexPresets            []CodexPreset      `json:"codexPresets,omitempty"`            // saved model+effort presets
-	CodexPresetsSeeded      bool               `json:"codexPresetsSeeded,omitempty"`      // true after first default preset seed
-	ScriptOrders            map[string][]string `json:"scriptOrders,omitempty"`            // dirPath -> ordered script paths
+	Directories             []Directory           `json:"directories"`
+	Exports                 []ExportVar           `json:"exports"`
+	OverrideMeta            map[string]ScriptMeta `json:"overrideMeta"`
+	ZshrcAnnotations        map[string]string     `json:"zshrcAnnotations,omitempty"`
+	AI                      AIConfig              `json:"ai,omitempty"`
+	AutoLaunch              bool                  `json:"autoLaunch,omitempty"`
+	TraceLogDir             string                `json:"traceLogDir,omitempty"` // AI call log dir, default: <configDir>/Hatch/traces
+	SkillsDir               string                `json:"skillsDir,omitempty"`   // skills master dir, default: <configDir>/Hatch/skills
+	DocLinks                []DocLink             `json:"docLinks,omitempty"`
+	AIProviders             []AIProvider          `json:"aiProviders,omitempty"`
+	ActiveProviderID        string                `json:"activeProviderId,omitempty"`
+	PromptTemplates         map[string]string     `json:"promptTemplates,omitempty"`         // v1.2: op -> override system prompt
+	Retention               DataRetention         `json:"retention,omitempty"`               // v1.3+: data cleanup policy
+	VPNAppDir               string                `json:"vpnAppDir,omitempty"`               // Clash Verge Rev data dir (default: auto-detect)
+	VPNBackupDir            string                `json:"vpnBackupDir,omitempty"`            // VPN backup dir (default: Hatch/vpn-backups)
+	ClaudeCodePresets       []ClaudeCodePreset    `json:"claudeCodePresets,omitempty"`       // saved model+effort presets
+	ClaudeCodePresetsSeeded bool                  `json:"claudeCodePresetsSeeded,omitempty"` // true after first default preset seed
+	CodexPresets            []CodexPreset         `json:"codexPresets,omitempty"`            // saved model+effort presets
+	CodexPresetsSeeded      bool                  `json:"codexPresetsSeeded,omitempty"`      // true after first default preset seed
+	ScriptOrders            map[string][]string   `json:"scriptOrders,omitempty"`            // dirPath -> ordered script paths
+	MCPDir                  string                `json:"mcpDir,omitempty"`                  // MCP master dir, default: ~/MyHub/mcp if present
+	MCPServers              []MCPServer           `json:"mcpServers,omitempty"`              // MCP registry managed by Hatch
+	MCPSeeded               bool                  `json:"mcpSeeded,omitempty"`               // true after first MCP directory discovery
 }
 
 func defaultPath() (string, error) {

@@ -105,6 +105,19 @@ Retention fields:
 
 `ExportBackup(targetDir)` zips `config.json`, `scripts.json`, and skills. `ImportBackup(zipPath)` overlays those files back into the current data locations and reloads memory config; app restart remains recommended.
 
+## MCP
+
+Hatch stores MCP registry data in `Config.MCPServers` and defaults the source directory to `~/MyHub/mcp`. First load seeds records from that directory when the registry is empty. The UI intentionally separates acquisition/import (local directory, GitHub clone, npm/npx registration) from target sync (Claude Code/Codex switches).
+
+Sync targets:
+
+- Claude Code: writes `~/.claude.json` top-level `mcpServers.<id>`.
+- Codex: writes `~/.codex/config.toml` `[mcp_servers.<id>]` tables.
+
+Both writes call `backupIfExists` first. Hatch does not keep MCP services running. `TestMCPConnection` shells out to `claude mcp get <id>` for Claude Code status and `codex mcp get <id>` for Codex config validation; Codex CLI output may not include live connection status, so those results can be `unknown` with `Mode=config`.
+
+First-time sync refuses to overwrite an existing same-name target MCP entry. After Hatch has marked that target enabled, later MCP edits may resync that same entry. Deleting a Hatch MCP record also removes its previously synced Claude Code/Codex target entries before removing the registry record. The UI displays MCP command, args, headers, and env values in plaintext by default because the module is meant for local inspection and troubleshooting.
+
 ## Pre-Script Chain
 
 `ScriptMeta.PreScripts` are run sequentially before the main script. `RunScript` routes to `RunWithPreScripts` automatically when set.

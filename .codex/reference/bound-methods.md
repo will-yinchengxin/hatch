@@ -20,6 +20,9 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / DeleteSkillEverywhere / GetSkillsStats` | Skill CRUD |
 | `SetSkillSync / ImportSkillsFrom / ResolveSkillImportConflict / CreateSkillTemplate` | Skill sync + import conflict handling |
 | `SuggestSkillContent / SuggestSkillFromDescription` | Skill AI optimize/generation |
+| `GetMCPSettings / SaveMCPSettings / ListMCPServers / SaveMCPServer / DeleteMCPServer` | MCP registry and management directory |
+| `ImportMCPFromLocalDir / InstallMCPFromGit / SaveNpmMCPServer / GetMCPTemplates` | MCP sources and starter templates |
+| `SetMCPEnabled / TestMCPConnection` | Write/remove global Claude Code/Codex MCP config and run CLI checks |
 | `GetAppDataPaths / SaveAppDataPaths` | Trace + skills dir config |
 | `GetAITraces / ClearAITraces / GetAITraceStorageInfo` | AI trace inspect |
 | `SaveAIConfig / GetAIProviders / SaveAIProviders / TestAIConfig` | Provider management |

@@ -31,15 +31,16 @@ description: "Hatch 前端参考：修改 frontend/index.html、frontend/src/mai
 ```text
 tab = 'scripts' | 'ai' | 'vpn'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'tools' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 ```
 
 - `scripts + !selectedDir`: 目录卡片 + workspace settings accordion。
 - `scripts + selectedDir`: 脚本列表。
-- `ai`: AI 侧边栏布局，含连接、skills、tools、prompts、data。
+- `ai`: AI 侧边栏布局，含连接、skills、mcp、tools、prompts、data。
 - `vpn`: VPN 侧边栏布局，含概览、配置、profiles、备份、自定义规则。
 - `editTarget != null`: 右侧编辑抽屉。
+- `?aiSubTab=mcp` 等 query 可直接打开 AI 子页，`?aiSubTab=mcp&mcpManual=1` 可打开 MCP 手册弹窗，便于本地截图验证。
 
 ## 关键状态
 
@@ -47,6 +48,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - 编辑抽屉：`editTarget`、`editForm`、`editSaving`，所有 per-script 行为都从这里配置。
 - AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、AI tool model config state。
 - Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`、`skillImportResult`、`skillConflictBusy`。
+- MCP：`mcpSettings`、`mcpServers`、`mcpTemplates`、`mcpForm`、`mcpSyncBusy`、`mcpTestBusy`、`mcpManualOpen`、`filteredMCPServers`。MCP 页面分两段：获取/安装 与 配置同步；配置值默认明文展示。
 - Data：`dataPaths`、`dataInventory`、`retention`。
 - VPN：`vpnStatus`、`vpnCurrentIP`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnSettingsForm`。
 - Workspace：`wsShellOpen`、`wsDirsOpen`、`wsEnvOpen`、`wsZshrcOpen`。

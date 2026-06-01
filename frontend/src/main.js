@@ -70,6 +70,17 @@ const GetClaudeSettings     = ()                            => window['go']['mai
 const SaveClaudeSettings    = (content)                     => window['go']['main']['App']['SaveClaudeSettings'](content);
 const GetCodexConfig        = ()                            => window['go']['main']['App']['GetCodexConfig']();
 const SaveCodexConfig       = (content)                     => window['go']['main']['App']['SaveCodexConfig'](content);
+const GetMCPSettings        = ()                            => window['go']['main']['App']['GetMCPSettings']();
+const SaveMCPSettings       = (mcpDir)                      => window['go']['main']['App']['SaveMCPSettings'](mcpDir);
+const ListMCPServers        = ()                            => window['go']['main']['App']['ListMCPServers']();
+const SaveMCPServer         = (server)                      => window['go']['main']['App']['SaveMCPServer'](server);
+const DeleteMCPServer       = (id)                          => window['go']['main']['App']['DeleteMCPServer'](id);
+const ImportMCPFromLocalDir = (path)                        => window['go']['main']['App']['ImportMCPFromLocalDir'](path);
+const InstallMCPFromGit     = (url, name)                   => window['go']['main']['App']['InstallMCPFromGit'](url, name);
+const SaveNpmMCPServer      = (pkg, name)                   => window['go']['main']['App']['SaveNpmMCPServer'](pkg, name);
+const SetMCPEnabled         = (id, target, enabled)         => window['go']['main']['App']['SetMCPEnabled'](id, target, enabled);
+const TestMCPConnection     = (id, target)                  => window['go']['main']['App']['TestMCPConnection'](id, target);
+const GetMCPTemplates       = ()                            => window['go']['main']['App']['GetMCPTemplates']();
 
 window.hatchApp = function () {
   return {
@@ -230,8 +241,29 @@ window.hatchApp = function () {
     skillImportResult: null,
     skillConflictBusy: {},   // { "source:name": true }
 
+    // MCP management
+    mcpSettings: {},
+    mcpSettingsForm: { mcpDir: '' },
+    mcpSettingsSaving: false,
+    mcpServers: [],
+    mcpTemplates: [],
+    mcpLoading: false,
+    mcpSearch: '',
+    mcpFilter: 'all',        // 'all' | 'claude' | 'codex' | 'failed'
+    mcpEditTarget: null,
+    mcpForm: null,
+    mcpSyncBusy: {},         // { "id:target": true }
+    mcpTestBusy: {},         // { "id:target": true }
+    mcpLocalPath: '',
+    mcpGitURL: '',
+    mcpGitName: '',
+    mcpNpmPackage: '',
+    mcpNpmName: '',
+    mcpImportBusy: '',
+    mcpManualOpen: false,
+
     // AI sub-navigation
-    aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'tools'
+    aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'mcp' | 'tools'
 
     // VPN module
     vpnSubTab: 'overview',   // 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
@@ -398,15 +430,32 @@ window.hatchApp = function () {
 
     // ── Lifecycle ──────────────────────────────────────────────────────
     async init() {
+      this.applyInitialRoute();
       await this.loadConfig();
       await this.scanAll();
       this.loadDataPaths();
       this.loadDocLinks();
       this.loadAIProviders();
+      if (this.tab === 'ai' && this.aiSubTab === 'mcp') this.loadMCP();
+      if (this.tab === 'ai' && this.aiSubTab === 'skills') this.loadSkills();
       this.setupEvents();
       this.setupSearchShortcuts();
       setInterval(() => this.refreshStatuses(), 3000);
       try { this.vpnStatus = await GetVPNStatus(); } catch (_) {}
+    },
+
+    applyInitialRoute() {
+      const params = new URLSearchParams(window.location.search || '');
+      const ai = params.get('aiSubTab') || params.get('ai');
+      const allowedAI = ['overview', 'connect', 'skills', 'mcp', 'tools', 'prompts', 'data'];
+      if (allowedAI.includes(ai)) {
+        this.tab = 'ai';
+        this.selectedDir = null;
+        this.aiSubTab = ai;
+      }
+      if (this.aiSubTab === 'mcp' && (params.get('mcpManual') === '1' || params.get('mcpManual') === 'true')) {
+        this.mcpManualOpen = true;
+      }
     },
 
     async loadConfig() {
@@ -1323,6 +1372,301 @@ window.hatchApp = function () {
       }
     },
 
+    // ── MCP management ────────────────────────────────────────────────
+    async loadMCP() {
+      this.mcpLoading = true;
+      try {
+        const [settings, servers, templates] = await Promise.all([
+          GetMCPSettings(),
+          ListMCPServers(),
+          GetMCPTemplates(),
+        ]);
+        this.mcpSettings = settings || {};
+        this.mcpSettingsForm = { mcpDir: this.mcpSettings.mcpDir || '' };
+        this.mcpServers = servers || [];
+        this.mcpTemplates = templates || [];
+      } catch (e) {
+        this.showError(`加载 MCP 失败: ${e}`);
+      } finally {
+        this.mcpLoading = false;
+      }
+    },
+
+    async saveMCPSettings() {
+      this.mcpSettingsSaving = true;
+      try {
+        await SaveMCPSettings((this.mcpSettingsForm.mcpDir || '').trim());
+        await this.loadMCP();
+        this.showSuccess('MCP 管理目录已保存');
+      } catch (e) {
+        this.showError(`保存 MCP 目录失败: ${e}`);
+      } finally {
+        this.mcpSettingsSaving = false;
+      }
+    },
+
+    openMCPServerEditor(server) {
+      this.mcpEditTarget = server?.id || 'new';
+      this.mcpForm = this.mcpFormFromServer(server || {
+        id: '',
+        name: '',
+        sourceType: 'local',
+        transport: 'stdio',
+        env: {},
+        httpHeaders: {},
+      });
+    },
+
+    openMCPTemplate(template) {
+      const copy = JSON.parse(JSON.stringify(template || {}));
+      copy.enabledInClaude = false;
+      copy.enabledInCodex = false;
+      copy.lastTestResults = {};
+      this.openMCPServerEditor(copy);
+    },
+
+    closeMCPEditor() {
+      this.mcpEditTarget = null;
+      this.mcpForm = null;
+    },
+
+    openMCPManual() {
+      this.mcpManualOpen = true;
+    },
+
+    closeMCPManual() {
+      this.mcpManualOpen = false;
+    },
+
+    mcpFormFromServer(server) {
+      const env = server.env || {};
+      const headers = server.httpHeaders || {};
+      return {
+        ...server,
+        argsRaw: (server.args || []).join('\n'),
+        tagsRaw: (server.tags || []).join(', '),
+        envRows: Object.keys(env).sort().map(k => ({ key: k, value: env[k] })),
+        headerRows: Object.keys(headers).sort().map(k => ({ key: k, value: headers[k] })),
+      };
+    },
+
+    mcpServerFromForm() {
+      const f = this.mcpForm || {};
+      const env = {};
+      for (const row of f.envRows || []) {
+        const key = (row.key || '').trim();
+        if (key) env[key] = row.value || '';
+      }
+      const httpHeaders = {};
+      for (const row of f.headerRows || []) {
+        const key = (row.key || '').trim();
+        if (key) httpHeaders[key] = row.value || '';
+      }
+      return {
+        id: (f.id || '').trim(),
+        name: (f.name || '').trim(),
+        description: (f.description || '').trim(),
+        sourceType: f.sourceType || 'local',
+        sourceUrl: (f.sourceUrl || '').trim(),
+        localPath: (f.localPath || '').trim(),
+        packageName: (f.packageName || '').trim(),
+        transport: f.transport || 'stdio',
+        command: (f.command || '').trim(),
+        args: (f.argsRaw || '').split('\n').map(s => s.trim()).filter(Boolean),
+        cwd: (f.cwd || '').trim(),
+        url: (f.url || '').trim(),
+        env,
+        httpHeaders,
+        bearerTokenEnvVar: (f.bearerTokenEnvVar || '').trim(),
+        startupTimeoutSec: Number(f.startupTimeoutSec || 0),
+        toolTimeoutSec: Number(f.toolTimeoutSec || 0),
+        tags: (f.tagsRaw || '').split(',').map(s => s.trim()).filter(Boolean),
+      };
+    },
+
+    addMCPEnvRow() {
+      if (!this.mcpForm) return;
+      this.mcpForm.envRows = [...(this.mcpForm.envRows || []), { key: '', value: '' }];
+    },
+
+    removeMCPEnvRow(idx) {
+      if (!this.mcpForm) return;
+      this.mcpForm.envRows = (this.mcpForm.envRows || []).filter((_, i) => i !== idx);
+    },
+
+    addMCPHeaderRow() {
+      if (!this.mcpForm) return;
+      this.mcpForm.headerRows = [...(this.mcpForm.headerRows || []), { key: '', value: '' }];
+    },
+
+    removeMCPHeaderRow(idx) {
+      if (!this.mcpForm) return;
+      this.mcpForm.headerRows = (this.mcpForm.headerRows || []).filter((_, i) => i !== idx);
+    },
+
+    async saveMCPForm() {
+      if (!this.mcpForm) return;
+      try {
+        const server = this.mcpServerFromForm();
+        const existing = this.mcpServers.find(s => s.id === server.id);
+        await SaveMCPServer(server);
+        const resynced = [];
+        if (existing?.enabledInClaude) {
+          await SetMCPEnabled(server.id, 'claude', true);
+          resynced.push('Claude Code');
+        }
+        if (existing?.enabledInCodex) {
+          await SetMCPEnabled(server.id, 'codex', true);
+          resynced.push('Codex');
+        }
+        await this.loadMCP();
+        this.closeMCPEditor();
+        const syncNote = resynced.length ? `，已同步到 ${resynced.join(' / ')}` : '';
+        this.showSuccess(`MCP「${server.name || server.id}」已保存${syncNote}`);
+      } catch (e) {
+        this.showError(`保存 MCP 失败: ${e}`);
+      }
+    },
+
+    async deleteMCP(id) {
+      try {
+        await DeleteMCPServer(id);
+        if (this.mcpEditTarget === id) this.closeMCPEditor();
+        await this.loadMCP();
+        this.showSuccess(`MCP「${id}」已从 Hatch 删除`);
+      } catch (e) {
+        this.showError(`删除 MCP 失败: ${e}`);
+      }
+    },
+
+    async importMCPLocal() {
+      const path = (this.mcpLocalPath || '').trim();
+      if (!path) { this.showError('请先填写本地 MCP 目录'); return; }
+      this.mcpImportBusy = 'local';
+      try {
+        const server = await ImportMCPFromLocalDir(path);
+        this.mcpLocalPath = '';
+        await this.loadMCP();
+        this.showSuccess(`已导入 MCP「${server.name || server.id}」`);
+      } catch (e) {
+        this.showError(`导入本地 MCP 失败: ${e}`);
+      } finally {
+        this.mcpImportBusy = '';
+      }
+    },
+
+    async installMCPGit() {
+      const url = (this.mcpGitURL || '').trim();
+      if (!url) { this.showError('请先填写 Git URL'); return; }
+      this.mcpImportBusy = 'git';
+      try {
+        const server = await InstallMCPFromGit(url, (this.mcpGitName || '').trim());
+        this.mcpGitURL = '';
+        this.mcpGitName = '';
+        await this.loadMCP();
+        this.showSuccess(`已安装 MCP「${server.name || server.id}」`);
+      } catch (e) {
+        this.showError(`Git 安装 MCP 失败: ${e}`);
+      } finally {
+        this.mcpImportBusy = '';
+      }
+    },
+
+    async addNpmMCP() {
+      const pkg = (this.mcpNpmPackage || '').trim();
+      if (!pkg) { this.showError('请先填写 npm 包名'); return; }
+      this.mcpImportBusy = 'npm';
+      try {
+        const server = await SaveNpmMCPServer(pkg, (this.mcpNpmName || '').trim());
+        this.mcpNpmPackage = '';
+        this.mcpNpmName = '';
+        await this.loadMCP();
+        this.showSuccess(`已添加 npm MCP「${server.name || server.id}」`);
+      } catch (e) {
+        this.showError(`添加 npm MCP 失败: ${e}`);
+      } finally {
+        this.mcpImportBusy = '';
+      }
+    },
+
+    async toggleMCPEnabled(id, target, enabled) {
+      const key = id + ':' + target;
+      this.mcpSyncBusy = { ...this.mcpSyncBusy, [key]: true };
+      try {
+        await SetMCPEnabled(id, target, enabled);
+        const idx = this.mcpServers.findIndex(s => s.id === id);
+        if (idx >= 0) {
+          const s = { ...this.mcpServers[idx] };
+          if (target === 'claude') s.enabledInClaude = enabled;
+          else s.enabledInCodex = enabled;
+          this.mcpServers = [...this.mcpServers.slice(0, idx), s, ...this.mcpServers.slice(idx + 1)];
+        }
+        this.showSuccess(enabled ? `MCP「${id}」已写入 ${this.mcpTargetLabel(target)} 全局配置` : `MCP「${id}」已从 ${this.mcpTargetLabel(target)} 全局配置移除`);
+      } catch (e) {
+        await this.loadMCP();
+        this.showError(`同步 MCP 失败: ${e}`);
+      } finally {
+        const b = { ...this.mcpSyncBusy };
+        delete b[key];
+        this.mcpSyncBusy = b;
+      }
+    },
+
+    async testMCP(id, target) {
+      const key = id + ':' + target;
+      this.mcpTestBusy = { ...this.mcpTestBusy, [key]: true };
+      try {
+        const result = await TestMCPConnection(id, target);
+        const idx = this.mcpServers.findIndex(s => s.id === id);
+        if (idx >= 0) {
+          const s = { ...this.mcpServers[idx] };
+          s.lastTestResults = { ...(s.lastTestResults || {}), [target]: result };
+          this.mcpServers = [...this.mcpServers.slice(0, idx), s, ...this.mcpServers.slice(idx + 1)];
+        }
+        if (result.status === 'success') this.showSuccess(result.summary || 'MCP 连接成功');
+        else this.showError(result.summary || 'MCP 连接测试失败');
+      } catch (e) {
+        this.showError(`MCP 测试失败: ${e}`);
+      } finally {
+        const b = { ...this.mcpTestBusy };
+        delete b[key];
+        this.mcpTestBusy = b;
+      }
+    },
+
+    mcpTargetLabel(target) {
+      return target === 'claude' ? 'Claude Code' : 'Codex';
+    },
+
+    mcpStatusClass(result) {
+      if (!result) return 'mcp-test-none';
+      if (result.status === 'success') return 'mcp-test-ok';
+      if (result.status === 'failed') return 'mcp-test-fail';
+      return 'mcp-test-unknown';
+    },
+
+    mcpConfigLines(server) {
+      if (!server) return [];
+      const lines = [];
+      if (server.transport === 'http') {
+        if (server.url) lines.push({ label: 'URL', value: server.url });
+        if (server.bearerTokenEnvVar) lines.push({ label: 'Bearer Env', value: server.bearerTokenEnvVar });
+        for (const [key, value] of Object.entries(server.httpHeaders || {}).sort()) {
+          lines.push({ label: `Header ${key}`, value });
+        }
+      } else {
+        if (server.command) lines.push({ label: 'Command', value: server.command });
+        if ((server.args || []).length) lines.push({ label: 'Args', value: (server.args || []).join(' ') });
+        if (server.cwd) lines.push({ label: 'CWD', value: server.cwd });
+        for (const [key, value] of Object.entries(server.env || {}).sort()) {
+          lines.push({ label: `Env ${key}`, value });
+        }
+      }
+      if (server.startupTimeoutSec) lines.push({ label: '启动超时', value: `${server.startupTimeoutSec}s` });
+      if (server.toolTimeoutSec) lines.push({ label: '工具超时', value: `${server.toolTimeoutSec}s` });
+      return lines;
+    },
+
     // ── AI providers ──────────────────────────────────────────────────
     async loadAIProviders() {
       try {
@@ -2165,6 +2509,24 @@ window.hatchApp = function () {
       else if (this.skillFilter === 'codex')  list = list.filter(s => s.inCodex);
       const q = (this.skillSearch || '').trim().toLowerCase();
       if (q) list = list.filter(s => s.name.toLowerCase().includes(q));
+      return list;
+    },
+
+    get filteredMCPServers() {
+      let list = this.mcpServers || [];
+      if (this.mcpFilter === 'claude') list = list.filter(s => s.enabledInClaude);
+      else if (this.mcpFilter === 'codex') list = list.filter(s => s.enabledInCodex);
+      else if (this.mcpFilter === 'failed') {
+        list = list.filter(s => Object.values(s.lastTestResults || {}).some(r => r.status === 'failed'));
+      }
+      const q = (this.mcpSearch || '').trim().toLowerCase();
+      if (q) {
+        list = list.filter(s =>
+          (s.id || '').toLowerCase().includes(q) ||
+          (s.name || '').toLowerCase().includes(q) ||
+          (s.description || '').toLowerCase().includes(q)
+        );
+      }
       return list;
     },
 

@@ -29,5 +29,10 @@
 - `DeleteSkill()` is Hatch-local only; it removes the master store copy and must not remove `~/.claude/skills` or `~/.codex/skills`.
 - `DeleteSkillEverywhere()` is the explicit destructive path for removing a skill from Hatch, Claude, and Codex.
 - Skill import uses content fingerprints for same-name skills; differing content returns UI conflicts and must not overwrite Hatch master until the user chooses a side.
+- MCP env values are stored in plaintext in `config.json`, like AI keys, and the MCP UI intentionally displays config values in plaintext for local review; do not log or screenshot secrets.
+- MCP sync writes global config only: Claude Code uses `~/.claude.json` top-level `mcpServers`, Codex uses `~/.codex/config.toml` `[mcp_servers.*]`.
+- First-time MCP sync refuses to overwrite an existing same-name target entry; rename the Hatch MCP or remove the target entry first.
+- Deleting a synced MCP record removes the Hatch registry entry and its Hatch-managed Claude/Codex global entries; use the per-target switches first if you only want to disable one side.
+- `codex mcp get` may only prove config readability, not live server connectivity; show this as `unknown` rather than success.
 - `switchQuickAIProvider()` must keep provider storage and `aiForm` in sync.
 - New feature markup should avoid inline styles; add named classes in `style.css`.
