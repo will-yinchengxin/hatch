@@ -445,6 +445,7 @@ window.hatchApp = function () {
       this.loadAIProviders();
       if (this.tab === 'ai' && this.aiSubTab === 'mcp') this.loadMCP();
       if (this.tab === 'ai' && this.aiSubTab === 'skills') this.loadSkills();
+      if (this.tab === 'ai' && this.aiSubTab === 'overview') this.loadOverview();
       this.setupEvents();
       this.setupSearchShortcuts();
       setInterval(() => this.refreshStatuses(), 3000);
@@ -2333,6 +2334,134 @@ window.hatchApp = function () {
       this.successTimer = setTimeout(() => { this.success = ''; this.successTimer = null; }, 3000);
     },
 
+    // ── Shared helpers: clipboard + AI overview + bulk actions ──────────
+    async copyToClipboard(text, label) {
+      try {
+        await navigator.clipboard.writeText(text || '');
+        this.showSuccess(`已复制${label ? '：' + label : ''}`);
+      } catch (_) {
+        this.showError('复制失败');
+      }
+    },
+
+    // Render a copy-paste config snippet for one MCP, mirroring the backend
+    // renderClaudeMCPServer / renderCodexMCPServer output.
+    renderMCPSnippet(server, target) {
+      if (!server) return '';
+      const id = server.id || 'server';
+      if (target === 'claude') {
+        const body = {};
+        if (server.transport === 'http') {
+          body.type = 'http';
+          body.url = server.url || '';
+          if (server.httpHeaders && Object.keys(server.httpHeaders).length) body.headers = server.httpHeaders;
+        } else {
+          body.type = 'stdio';
+          body.command = server.command || '';
+          body.args = server.args || [];
+          body.env = server.env || {};
+          if (server.cwd) body.cwd = server.cwd;
+        }
+        return JSON.stringify({ [id]: body }, null, 2);
+      }
+      const q = (s) => JSON.stringify(s ?? '');
+      const lines = [`[mcp_servers.${id}]`];
+      if (server.transport === 'http') {
+        lines.push(`url = ${q(server.url || '')}`);
+        if (server.bearerTokenEnvVar) lines.push(`bearer_token_env_var = ${q(server.bearerTokenEnvVar)}`);
+        const hk = Object.keys(server.httpHeaders || {}).sort();
+        if (hk.length) lines.push(`http_headers = { ${hk.map(k => `${q(k)} = ${q(server.httpHeaders[k])}`).join(', ')} }`);
+      } else {
+        lines.push(`command = ${q(server.command || '')}`);
+        if ((server.args || []).length) lines.push(`args = [${server.args.map(q).join(', ')}]`);
+        if (server.cwd) lines.push(`cwd = ${q(server.cwd)}`);
+      }
+      if (server.startupTimeoutSec) lines.push(`startup_timeout_sec = ${server.startupTimeoutSec}`);
+      if (server.toolTimeoutSec) lines.push(`tool_timeout_sec = ${server.toolTimeoutSec}`);
+      lines.push('enabled = true');
+      const ek = server.transport !== 'http' ? Object.keys(server.env || {}).sort() : [];
+      if (ek.length) {
+        lines.push('', `[mcp_servers.${id}.env]`);
+        ek.forEach(k => lines.push(`${k} = ${q(server.env[k])}`));
+      }
+      return lines.join('\n');
+    },
+
+    async loadOverview() {
+      try { await this.loadAIUsageStatuses(); } catch (_) {}
+      try { if (!this.aiProviders.length) await this.loadAIProviders(); } catch (_) {}
+      try { this.skillsStats = await GetSkillsStats(); } catch (_) {}
+      try { if (!this.mcpServers.length) this.mcpServers = (await ListMCPServers()) || []; } catch (_) {}
+      try { if (!this.aiTraces.length) await this.loadAITraces(); } catch (_) {}
+    },
+
+    duplicateProvider(p) {
+      this.openProviderEditor(null);
+      this.providerForm = { id: '', name: `${p.name || p.model || '提供商'} 副本`, baseUrl: p.baseUrl || '', model: p.model || '', apiKey: '', _isNew: true };
+      this.providerTestResult = '';
+    },
+
+    async bulkSkillSync(target, enabled) {
+      const list = this.filteredSkills || [];
+      if (!list.length) { this.showError('没有可操作的 Skill'); return; }
+      let n = 0;
+      for (const s of list) {
+        const already = target === 'claude' ? s.inClaude : s.inCodex;
+        if (already === enabled) continue;
+        try { await SetSkillSync(s.name, target, enabled); n++; } catch (_) {}
+      }
+      await this.loadSkills();
+      const label = target === 'claude' ? 'Claude' : 'Codex';
+      this.showSuccess(enabled ? `已同步 ${n} 个 Skill 到 ${label}` : `已从 ${label} 取消 ${n} 个 Skill`);
+    },
+
+    async bulkSkillUnsyncAll() {
+      const list = this.filteredSkills || [];
+      if (!list.length) { this.showError('没有可操作的 Skill'); return; }
+      let n = 0;
+      for (const s of list) {
+        if (s.inClaude) { try { await SetSkillSync(s.name, 'claude', false); n++; } catch (_) {} }
+        if (s.inCodex)  { try { await SetSkillSync(s.name, 'codex',  false); n++; } catch (_) {} }
+      }
+      await this.loadSkills();
+      this.showSuccess(`已取消 ${n} 项同步`);
+    },
+
+    async bulkMCPEnable(target, enabled) {
+      const list = this.filteredMCPServers || [];
+      if (!list.length) { this.showError('没有可操作的 MCP'); return; }
+      let ok = 0, fail = 0;
+      for (const s of list) {
+        const already = target === 'claude' ? s.enabledInClaude : s.enabledInCodex;
+        if (already === enabled) continue;
+        try { await SetMCPEnabled(s.id, target, enabled); ok++; } catch (_) { fail++; }
+      }
+      await this.loadMCP();
+      const label = this.mcpTargetLabel(target);
+      let msg = enabled ? `已启用 ${ok} 个到 ${label}` : `已从 ${label} 移除 ${ok} 个`;
+      if (fail) msg += `，${fail} 个跳过（冲突或失败）`;
+      this.showSuccess(msg);
+    },
+
+    async bulkTestMCP() {
+      const list = this.filteredMCPServers || [];
+      let tested = 0, failed = 0;
+      for (const s of list) {
+        for (const target of ['claude', 'codex']) {
+          const enabled = target === 'claude' ? s.enabledInClaude : s.enabledInCodex;
+          if (!enabled) continue;
+          try {
+            const r = await TestMCPConnection(s.id, target);
+            tested++;
+            if (r && r.status === 'failed') failed++;
+          } catch (_) { tested++; failed++; }
+        }
+      }
+      await this.loadMCP();
+      if (!tested) { this.showError('没有已启用的 MCP 可测试'); return; }
+      this.showSuccess(`已测试 ${tested} 项${failed ? `，${failed} 项失败` : '，全部通过'}`);
+    },
+
     langIcon(lang) {
       return { python: '🐍', shell: '🐚', ruby: '💎', node: '🟩', binary: '⚙️' }[lang] || '📄';
     },
@@ -2579,6 +2708,18 @@ window.hatchApp = function () {
       const q = (this.skillSearch || '').trim().toLowerCase();
       if (q) list = list.filter(s => s.name.toLowerCase().includes(q));
       return list;
+    },
+
+    get mcpEnabledCount() {
+      return (this.mcpServers || []).filter(s => s.enabledInClaude || s.enabledInCodex).length;
+    },
+
+    get mcpFailedCount() {
+      return (this.mcpServers || []).filter(s => Object.values(s.lastTestResults || {}).some(r => r.status === 'failed')).length;
+    },
+
+    get recentTraceErrors() {
+      return (this.aiTraces || []).filter(t => t.error).slice(0, 3);
     },
 
     get filteredMCPServers() {

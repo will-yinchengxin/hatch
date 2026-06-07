@@ -76,6 +76,10 @@ Core tokens:
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
 - AI: overview, connect/providers/traces, skills, tools/status, prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. Model shortcut panels share the `agent-*` config layout classes; the Goals toggle sits in the shared action row.
+  - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, Claude/Codex install+usage, skills counts, MCP enabled/failed counts, and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods and is called on the overview sidenav button and from `init()`.
+  - Bulk actions (`.bulk-action-bar`) on skills and MCP: `bulkSkillSync` / `bulkSkillUnsyncAll` / `bulkMCPEnable` / `bulkTestMCP` iterate `filteredSkills` / `filteredMCPServers` serially.
+  - `copyToClipboard(text, label)` is the shared clipboard helper (provider URL/model, MCP `renderMCPSnippet` Claude/Codex blocks, default prompts, trace blocks). `renderMCPSnippet(server, target)` mirrors backend `renderClaudeMCPServer`/`renderCodexMCPServer`.
+  - `duplicateProvider(p)` opens the provider editor prefilled (baseUrl/model, blank apiKey, "副本" name).
 - VPN: overview/status hero, config editor, profiles editor, backup/restore, enhance rules/hosts/DNS view.
 
 ## CSS And Alpine Pitfalls

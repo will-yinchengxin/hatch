@@ -79,7 +79,8 @@
       "Bash(screencapture -x /tmp/hatch-chrome.png)",
       "Bash(screencapture -x /tmp/hatch-chrome2.png)",
       "Bash(screencapture -x /tmp/hatch-native.png)",
-      "mcp__mysql__mysql_query"
+      "mcp__mysql__mysql_query",
+      "Bash(go vet *)"
     ]
   }
 }

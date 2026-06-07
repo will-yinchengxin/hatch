@@ -6148,3 +6148,114 @@ details[open] .export-preview-toggle::before {
 .sort-mode-card:active {
   cursor: grabbing;
 }
+
+/* ── AI overview dashboard ──────────────────────────────────────── */
+.ai-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+.ai-dash-card {
+  background: var(--surface-2);
+  border: 1px solid var(--surface-4);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.05s;
+}
+.ai-dash-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(193, 95, 60, 0.12);
+}
+.ai-dash-card:active {
+  transform: translateY(1px);
+}
+.ai-dash-card-wide {
+  grid-column: 1 / -1;
+}
+.ai-dash-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-dash-icon {
+  font-size: 1.05rem;
+}
+.ai-dash-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.ai-dash-head .badge {
+  margin-left: auto;
+}
+.ai-dash-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ai-dash-stat {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.ai-dash-usage {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ai-dash-usage-pill {
+  background: var(--surface-3);
+  border: 1px solid var(--surface-4);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.ai-dash-usage-pill.usage-low  { border-color: var(--green); }
+.ai-dash-usage-pill.usage-mid  { border-color: var(--yellow); }
+.ai-dash-usage-pill.usage-high { border-color: var(--red); }
+.ai-dash-usage-pill.usage-low  strong { color: var(--green); }
+.ai-dash-usage-pill.usage-mid  strong { color: var(--yellow); }
+.ai-dash-usage-pill.usage-high strong { color: var(--red); }
+.ai-dash-err-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--surface-3);
+}
+.ai-dash-err-line:last-child {
+  border-bottom: none;
+}
+.ai-dash-err-op {
+  font-weight: 600;
+  color: var(--red);
+  white-space: nowrap;
+}
+.ai-dash-err-msg {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Bulk action bar (skills / mcp) ─────────────────────────────── */
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 0 2px;
+}
+
+/* ── Inline copy button ─────────────────────────────────────────── */
+.copy-inline {
+  margin-left: 8px;
+  padding: 0 6px;
+  line-height: 1.6;
+}

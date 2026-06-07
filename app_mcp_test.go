@@ -178,8 +178,54 @@ func TestSetMCPEnabledRejectsExistingClaudeEntry(t *testing.T) {
 		Command:   "node",
 	}}}}
 	err := a.SetMCPEnabled("mysql", mcpTargetClaude, true)
-	if err == nil || !strings.Contains(err.Error(), "already has MCP") {
+	if err == nil || !strings.Contains(err.Error(), "已跳过以避免覆盖") {
 		t.Fatalf("expected conflict error, got %v", err)
+	}
+}
+
+func TestSetMCPEnabledRejectsExistingCodexEntry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	codexDir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(codexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(codexDir, "config.toml"), []byte("[mcp_servers.mysql]\ncommand = \"existing\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{cfg: &config.Config{OverrideMeta: map[string]config.ScriptMeta{}, MCPServers: []config.MCPServer{{
+		ID:        "mysql",
+		Name:      "MySQL",
+		Transport: mcpTransportStdio,
+		Command:   "node",
+	}}}}
+	err := a.SetMCPEnabled("mysql", mcpTargetCodex, true)
+	if err == nil || !strings.Contains(err.Error(), "已跳过以避免覆盖") {
+		t.Fatalf("expected conflict error, got %v", err)
+	}
+}
+
+// Re-syncing an MCP that Hatch already enabled must be allowed to overwrite its
+// own entry rather than tripping the conflict guard.
+func TestSetMCPEnabledAllowsResyncOfOwnEntry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{
+  "mcpServers": {
+    "mysql": {"type":"stdio","command":"node","args":[],"env":{}}
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{cfg: &config.Config{OverrideMeta: map[string]config.ScriptMeta{}, MCPServers: []config.MCPServer{{
+		ID:              "mysql",
+		Name:            "MySQL",
+		Transport:       mcpTransportStdio,
+		Command:         "node",
+		EnabledInClaude: true,
+	}}}}
+	if err := a.SetMCPEnabled("mysql", mcpTargetClaude, true); err != nil {
+		t.Fatalf("resync should be allowed, got %v", err)
 	}
 }
 

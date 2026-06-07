@@ -374,8 +374,24 @@ func (a *App) SetMCPEnabled(id, target string, enabled bool) error {
 	var err error
 	switch target {
 	case mcpTargetClaude:
+		// First-time enable must not clobber a same-named entry the user wrote by
+		// hand. Re-syncing an already-enabled MCP (edit/update) is allowed to overwrite.
+		if enabled && !server.EnabledInClaude {
+			exists, derr := claudeMCPEntryExists(server.ID)
+			if derr != nil {
+				return derr
+			}
+			if exists {
+				return fmt.Errorf("Claude Code 配置中已存在名为「%s」的 MCP，已跳过以避免覆盖手工配置；如需 Hatch 接管请先在 ~/.claude.json 中删除该条目", server.ID)
+			}
+		}
 		err = writeClaudeMCPConfig(server, enabled)
 	case mcpTargetCodex:
+		if enabled && !server.EnabledInCodex {
+			if codexMCPEntryExists(server.ID) {
+				return fmt.Errorf("Codex 配置中已存在名为「%s」的 MCP，已跳过以避免覆盖手工配置；如需 Hatch 接管请先在 ~/.codex/config.toml 中删除该条目", server.ID)
+			}
+		}
 		err = writeCodexMCPConfig(server, enabled)
 	default:
 		return fmt.Errorf("unknown MCP target: %s", target)
@@ -772,6 +788,55 @@ func cloneStringMap(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// claudeMCPEntryExists reports whether ~/.claude.json already defines an MCP
+// server under the given id. Used to avoid clobbering hand-written entries.
+func claudeMCPEntryExists(id string) (bool, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false, err
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".claude.json"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return false, nil
+	}
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return false, fmt.Errorf("invalid ~/.claude.json: %w", err)
+	}
+	servers, _ := raw["mcpServers"].(map[string]interface{})
+	_, ok := servers[id]
+	return ok, nil
+}
+
+// codexMCPEntryExists reports whether ~/.codex/config.toml already defines a
+// [mcp_servers.<id>] section. Missing file/dir is treated as "not present".
+func codexMCPEntryExists(id string) bool {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
+			continue
+		}
+		if strings.Trim(trimmed, "[]") == "mcp_servers."+id {
+			return true
+		}
+	}
+	return false
 }
 
 func writeClaudeMCPConfig(server config.MCPServer, enabled bool) error {

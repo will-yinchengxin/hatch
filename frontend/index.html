@@ -631,7 +631,7 @@
       <!-- Left sidebar -->
       <nav class="ai-sidenav">
         <button class="ai-sidenav-item" :class="aiSubTab==='overview' ? 'active' : ''"
-          @click="aiSubTab='overview'">
+          @click="aiSubTab='overview'; loadOverview()">
           <span class="ai-sidenav-icon">📖</span>
           <span>概览</span>
         </button>
@@ -676,22 +676,127 @@
         <!-- ══ 概览 ══════════════════════════════════════════════════ -->
         <div x-show="aiSubTab==='overview'">
           <section class="settings-section">
-            <h3>可用能力</h3>
-            <div class="ai-capability-list">
-              <div class="ai-capability">
-                <strong>✦ 脚本智能填写</strong>
-                <span>脚本卡片点击「✦ 智能填写」，AI 读取内容填充元信息，进入编辑抽屉后手动保存。</span>
+            <div class="section-header-row">
+              <h3>概览</h3>
+              <button class="btn-sm" @click="loadOverview()" title="刷新状态">↻</button>
+            </div>
+            <div class="ai-dashboard-grid">
+
+              <!-- 连接 -->
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='connect'" @keydown.enter="aiSubTab='connect'">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">🔌</span>
+                  <span class="ai-dash-title">连接</span>
+                  <span class="badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '可用' : '未完成'"></span>
+                </div>
+                <div class="ai-dash-body">
+                  <template x-if="activeProvider">
+                    <div>
+                      <div class="ai-dash-stat" x-text="activeProvider.name || activeProvider.model"></div>
+                      <div class="muted text-xs" x-text="activeProvider.model"></div>
+                    </div>
+                  </template>
+                  <template x-if="!activeProvider">
+                    <div class="muted text-sm">未配置活跃提供商</div>
+                  </template>
+                  <div class="muted text-xs" x-text="'共 ' + (aiProviders.length||0) + ' 个提供商'"></div>
+                </div>
               </div>
-              <div class="ai-capability">
-                <strong>📄 脚本内容编辑</strong>
-                <span>脚本卡片点击「📄 内容」，输入 AI 指令后点「生成」，AI 按指令修改脚本，确认后保存写入。</span>
+
+              <!-- Claude Code -->
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='tools'; loadAIUsageStatuses()" @keydown.enter="aiSubTab='tools'; loadAIUsageStatuses()">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">⚡</span>
+                  <span class="ai-dash-title">Claude Code</span>
+                  <span class="badge" :class="claudeStatus?.claudeInstalled ? 'badge-ok' : 'badge-warn'" x-text="claudeStatus ? (claudeStatus.claudeInstalled ? '已装' : '未装') : '…'"></span>
+                </div>
+                <div class="ai-dash-body">
+                  <template x-if="claudeStatus && claudeStatus.hasUsageData">
+                    <div class="ai-dash-usage">
+                      <span class="ai-dash-usage-pill" :class="usagePill(claudeStatus.fiveHourPct)">5h <strong x-text="Math.round(claudeStatus.fiveHourPct)+'%'"></strong></span>
+                      <span class="ai-dash-usage-pill" :class="usagePill(claudeStatus.sevenDayPct)">7d <strong x-text="Math.round(claudeStatus.sevenDayPct)+'%'"></strong></span>
+                    </div>
+                  </template>
+                  <template x-if="claudeStatus && !claudeStatus.hasUsageData">
+                    <div class="muted text-sm" x-text="claudeStatus.claudeInstalled ? '无用量缓存' : 'CLI 未安装'"></div>
+                  </template>
+                  <template x-if="!claudeStatus">
+                    <div class="muted text-sm">点击检测</div>
+                  </template>
+                </div>
               </div>
-              <div class="ai-capability">
-                <strong>🗂 zshrc 智能整理</strong>
-                <span>工作台「Shell 配置解析」区域，AI 重排 ~/.zshrc 结构，预览确认后应用，原文自动备份。</span>
+
+              <!-- Codex -->
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='tools'; loadAIUsageStatuses()" @keydown.enter="aiSubTab='tools'; loadAIUsageStatuses()">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">🧠</span>
+                  <span class="ai-dash-title">Codex</span>
+                  <span class="badge" :class="codexStatus?.codexInstalled ? 'badge-ok' : 'badge-warn'" x-text="codexStatus ? (codexStatus.codexInstalled ? '已装' : '未装') : '…'"></span>
+                </div>
+                <div class="ai-dash-body">
+                  <template x-if="codexStatus && codexStatus.hasUsageData">
+                    <div class="ai-dash-usage">
+                      <span class="ai-dash-usage-pill" :class="usagePill(codexStatus.primary.usedPercent)" x-show="codexStatus.primary?.available" x-text="(codexStatus.primary?.label || '主') + ' ' + Math.round(codexStatus.primary?.usedPercent || 0) + '%'"></span>
+                      <span class="ai-dash-usage-pill" :class="usagePill(codexStatus.secondary.usedPercent)" x-show="codexStatus.secondary?.available" x-text="(codexStatus.secondary?.label || '次') + ' ' + Math.round(codexStatus.secondary?.usedPercent || 0) + '%'"></span>
+                    </div>
+                  </template>
+                  <template x-if="codexStatus && !codexStatus.hasUsageData">
+                    <div class="muted text-sm" x-text="codexStatus.codexInstalled ? '无用量数据' : 'CLI 未安装'"></div>
+                  </template>
+                  <template x-if="!codexStatus">
+                    <div class="muted text-sm">点击检测</div>
+                  </template>
+                </div>
               </div>
+
+              <!-- Skills -->
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='skills'; loadSkills()" @keydown.enter="aiSubTab='skills'; loadSkills()">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">📚</span>
+                  <span class="ai-dash-title">Skills</span>
+                </div>
+                <div class="ai-dash-body">
+                  <div class="ai-dash-stat" x-text="skillsStats.total || 0"></div>
+                  <div class="muted text-xs" x-text="'Claude ' + (skillsStats.claude||0) + ' · Codex ' + (skillsStats.codex||0)"></div>
+                </div>
+              </div>
+
+              <!-- MCP -->
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='mcp'; loadMCP()" @keydown.enter="aiSubTab='mcp'; loadMCP()">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">🧩</span>
+                  <span class="ai-dash-title">MCP</span>
+                  <span class="badge badge-warn" x-show="mcpFailedCount > 0" x-text="mcpFailedCount + ' 失败'"></span>
+                </div>
+                <div class="ai-dash-body">
+                  <div class="ai-dash-stat" x-text="(mcpServers.length||0)"></div>
+                  <div class="muted text-xs" x-text="'已启用 ' + mcpEnabledCount + ' 个'"></div>
+                </div>
+              </div>
+
+              <!-- 最近报错 -->
+              <div class="ai-dash-card ai-dash-card-wide" role="button" tabindex="0" @click="aiSubTab='connect'" @keydown.enter="aiSubTab='connect'">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">📡</span>
+                  <span class="ai-dash-title">最近 AI 报错</span>
+                </div>
+                <div class="ai-dash-body">
+                  <template x-if="recentTraceErrors.length === 0">
+                    <div class="muted text-sm">无异常</div>
+                  </template>
+                  <template x-for="t in recentTraceErrors" :key="t.id">
+                    <div class="ai-dash-err-line">
+                      <span class="ai-dash-err-op" x-text="t.op"></span>
+                      <span class="muted text-xs" x-text="t.at"></span>
+                      <span class="ai-dash-err-msg text-xs" x-text="t.error"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
             </div>
           </section>
+
           <section class="settings-section">
             <h3>快速开始</h3>
             <p class="hint">1. 前往「连接」配置 OpenAI 兼容的 API 密钥和模型。</p>
@@ -733,6 +838,9 @@
                     <button class="btn-sm" x-show="activeProviderID !== p.id"
                       @click="setActiveProvider(p.id)">切换</button>
                     <span class="badge badge-ok provider-badge-active" x-show="activeProviderID === p.id">活跃</span>
+                    <button class="btn-sm" @click="copyToClipboard(p.baseUrl, 'Base URL')" title="复制 Base URL">⧉ URL</button>
+                    <button class="btn-sm" @click="copyToClipboard(p.model, '模型名')" title="复制模型名">⧉ 模型</button>
+                    <button class="btn-sm" @click="duplicateProvider(p)" title="基于此条目复制为新提供商">复制</button>
                     <button class="btn-sm" @click="openProviderEditor(p)">编辑</button>
                     <button class="btn-sm btn-danger-sm" @click="deleteProvider(p.id)">✕</button>
                   </div>
@@ -853,11 +961,18 @@
                     <div x-show="aiTraceExpanded[t.id]" class="ai-trace-detail">
                       <div class="ai-trace-block-label">URL</div>
                       <pre class="ai-trace-block ai-trace-url" x-text="t.url"></pre>
-                      <div class="ai-trace-block-label">System Prompt</div>
+                      <div class="ai-trace-block-label">System Prompt
+                        <button class="btn-sm copy-inline" @click.stop="copyToClipboard(t.systemPrompt, 'System Prompt')">⧉</button>
+                      </div>
                       <pre class="ai-trace-block" x-text="t.systemPrompt"></pre>
-                      <div class="ai-trace-block-label">User Prompt</div>
+                      <div class="ai-trace-block-label">User Prompt
+                        <button class="btn-sm copy-inline" @click.stop="copyToClipboard(t.userPrompt, 'User Prompt')">⧉</button>
+                      </div>
                       <pre class="ai-trace-block" x-text="t.userPrompt"></pre>
-                      <div class="ai-trace-block-label" x-text="t.error ? '原始响应 / 错误' : '原始响应'"></div>
+                      <div class="ai-trace-block-label">
+                        <span x-text="t.error ? '原始响应 / 错误' : '原始响应'"></span>
+                        <button class="btn-sm copy-inline" @click.stop="copyToClipboard(t.rawResponse || t.error, '响应')">⧉</button>
+                      </div>
                       <pre class="ai-trace-block" :class="t.error ? 'ai-trace-block-err' : ''" x-text="t.rawResponse || t.error"></pre>
                     </div>
                   </div>
@@ -928,6 +1043,13 @@
                 <button class="skill-filter-tab" :class="skillFilter==='codex'  ? 'active' : ''" @click="skillFilter='codex'">Codex</button>
               </div>
               <input type="search" x-model="skillSearch" placeholder="按名称搜索…" class="skill-search-input" />
+            </div>
+
+            <div class="bulk-action-bar" x-show="!skillsLoading && filteredSkills.length > 0">
+              <span class="muted text-xs">批量（按当前筛选）：</span>
+              <button class="btn-sm" @click="bulkSkillSync('claude', true)">全部 → Claude</button>
+              <button class="btn-sm" @click="bulkSkillSync('codex', true)">全部 → Codex</button>
+              <button class="btn-sm" @click="bulkSkillUnsyncAll()">全部取消同步</button>
             </div>
 
             <div x-show="skillsLoading" class="muted text-sm" style="padding:12px 0">加载中…</div>
@@ -1371,6 +1493,13 @@
               <input type="search" x-model="mcpSearch" placeholder="搜索 MCP…" class="skill-search-input" />
             </div>
 
+            <div class="bulk-action-bar" x-show="!mcpLoading && filteredMCPServers.length > 0">
+              <span class="muted text-xs">批量（按当前筛选）：</span>
+              <button class="btn-sm" @click="bulkMCPEnable('claude', true)">全部 → Claude</button>
+              <button class="btn-sm" @click="bulkMCPEnable('codex', true)">全部 → Codex</button>
+              <button class="btn-sm" @click="bulkTestMCP()">测全部</button>
+            </div>
+
             <div x-show="mcpLoading" class="muted text-sm mcp-empty">加载中…</div>
             <div x-show="!mcpLoading && mcpServers.length === 0" class="muted text-sm mcp-empty">暂无 MCP。可以从本地目录、Git 或 npm 添加。</div>
             <div class="mcp-list" x-show="!mcpLoading && filteredMCPServers.length > 0">
@@ -1417,6 +1546,8 @@
                     <div class="mcp-actions">
                       <button class="btn-sm" @click="testMCP(s.id, 'claude')" :disabled="!s.enabledInClaude || !!mcpTestBusy[s.id+':claude']" :aria-busy="!!mcpTestBusy[s.id+':claude']" title="需先开启 Claude 同步">测 Claude</button>
                       <button class="btn-sm" @click="testMCP(s.id, 'codex')" :disabled="!s.enabledInCodex || !!mcpTestBusy[s.id+':codex']" :aria-busy="!!mcpTestBusy[s.id+':codex']" title="需先开启 Codex 同步">测 Codex</button>
+                      <button class="btn-sm" @click="copyToClipboard(renderMCPSnippet(s, 'claude'), 'Claude 配置')" title="复制 Claude (~/.claude.json) 配置块">⧉ Claude</button>
+                      <button class="btn-sm" @click="copyToClipboard(renderMCPSnippet(s, 'codex'), 'Codex 配置')" title="复制 Codex (config.toml) 配置块">⧉ Codex</button>
                       <button class="btn-sm" x-show="s.sourceType === 'git'" @click="updateMCPFromGit(s.id)" :aria-busy="!!mcpUpdateBusy[s.id]" title="git pull 更新">更新</button>
                       <button class="btn-sm" @click="openMCPServerEditor(s)">编辑</button>
                       <button class="btn-sm btn-danger" @click="openMCPDeleteModal(s)">删除</button>
@@ -1884,6 +2015,7 @@
                     <span class="prompt-status-on" x-show="(promptTemplates[op.key]||'').trim()">● 已覆盖</span>
                     <span class="prompt-status-off" x-show="!(promptTemplates[op.key]||'').trim()">○ 使用默认</span>
                     <button class="btn-edit" type="button" @click="togglePromptDefault(op.key)" x-text="promptDefaultsOpen[op.key] ? '收起默认' : '查看默认'"></button>
+                    <button class="btn-edit" type="button" @click="copyToClipboard(promptDefaults[op.key], '默认 Prompt')" title="复制默认 Prompt 到剪贴板">⧉ 复制默认</button>
                     <button class="btn-edit" type="button" @click="useDefaultAsTemplate(op.key)" title="把默认 Prompt 复制到下面，方便基于它修改">↓ 以默认为模板</button>
                   </span>
                 </label>

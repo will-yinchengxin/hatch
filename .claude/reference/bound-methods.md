@@ -36,6 +36,10 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetClaudeCodePresets / SaveClaudeCodePreset / DeleteClaudeCodePreset` | Claude preset management |
 | `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | Codex preset management |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
+| `ListMCPServers / SaveMCPServer / DeleteMCPServer / GetMCPTemplates` | MCP registry CRUD + built-in template gallery |
+| `ImportMCPFromLocalDir / InstallMCPFromGit / SaveNpmMCPServer` | Add MCP from local dir / git clone / npm package |
+| `SetMCPEnabled(id, target, enabled)` | Sync MCP to `~/.claude.json` or `~/.codex/config.toml`; first-time enable refuses to overwrite a same-named hand-written entry (resync of an already-enabled MCP overwrites its own block) |
+| `TestMCPConnection(id, target)` | Claude: `claude mcp get` real connection check; Codex: config readability only |
 | `UninstallMCPFromDisk(id)` | Remove from Hatch registry + Claude/Codex configs + delete local dir (git/local only) |
 | `UpdateMCPFromGit(id)` | `git pull` in local dir, re-infer command/args, resync to enabled targets |
 | `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |
