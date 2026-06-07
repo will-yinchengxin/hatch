@@ -33,24 +33,24 @@ rg "func \\(a \\*App\\)" -n *.go
 
 重点：
 
-- 新增/删除/修改 Wails-bound methods -> 更新 `.codex/reference/bound-methods.md`。
-- `internal/config/config.go` 数据结构变更 -> 更新 `.codex/reference/data-model.md`。
-- `frontend/src/main.js` 新状态字段 -> 更新 `frontend.md` 和 `hatch-frontend` skill。
-- 新 UI 布局、CSS class、交互模式 -> 更新 `frontend.md` 和 `hatch-frontend` skill。
-- scanner/executor/scheduler/zshrc/AI/data/VPN 行为变化 -> 更新 `internals.md`。
-- 非显而易见的问题 -> 更新 `gotchas.md`。
+- 新增/删除/修改 Wails-bound methods -> 更新 `.codex/reference/bound-methods.md` 和 `AGENTS.md`。
+- `internal/config/config.go` 数据结构变更 -> 更新 `.codex/reference/data-model.md` 和 `AGENTS.md`。
+- `frontend/src/main.js` 新状态字段 -> 更新 `.codex/reference/frontend.md` 和 `.codex/skills/hatch-frontend/SKILL.md`。
+- 新 UI 布局、CSS class、交互模式 -> 更新 `.codex/reference/frontend.md` 和 `.codex/skills/hatch-frontend/SKILL.md`。
+- scanner/executor/scheduler/zshrc/AI/data/VPN 行为变化 -> 更新 `.codex/reference/internals.md`。
+- 非显而易见的问题 -> 更新 `.codex/reference/gotchas.md`。
 
 ## 更新原则
 
 - `AGENTS.md` 只放高频规则、source of truth、命令、边界和文档路由。
-- 细节进入 `.codex/reference/**`，不要把 `AGENTS.md` 重新变成完整手册。
+- 细节进入 `.codex/reference/**`，不要把入口文档重新变成完整手册。
 - Skill 只保留可执行工作流和任务前检查，不承载所有参考内容。
 - 不创建 hooks、agents、subagents 或后台自动化，除非用户明确同意。
 
 ## 检查标准
 
-- `rg "func \\(a \\*App\\)" -n *.go` 的方法表与 `bound-methods.md` 没有明显遗漏。
-- Config / ScriptMeta 字段与 `data-model.md` 没有明显漂移。
-- 前端状态字段、sub-tab、主要页面结构与 `frontend.md` 没有明显漂移。
+- `rg "func \\(a \\*App\\)" -n *.go` 的方法表与 bound-methods 文档没有明显遗漏。
+- Config / ScriptMeta 字段与 data-model 文档没有明显漂移。
+- 前端状态字段、sub-tab、主要页面结构与 frontend 文档没有明显漂移。
 - `AGENTS.md` 不包含过长实现细节，能路由到对应 reference 或 skill。
 - 读回改动文件，确认 markdown frontmatter 和表格完整。

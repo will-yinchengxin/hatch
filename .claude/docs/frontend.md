@@ -30,6 +30,8 @@ editTarget != null      -> edit drawer overlay
 | `skills / skillsStats / skillSearch / skillFilter / filteredSkills` | Skill list and filter UI |
 | `skillImportResult / skillConflictBusy` | Skill import results and per-conflict action state |
 | `skillAIInstruction / skillAIBusy` | Skill AI optimize bar |
+| `mcpSettings / mcpServers / mcpTemplates / filteredMCPServers` | MCP registry, templates, filters, and config directory |
+| `mcpForm / mcpSyncBusy / mcpTestBusy / mcpImportBusy / mcpManualOpen` | MCP editor, target sync, connection checks, separated source-install state, and operation-manual modal |
 | `hooks / hooksStats / hooksSearch / hooksFilter / filteredHooks` | Hook list and filter UI |
 | `hookEventSupport / hookForm / hookEditOpen / hookEditIsNew / hookSaving` | Hook event catalog + edit form state |
 | `hookSyncBusy / hookTemplates / hookTemplateGalleryOpen / hookSuggestDesc / hookSuggestBusy` | Hook sync busy keys, template gallery, header AI draft bar |
@@ -79,7 +81,7 @@ Core tokens:
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI: overview, connect/providers/traces, skills, tools/status, prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. Model shortcut panels share the `agent-*` config layout classes; the Goals toggle sits in the shared action row.
+- AI: overview, connect/providers/traces, skills, MCP, hooks, tools/status, prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. MCP starts with a double-click operation manual, separates local/Git/npm acquisition from Claude Code/Codex sync, shows MCP config values in plaintext for review, writes global target config, and shows CLI test results. Model shortcut panels share the `agent-*` config layout classes; the Goals toggle sits in the shared action row.
   - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, Claude/Codex install+usage, skills counts, MCP enabled/failed counts, hooks counts (total + Claude/Codex enabled), and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods (including `GetHooksStats`) and is called on the overview sidenav button and from `init()`.
   - Bulk actions (`.bulk-action-bar`) on skills and MCP: `bulkSkillSync` / `bulkSkillUnsyncAll` / `bulkMCPEnable` / `bulkTestMCP` iterate `filteredSkills` / `filteredMCPServers` serially.
   - `copyToClipboard(text, label)` is the shared clipboard helper (provider URL/model, MCP `renderMCPSnippet` Claude/Codex blocks, default prompts, trace blocks). `renderMCPSnippet(server, target)` mirrors backend `renderClaudeMCPServer`/`renderCodexMCPServer`.

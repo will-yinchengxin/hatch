@@ -16,13 +16,10 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `SaveExports / CheckZshrc / ParseZshrc / SaveZshrcAnnotation` | Shell config |
 | `SuggestZshrcOrganization / ApplyZshrcOrganization` | AI zshrc preview + backup/write |
 | `GetAutoLaunchEnabled / SetAutoLaunchEnabled` | Login autostart |
-| AI tool status methods | Status cards |
+| `GetClaudeCodeStatus / GetCodexUsageStatus` | Status cards |
 | `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / DeleteSkillEverywhere / GetSkillsStats` | Skill CRUD |
 | `SetSkillSync / ImportSkillsFrom / ResolveSkillImportConflict / CreateSkillTemplate` | Skill sync + import conflict handling |
 | `SuggestSkillContent / SuggestSkillFromDescription` | Skill AI optimize/generation |
-| `GetMCPSettings / SaveMCPSettings / ListMCPServers / SaveMCPServer / DeleteMCPServer` | MCP registry and management directory |
-| `ImportMCPFromLocalDir / InstallMCPFromGit / SaveNpmMCPServer / GetMCPTemplates` | MCP sources and starter templates |
-| `SetMCPEnabled / TestMCPConnection` | Write/remove global Claude Code/Codex MCP config and run CLI checks |
 | `GetAppDataPaths / SaveAppDataPaths` | Trace + skills dir config |
 | `GetAITraces / ClearAITraces / GetAITraceStorageInfo` | AI trace inspect |
 | `SaveAIConfig / GetAIProviders / SaveAIProviders / TestAIConfig` | Provider management |
@@ -34,15 +31,27 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `ExportBackup / ImportBackup` | Config/store/skills zip backup |
 | `RunWithPreScripts` | Explicit chain runner |
 | `GetAppDataInventory / CleanupDataDir / GetRetentionPolicy / SaveRetentionPolicy` | Data dashboard |
-| AI tool settings and model config editors | Tool config editors |
+| `GetClaudeSettings / SaveClaudeSettings / GetClaudeCodeConfig / SetClaudeCodeConfig` | Compatible-target config editors |
 | `GetCodexConfig / SaveCodexConfig / GetCodexModelConfig / SetCodexModelConfig` | Codex config editors, including model, reasoning effort, and `[features].goals` |
-| AI tool preset methods | Preset management |
+| `GetClaudeCodePresets / SaveClaudeCodePreset / DeleteClaudeCodePreset` | Compatible-target preset management |
 | `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | Codex preset management |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
+| `GetMCPSettings / SaveMCPSettings(mcpDir)` | Read/write MCP master dir (default `~/MyHub/mcp` if present); `SaveMCPSettings` creates the dir |
+| `ListMCPServers / SaveMCPServer / DeleteMCPServer / GetMCPTemplates` | MCP registry CRUD + built-in template gallery; first `ListMCPServers` seeds the registry from disk once (`MCPSeeded`) |
+| `ImportMCPFromLocalDir / InstallMCPFromGit / SaveNpmMCPServer` | Add MCP from local dir / git clone / npm package |
+| `SetMCPEnabled(id, target, enabled)` | Sync MCP to `~/.claude.json` or `~/.codex/config.toml`; first-time enable refuses to overwrite a same-named hand-written entry (resync of an already-enabled MCP overwrites its own block) |
+| `TestMCPConnection(id, target)` | Compatible target: `claude mcp get` real connection check; Codex: config readability only |
+| `UninstallMCPFromDisk(id)` | Remove from Hatch registry + target configs + delete local dir (git/local only) |
+| `UpdateMCPFromGit(id)` | `git pull` in local dir, re-infer command/args, resync to enabled targets |
+| `ListHooks / SaveHook / DeleteHook / GetHooksStats` | Command-hook registry CRUD; `SaveHook` preserves sync flags; `DeleteHook` also removes from enabled targets |
+| `SetHookEnabled(id, target, enabled)` | Sync one hook to `~/.claude/settings.json` (`hooks`) or `~/.codex/hooks.json`; first-time enable refuses to overwrite a matching hand-written hook; rejects target-unsupported events |
+| `GetHookTemplates / GetHookEventSupport` | Built-in hook template gallery; event catalog with per-target (claude/codex) support flags |
+| `SuggestHookFromDescription(desc)` | AI drafts a command `HookDef` from natural language; UI-only, never persisted |
+| `SuggestHookEdit(current, instruction)` | AI refines an existing `HookDef` per an instruction (preserves id); UI-only, never persisted |
 | `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |
 | `GetVPNEnhanceData` | Parse merge/rules profiles into prepend rules, hosts, DNS fake-IP filters |
-| `GetVPNConfigFile / SaveVPNConfigFile / GetVPNProfileContent / SaveVPNProfileContent` | VPN config/profile edit |
-| `ExportVPNBackup / ImportVPNBackup / ListVPNBackups` | VPN backup/restore |
+| `GetVPNConfigFile / SaveVPNConfigFile / GetVPNProfileContent / SaveVPNProfileContent` | VPN config/profile edit; saves validate YAML before overwrite (`.js` script profiles skip validation) and write a `.bak` |
+| `ExportVPNBackup / ImportVPNBackup / ListVPNBackups / DeleteVPNBackup` | VPN backup/restore/delete; import is zip-slip guarded, delete only accepts `clash-verge-*.zip` inside the managed backup dir |
 | `OpenVPNDir / OpenVPNBackupDir` | Finder open helpers |
 
 ## Events

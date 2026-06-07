@@ -96,7 +96,15 @@
       "Bash(codex exec *)",
       "Bash(CODEX_HOME=/tmp/hatch-hook-verify/.codex codex exec --dangerously-bypass-hook-trust --skip-git-repo-check \"say hi\")",
       "Bash(HOME=/tmp/hatch-hook-verify timeout 30 claude doctor)",
-      "Bash(rm -f /Users/yinchengxin/MyHub/hatch/app_hooks_verify_test.go /tmp/hooks-good.json)"
+      "Bash(rm -f /Users/yinchengxin/MyHub/hatch/app_hooks_verify_test.go /tmp/hooks-good.json)",
+      "Bash(rg \"func \\\\\\(a \\\\*App\\\\\\)\" -n *.go)",
+      "Bash(rg \"func \\\\\\(a \\\\*App\\\\\\)\" -oN *.go)",
+      "Bash(rg \"func \\\\\\(a \\\\*App\\\\\\)\" -oN app_mcp.go)",
+      "Bash(rg \"func \\\\\\(a \\\\*App\\\\\\)\" -oN app_hooks.go)",
+      "Bash(rg \"func \\\\\\(a \\\\*App\\\\\\)\" -oN app_vpn.go)",
+      "Bash(rg -No \"func \\\\\\(a \\\\*App\\\\\\) \\(\\\\w+\\)\" -r '$1' app_mcp.go)",
+      "Bash(rg -No \"func \\\\\\(a \\\\*App\\\\\\) \\(\\\\w+\\)\" -r '$1' app_hooks.go)",
+      "Bash(rg -No \"func \\\\\\(a \\\\*App\\\\\\) \\(\\\\w+\\)\" -r '$1' app_vpn.go)"
     ]
   }
 }

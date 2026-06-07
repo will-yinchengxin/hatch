@@ -95,6 +95,19 @@ Positional keys change when the file is edited.
 - `SaveHook` is pure (registry only, preserves sync flags); the frontend re-syncs already-enabled targets after save. `SuggestHookFromDescription` (draft from text) and `SuggestHookEdit` (refine an existing `HookDef` per an instruction, preserving its id) both go through `callAIOp` and return drafts for UI confirmation — they never persist. Both writers back up the target file via `backupIfExists` before writing.
 - `ListHooks` seeds a default `hello-test` hook once (guarded by `Config.HooksSeeded`): a `UserPromptSubmit` hook that injects a confirmation into the context when the prompt contains "hello". Seeding enables it for Claude (writes `~/.claude/settings.json`) unless a hand-written conflict exists, so the capability is demonstrable out of the box.
 
+## MCP
+
+Hatch stores MCP registry data in `Config.MCPServers` and defaults the source directory to `~/MyHub/mcp`. First load seeds records from that directory when the registry is empty, then sets `Config.MCPSeeded` so discovery does not repeatedly re-import removed entries. The UI intentionally separates acquisition/import (local directory, GitHub clone, npm/npx registration) from target sync (Claude Code/Codex switches).
+
+Sync targets:
+
+- Claude Code: writes `~/.claude.json` top-level `mcpServers.<id>`.
+- Codex: writes `~/.codex/config.toml` `[mcp_servers.<id>]` tables.
+
+Both writes call `backupIfExists` first. Hatch does not keep MCP services running. `TestMCPConnection` shells out to `claude mcp get <id>` for Claude Code status and `codex mcp get <id>` for Codex config validation; Codex CLI output may not include live connection status, so those results can be `unknown` with `Mode=config`.
+
+First-time sync refuses to overwrite an existing same-name target MCP entry. After Hatch has marked that target enabled, later MCP edits may resync that same entry. Deleting a Hatch MCP record also removes its previously synced Claude Code/Codex target entries before removing the registry record. `UninstallMCPFromDisk` additionally deletes git/local source dirs; `UpdateMCPFromGit` runs `git pull`, re-infers command/args, and resyncs enabled targets. The UI displays MCP command, args, headers, and env values in plaintext by default because the module is meant for local inspection and troubleshooting.
+
 ## Data Retention And Backup
 
 `GetAppDataInventory()` reports config, store, traces, runs, skills, pids, and backups with size, file count, oldest/newest mtime, and cleanable flag.

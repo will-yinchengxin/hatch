@@ -52,17 +52,21 @@ Use `go test ./...` whenever a Wails-bound method, root package file, or generat
 hatch/
 ├── app.go                  # App startup, service restore, active AI config
 ├── app_scripts.go          # Directory CRUD, scanning, script metadata save/reset/order
-├── app_executor.go         # RunScript, ServiceAction, run history, per-script env/notify
-├── app_zshrc.go            # zshrc parse, annotations, AI organization, apply backup/write
-├── app_ai.go               # OpenAI-compatible providers, Suggest*, callAIOp, trace emit
+├── app_executor.go         # RunScript, ServiceAction, RunWithPreScripts, run history, env/notify
+├── app_scheduler.go        # Cron scheduling: ApplyAllSchedules, ListSchedules, RemoveSchedule
+├── app_diagnostics.go      # CheckScriptHealth, CheckCommandAvailable, CheckPathHealth
+├── app_backup.go           # ExportBackup, ImportBackup
+├── app_zshrc.go            # zshrc parse, annotations, AI organization, ListAliasInventory
+├── app_ai.go               # OpenAI-compatible providers, Suggest*, callAIOp, streaming, prompts
 ├── app_observability.go    # AI tool status, AI trace persistence, macOS notify
-├── app_files.go            # Script files, data paths, autostart, doc links, config editors
-├── app_v12.go              # Scheduler, health checks, prompt templates, stream protocol
-├── app_v13.go              # PATH health, backup/restore, pre-script chain
-├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI
+├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI, paths, autolaunch, doc links
+├── app_fileio.go           # ReadScriptFile, WriteScriptFile, CreateScriptFile, OpenFile
+├── app_claude.go           # Compatible-target settings, presets, TOML helpers
+├── app_codex.go            # Codex settings, presets
 ├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
-├── app_mcp.go              # MCP registry, global Claude/Codex sync, CLI checks
-├── skills.go               # SKILL.md master store and sync
+├── app_skills.go           # SKILL.md master store and sync
+├── app_hooks.go            # Command hook registry, multi-target hook sync, AI draft
+├── app_mcp.go              # MCP registry, local/git/npm install, multi-target sync, connection test
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```
@@ -78,14 +82,14 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | AI traces | `~/Library/Application Support/Hatch/traces/<date>.jsonl` by default |
 | Run history | `~/Library/Application Support/Hatch/runs/<script>/<id>.{log,json}` |
 | Master skills | `~/Library/Application Support/Hatch/skills/` by default |
-| MCP source dir | `~/MyHub/mcp` by default |
-| Claude Code MCP config | `~/.claude.json` top-level `mcpServers` |
-| Codex MCP config | `~/.codex/config.toml` `[mcp_servers.*]` |
 | PID files | `/tmp/hatch/<script-name>.pid` |
 | zshrc managed block | `~/.zshrc` Hatch block only |
 | zshrc backups | `~/.zshrc.hatch-backup-<YYYYMMDD-HHMMSS>` |
 | App autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
+| External usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
+| Codex hooks (Hatch-managed) | `~/.codex/hooks.json` |
+| Compatible hooks target (Hatch-managed) | `~/.claude/settings.json` `hooks` key |
 | Backup export | `~/Desktop/hatch-backup-<ts>.zip` by default |
 | VPN config | Clash Verge Rev app dir, auto-detected unless configured |
 | VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` by default |
@@ -102,7 +106,8 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 - `findCLI()` should be used for user-installed tools that may only exist in login shell PATH.
 - AI suggestions populate UI for user confirmation; they must not silently persist metadata, notes, prompts, skills, or zshrc changes.
 - AI API keys are stored as local plaintext config; never print them in logs or expose them in screenshots.
-- MCP env values are stored as local plaintext config; sync writes global Claude Code/Codex config but Hatch does not keep MCP services running.
+- MCP env values are stored as local plaintext config; sync writes global target config but Hatch does not keep MCP services running.
+- Hooks are `command`-type only. One `HookDef` is authored once and synced to supported targets. Hatch-owned handlers carry a `hatchId` marker so sync updates/removes only its own entries and never touches hand-written hooks; first-time enable refuses to overwrite a matching hand-written hook. Target-unsupported events (for example `Notification`, `SessionEnd`) are gated off where unsupported.
 
 ## Frontend Rules
 

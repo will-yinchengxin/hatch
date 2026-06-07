@@ -47,6 +47,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - 编辑抽屉：`editTarget`、`editForm`、`editSaving`，所有 per-script 行为都从这里配置。
 - AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、AI tool model config state。
 - Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`、`skillImportResult`、`skillConflictBusy`。
+- MCP：`mcpSettings`、`mcpServers`、`mcpTemplates`、`mcpForm`、`mcpSyncBusy`、`mcpTestBusy`、`mcpImportBusy`、`mcpManualOpen`、`filteredMCPServers`。MCP 页面分两段：获取/安装 与 配置同步；配置值默认明文展示；批量启用/测试迭代 `filteredMCPServers`。
 - Hooks：`hooks`、`hooksStats`、`hooksSearch`、`hooksFilter`、`filteredHooks`、`hookEventSupport`、`hookForm`/`hookEditOpen`、`hookSyncBusy`、`hookTemplates`、`hookSuggestDesc`（头部起草）、`hookAIInstruction`/`hookAIBusy`（编辑器内 AI 优化）。`hookEventSupports(event,target)` 控制同步开关置灰；同步开关复用 `.skill-sync-toggle`，编辑用表单（`.hook-editor-panel`）而非 markdown 编辑器；`SuggestHookFromDescription` 起草新钩子，`SuggestHookEdit` 改进现有钩子。
 - Data：`dataPaths`、`dataInventory`、`retention`。
 - VPN：`vpnStatus`、`vpnCurrentIP`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnSettingsForm`。

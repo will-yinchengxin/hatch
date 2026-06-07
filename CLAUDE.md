@@ -66,6 +66,7 @@ hatch/
 ├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
 ├── app_skills.go           # SKILL.md master store and sync
 ├── app_hooks.go            # Command hook registry, Claude/Codex hook sync, AI draft
+├── app_mcp.go              # MCP registry, local/git/npm install, Claude/Codex sync, connection test
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```
