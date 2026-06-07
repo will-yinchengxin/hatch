@@ -64,7 +64,7 @@ Core tokens:
 
 ## Layout
 
-- Sticky 52px header: logo, tab nav, search/refresh, quick-AI provider button, VPN status pill, autostart toggle.
+- Sticky 52px header: logo, tab nav (segmented control — `.tab-nav` is a single rounded container; `.tab.active` is a charcoal fill with a soft shadow; all three tabs carry an icon), tab-aware refresh button (`headerRefresh()` dispatches per `tab`), quick-AI provider button (tooltip shows active provider name + baseUrl), VPN status pill (`vpnPillTitle()` tooltip surfaces system-proxy/TUN/exit-IP), autostart toggle.
 - Content max-width 1080px, centered, `padding: 24px 22px 44px`.
 - `page-hero` bands use eyebrow, h1, subtitle, and stat cards.
 - Responsive breakpoint: 820px. Cards/forms become single column; edit drawer becomes full width.

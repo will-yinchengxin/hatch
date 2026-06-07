@@ -116,3 +116,5 @@ Each pre-script uses its own env if configured, but does not emit its own events
 The VPN module targets Clash Verge Rev. It can read/edit configured YAML files, parse profiles, export/import backups, read live proxy groups over the Clash Unix socket, and inspect enhance data from `merge` and `rules` profiles.
 
 `GetVPNStatus()` should prefer live Clash API data. `profiles.yaml` selected nodes are fallback only.
+
+`SaveVPNConfigFile` / `SaveVPNProfileContent` run `validateYAML` before overwriting so a malformed edit cannot break the Clash core; `.js` script profiles skip validation. `ImportVPNBackup` rejects entries that resolve outside the Clash dir (separator-boundary check). `DeleteVPNBackup` only removes `clash-verge-*.zip` files located directly inside the managed backup dir.

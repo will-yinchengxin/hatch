@@ -43,6 +43,8 @@ export function DeleteSkill(arg1:string):Promise<void>;
 
 export function DeleteSkillEverywhere(arg1:string):Promise<void>;
 
+export function DeleteVPNBackup(arg1:string):Promise<void>;
+
 export function ExportBackup(arg1:string):Promise<main.BackupResult>;
 
 export function ExportVPNBackup():Promise<main.VPNBackupResult>;

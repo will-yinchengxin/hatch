@@ -25,7 +25,7 @@
     </div>
 
     <nav class="tab-nav" x-show="!selectedDir">
-      <button class="tab" :class="tab==='scripts' ? 'active' : ''" @click="tab='scripts'">工作台</button>
+      <button class="tab" :class="tab==='scripts' ? 'active' : ''" @click="tab='scripts'">🗂 工作台</button>
       <button class="tab" :class="tab==='ai'      ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses(); loadAITraces()">✦ AI</button>
       <button class="tab" :class="tab==='vpn'     ? 'active' : ''" @click="tab='vpn'; loadVPNOverview()">🔒 VPN</button>
     </nav>
@@ -41,10 +41,9 @@
       />
       <button
         class="btn-refresh"
-        @click="selectedDir ? scanDir(selectedDir) : (tab==='scripts' ? scanAll() : null)"
-        :aria-busy="loading"
-        x-show="tab==='scripts'"
-        title="重新扫描"
+        @click="headerRefresh()"
+        :aria-busy="loading || vpnStatusRefreshing"
+        :title="tab==='vpn' ? '刷新代理状态' : (tab==='ai' ? '刷新 AI 状态与日志' : '重新扫描')"
       >↻ 刷新</button>
       <!-- v1.3+: quick AI panel (model switch + trace log) -->
       <div class="quick-ai-wrap">
@@ -52,7 +51,7 @@
           class="btn-refresh"
           @click="toggleQuickAI()"
           :class="{active: quickAIOpen}"
-          title="切换模型 / 查看 AI 调用日志"
+          :title="(activeProvider ? (activeProvider.name || '') + (activeProvider.baseUrl ? ' · ' + activeProvider.baseUrl : '') : '未配置 provider') + ' — 切换模型 / 查看 AI 调用日志'"
         >
           <span x-text="quickAIActiveLabel || '✦ AI'"></span>
           <span class="quick-ai-toggle-arrow" x-text="quickAIOpen ? '▲' : '▼'"></span>
@@ -124,7 +123,7 @@
       <button class="btn-refresh vpn-hdr-pill"
               :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-hdr-pill-on' : ''"
               @click="tab='vpn'; selectedDir=null; loadVPNOverview()"
-              title="VPN 状态 — 点击打开配置中心">
+              :title="vpnPillTitle()">
         <span class="vpn-hdr-dots">
           <span class="vpn-hdr-dot" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-dot-on' : 'vpn-dot-off'" title="系统代理"></span>
           <span class="vpn-hdr-dot" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-dot-on' : 'vpn-dot-off'" title="TUN"></span>
@@ -2821,6 +2820,7 @@
                   <button class="btn-edit" @click="importVPNBackup(bk)" :aria-busy="vpnRestoreBusy" :disabled="vpnRestoreBusy">
                     ↩ 恢复
                   </button>
+                  <button class="btn-edit btn-danger" @click="deleteVPNBackup(bk)" title="删除此备份文件">🗑 删除</button>
                 </div>
               </template>
             </div>

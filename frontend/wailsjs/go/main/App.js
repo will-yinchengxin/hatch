@@ -78,6 +78,10 @@ export function DeleteSkillEverywhere(arg1) {
   return window['go']['main']['App']['DeleteSkillEverywhere'](arg1);
 }
 
+export function DeleteVPNBackup(arg1) {
+  return window['go']['main']['App']['DeleteVPNBackup'](arg1);
+}
+
 export function ExportBackup(arg1) {
   return window['go']['main']['App']['ExportBackup'](arg1);
 }

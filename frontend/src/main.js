@@ -60,6 +60,7 @@ const SaveVPNProfileContent = (uid, content)                => window['go']['mai
 const ExportVPNBackup       = ()                            => window['go']['main']['App']['ExportVPNBackup']();
 const ImportVPNBackup       = (zipPath)                     => window['go']['main']['App']['ImportVPNBackup'](zipPath);
 const ListVPNBackups        = ()                            => window['go']['main']['App']['ListVPNBackups']();
+const DeleteVPNBackup       = (zipPath)                     => window['go']['main']['App']['DeleteVPNBackup'](zipPath);
 const OpenVPNDir            = ()                            => window['go']['main']['App']['OpenVPNDir']();
 const OpenVPNBackupDir      = ()                            => window['go']['main']['App']['OpenVPNBackupDir']();
 const GetVPNSettings        = ()                            => window['go']['main']['App']['GetVPNSettings']();
@@ -2740,6 +2741,32 @@ window.hatchApp = function () {
       return list;
     },
 
+    // ── Header ────────────────────────────────────────────────────────────
+    headerRefresh() {
+      if (this.tab === 'scripts') {
+        this.selectedDir ? this.scanDir(this.selectedDir) : this.scanAll();
+      } else if (this.tab === 'vpn') {
+        this.refreshVPNStatus();
+      } else if (this.tab === 'ai') {
+        this.loadAIUsageStatuses();
+        this.loadAITraces();
+        if (this.aiSubTab === 'overview') this.loadOverview();
+        else if (this.aiSubTab === 'mcp') this.loadMCP();
+        else if (this.aiSubTab === 'skills') this.loadSkills();
+      }
+    },
+
+    vpnPillTitle() {
+      const s = this.vpnStatus;
+      if (!s) return 'VPN 状态 — 点击打开配置中心';
+      const sp = s.systemProxyEnabled ? '开' : '关';
+      const tun = s.tunEnabled ? '开' : '关';
+      const ip = (this.vpnCurrentIP && !this.vpnCurrentIP.error)
+        ? (this.vpnCurrentIP.country || this.vpnCurrentIP.ip || '—')
+        : '—';
+      return `系统代理: ${sp} · TUN: ${tun} · 出口: ${ip} — 点击打开配置中心`;
+    },
+
     // ── VPN ───────────────────────────────────────────────────────────────
 
     async refreshVPNStatus() {
@@ -2907,6 +2934,18 @@ window.hatchApp = function () {
 
     vpnBackupBasename(path) {
       return path.split('/').pop();
+    },
+
+    async deleteVPNBackup(zipPath) {
+      if (!confirm(`确认删除备份？\n${this.vpnBackupBasename(zipPath)}\n\n此操作不可撤销。`)) return;
+      try {
+        await DeleteVPNBackup(zipPath);
+        this.vpnBackups = await ListVPNBackups();
+        this.vpnMsg = '已删除备份';
+        setTimeout(() => { this.vpnMsg = ''; }, 3000);
+      } catch (e) {
+        this.vpnMsg = '删除失败: ' + e;
+      }
     },
 
     vpnProfileTypeBadge(type) {

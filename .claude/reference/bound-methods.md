@@ -44,8 +44,8 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `UpdateMCPFromGit(id)` | `git pull` in local dir, re-infer command/args, resync to enabled targets |
 | `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |
 | `GetVPNEnhanceData` | Parse merge/rules profiles into prepend rules, hosts, DNS fake-IP filters |
-| `GetVPNConfigFile / SaveVPNConfigFile / GetVPNProfileContent / SaveVPNProfileContent` | VPN config/profile edit |
-| `ExportVPNBackup / ImportVPNBackup / ListVPNBackups` | VPN backup/restore |
+| `GetVPNConfigFile / SaveVPNConfigFile / GetVPNProfileContent / SaveVPNProfileContent` | VPN config/profile edit; saves validate YAML before overwrite (`.js` script profiles skip validation) and write a `.bak` |
+| `ExportVPNBackup / ImportVPNBackup / ListVPNBackups / DeleteVPNBackup` | VPN backup/restore/delete; import is zip-slip guarded, delete only accepts `clash-verge-*.zip` inside the managed backup dir |
 | `OpenVPNDir / OpenVPNBackupDir` | Finder open helpers |
 
 ## Events

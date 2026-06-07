@@ -46,10 +46,10 @@ type VPNBackupResult struct {
 }
 
 type VPNSettings struct {
-	AppDir       string `json:"appDir"`
-	BackupDir    string `json:"backupDir"`
-	AppDirIsSet  bool   `json:"appDirIsSet"`
-	BackupIsSet  bool   `json:"backupIsSet"`
+	AppDir      string `json:"appDir"`
+	BackupDir   string `json:"backupDir"`
+	AppDirIsSet bool   `json:"appDirIsSet"`
+	BackupIsSet bool   `json:"backupIsSet"`
 }
 
 type VPNProxyGroup struct {
@@ -68,11 +68,11 @@ type VPNEnhanceData struct {
 type VPNStatus struct {
 	SystemProxyEnabled bool            `json:"systemProxyEnabled"`
 	TUNEnabled         bool            `json:"tunEnabled"`
-	TUNInterface       string          `json:"tunInterface"`      // e.g. "utun3: 198.18.0.1"
-	TUNExcludedCIDRs   []string        `json:"tunExcludedCidrs"`  // from clash-verge.yaml tun config
-	CurrentGroup       string          `json:"currentGroup"`      // primary proxy group name
-	CurrentNode        string          `json:"currentNode"`       // selected node label
-	ProxyGroups        []VPNProxyGroup `json:"proxyGroups"`       // all proxy group selections
+	TUNInterface       string          `json:"tunInterface"`     // e.g. "utun3: 198.18.0.1"
+	TUNExcludedCIDRs   []string        `json:"tunExcludedCidrs"` // from clash-verge.yaml tun config
+	CurrentGroup       string          `json:"currentGroup"`     // primary proxy group name
+	CurrentNode        string          `json:"currentNode"`      // selected node label
+	ProxyGroups        []VPNProxyGroup `json:"proxyGroups"`      // all proxy group selections
 	ExpireAt           int64           `json:"expireAt"`
 	Upload             int64           `json:"upload"`
 	Download           int64           `json:"download"`
@@ -129,6 +129,19 @@ func (a *App) vpnBackupDir() (string, error) {
 func safeProfilePath(uid string) bool {
 	// Block path traversal; allow dots (extensions like .yaml, .js are fine)
 	return !strings.Contains(uid, "..") && !strings.ContainsAny(uid, "/\\")
+}
+
+// validateYAML rejects content that is not parseable YAML, so a stray typo
+// cannot be written back and silently break the Clash core on next reload.
+func validateYAML(content string) error {
+	if strings.TrimSpace(content) == "" {
+		return nil
+	}
+	var v interface{}
+	if err := yaml.Unmarshal([]byte(content), &v); err != nil {
+		return fmt.Errorf("YAML 格式错误，未保存: %w", err)
+	}
+	return nil
 }
 
 // ─── Settings ────────────────────────────────────────────────────────────────
@@ -296,8 +309,8 @@ func (a *App) GetVPNStatus() VPNStatus {
 			var cvConfig struct {
 				TUN struct {
 					RouteExcludeAddress      []string `yaml:"route-exclude-address"`
-					Inet4RouteExcludeAddress  []string `yaml:"inet4-route-exclude-address"`
-					ExcludeAddress            []string `yaml:"exclude-address"`
+					Inet4RouteExcludeAddress []string `yaml:"inet4-route-exclude-address"`
+					ExcludeAddress           []string `yaml:"exclude-address"`
 				} `yaml:"tun"`
 			}
 			if yaml.Unmarshal(data, &cvConfig) == nil {
@@ -574,6 +587,10 @@ func (a *App) SaveVPNConfigFile(name, content string) error {
 	if !allowed[name] {
 		return fmt.Errorf("不允许写入的配置文件: %s", name)
 	}
+	// All managed config files are YAML; reject broken content before overwriting.
+	if err := validateYAML(content); err != nil {
+		return err
+	}
 
 	dir, err := a.clashVergeDir()
 	if err != nil {
@@ -635,6 +652,14 @@ func (a *App) SaveVPNProfileContent(filename, content string) error {
 				targetPath = candidate
 				break
 			}
+		}
+	}
+
+	// Validate YAML profiles before writing; script (.js) profiles are skipped.
+	lower := strings.ToLower(targetPath)
+	if strings.HasSuffix(lower, ".yaml") || strings.HasSuffix(lower, ".yml") {
+		if err := validateYAML(content); err != nil {
+			return err
 		}
 	}
 
@@ -732,7 +757,9 @@ func (a *App) ImportVPNBackup(zipPath string) (string, error) {
 			continue
 		}
 		dest := filepath.Join(clashDir, f.Name)
-		if !strings.HasPrefix(filepath.Clean(dest), filepath.Clean(clashDir)) {
+		cleanRoot := filepath.Clean(clashDir)
+		cleanDest := filepath.Clean(dest)
+		if cleanDest != cleanRoot && !strings.HasPrefix(cleanDest, cleanRoot+string(os.PathSeparator)) {
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
@@ -776,6 +803,24 @@ func (a *App) ListVPNBackups() []string {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(paths)))
 	return paths
+}
+
+// DeleteVPNBackup removes a single clash-verge-*.zip backup from the managed
+// backup directory. Refuses paths outside that dir or with an unexpected name.
+func (a *App) DeleteVPNBackup(zipPath string) error {
+	backupDir, err := a.vpnBackupDir()
+	if err != nil {
+		return err
+	}
+	clean := filepath.Clean(zipPath)
+	if filepath.Dir(clean) != filepath.Clean(backupDir) {
+		return fmt.Errorf("只能删除备份目录内的文件")
+	}
+	base := filepath.Base(clean)
+	if !strings.HasPrefix(base, "clash-verge-") || !strings.HasSuffix(base, ".zip") {
+		return fmt.Errorf("非法的备份文件名: %s", base)
+	}
+	return os.Remove(clean)
 }
 
 // OpenVPNDir opens the Clash Verge Rev data directory in Finder.

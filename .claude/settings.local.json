@@ -80,7 +80,11 @@
       "Bash(screencapture -x /tmp/hatch-chrome2.png)",
       "Bash(screencapture -x /tmp/hatch-native.png)",
       "mcp__mysql__mysql_query",
-      "Bash(go vet *)"
+      "Bash(go vet *)",
+      "Bash(gofmt -l app_vpn.go)",
+      "Bash(cd *)",
+      "Bash(gofmt -w app_vpn.go)",
+      "Bash(gofmt -l app_vpn.go app_vpn_test.go)"
     ]
   }
 }
