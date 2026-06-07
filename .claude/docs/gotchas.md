@@ -31,3 +31,7 @@
 - Skill import uses content fingerprints for same-name skills; differing content returns UI conflicts and must not overwrite Hatch master until the user chooses a side.
 - `switchQuickAIProvider()` must keep provider storage and `aiForm` in sync.
 - New feature markup should avoid inline styles; add named classes in `style.css`.
+- Hooks sync writes a `hatchId` field into each handler in `~/.claude/settings.json` and `~/.codex/hooks.json`; this is how Hatch finds its own entries. Both CLIs tolerate the extra key. If a future CLI version rejects it, fall back to matching handlers by event+matcher+command+args instead of removing the field.
+- Codex hooks go in the dedicated `~/.codex/hooks.json` (Hatch-owned, merges around hand-written handlers), never inline `config.toml` `[hooks]` — that file is reserved for the MCP block and model/effort merges.
+- `SetHookEnabled` first-time enable refuses to overwrite a matching hand-written hook (event+matcher+command on a non-`hatchId` handler); re-syncing an already-enabled hook overwrites its own handler. Codex-unsupported events (`Notification`, `SessionEnd`) are rejected for the Codex target and greyed out in the UI.
+- `SaveHook()` is registry-only; the frontend `saveHook()` re-syncs already-enabled targets afterward (same pattern as `saveMCPForm`). `SuggestHookFromDescription()` is UI-draft only and must not persist.

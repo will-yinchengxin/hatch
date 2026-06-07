@@ -65,6 +65,7 @@ hatch/
 ├── app_codex.go            # Codex settings, presets
 ├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
 ├── app_skills.go           # SKILL.md master store and sync
+├── app_hooks.go            # Command hook registry, Claude/Codex hook sync, AI draft
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```
@@ -86,6 +87,8 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | App autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
 | Claude usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
+| Codex hooks (Hatch-managed) | `~/.codex/hooks.json` |
+| Claude hooks (Hatch-managed) | `~/.claude/settings.json` `hooks` key |
 | Backup export | `~/Desktop/hatch-backup-<ts>.zip` by default |
 | VPN config | Clash Verge Rev app dir, auto-detected unless configured |
 | VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` by default |
@@ -102,6 +105,7 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 - `findCLI()` should be used for user-installed tools that may only exist in login shell PATH.
 - AI suggestions populate UI for user confirmation; they must not silently persist metadata, notes, prompts, skills, or zshrc changes.
 - AI API keys are stored as local plaintext config; never print them in logs or expose them in screenshots.
+- Hooks are `command`-type only (shared by Claude Code and Codex). One `HookDef` is authored once and synced to Claude (`~/.claude/settings.json` `hooks`) and/or Codex (`~/.codex/hooks.json`). Hatch-owned handlers carry a `hatchId` marker so sync updates/removes only its own entries and never touches hand-written hooks; first-time enable refuses to overwrite a matching hand-written hook. Codex-unsupported events (e.g. `Notification`, `SessionEnd`) are gated off for the Codex target.
 
 ## Frontend Rules
 

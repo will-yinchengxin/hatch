@@ -7,7 +7,7 @@ Use this with `.claude/skills/hatch-frontend/SKILL.md` before editing `frontend/
 ```text
 tab = 'scripts' | 'ai' | 'vpn'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'tools' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 
 scripts + !selectedDir  -> directory cards + workspace-settings accordion
@@ -30,6 +30,10 @@ editTarget != null      -> edit drawer overlay
 | `skills / skillsStats / skillSearch / skillFilter / filteredSkills` | Skill list and filter UI |
 | `skillImportResult / skillConflictBusy` | Skill import results and per-conflict action state |
 | `skillAIInstruction / skillAIBusy` | Skill AI optimize bar |
+| `hooks / hooksStats / hooksSearch / hooksFilter / filteredHooks` | Hook list and filter UI |
+| `hookEventSupport / hookForm / hookEditOpen / hookEditIsNew / hookSaving` | Hook event catalog + edit form state |
+| `hookSyncBusy / hookTemplates / hookTemplateGalleryOpen / hookSuggestDesc / hookSuggestBusy` | Hook sync busy keys, template gallery, header AI draft bar |
+| `hookAIInstruction / hookAIBusy` | In-editor AI optimize bar for refining an existing hook |
 | `dataPaths / dataPathsForm / dataInventory / retention` | Data paths, inventory, retention |
 | `zshrcEntries / zshrcFilter` | Parsed zshrc |
 | `autoLaunchEnabled` | Login autostart |
@@ -76,10 +80,11 @@ Core tokens:
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
 - AI: overview, connect/providers/traces, skills, tools/status, prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. Model shortcut panels share the `agent-*` config layout classes; the Goals toggle sits in the shared action row.
-  - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, Claude/Codex install+usage, skills counts, MCP enabled/failed counts, and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods and is called on the overview sidenav button and from `init()`.
+  - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, Claude/Codex install+usage, skills counts, MCP enabled/failed counts, hooks counts (total + Claude/Codex enabled), and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods (including `GetHooksStats`) and is called on the overview sidenav button and from `init()`.
   - Bulk actions (`.bulk-action-bar`) on skills and MCP: `bulkSkillSync` / `bulkSkillUnsyncAll` / `bulkMCPEnable` / `bulkTestMCP` iterate `filteredSkills` / `filteredMCPServers` serially.
   - `copyToClipboard(text, label)` is the shared clipboard helper (provider URL/model, MCP `renderMCPSnippet` Claude/Codex blocks, default prompts, trace blocks). `renderMCPSnippet(server, target)` mirrors backend `renderClaudeMCPServer`/`renderCodexMCPServer`.
   - `duplicateProvider(p)` opens the provider editor prefilled (baseUrl/model, blank apiKey, "副本" name).
+  - Hooks (`aiSubTab==='hooks'`, `.ai-hooks-section`): registry of `command` hooks. Each `.hook-item` shows event badge + matcher + command preview and two `.skill-sync-toggle` switches (Claude/Codex); a switch gets `.sync-disabled` when `hookEventSupports(h.event, target)` is false. Editing uses a form (`.hook-editor-panel` / `.hook-form-grid`), not a markdown editor. The editor has an inline AI bar (`.se-ai-bar`, `hookAIInstruction` / `hookAIBusy`): `optimizeHookWithAI()` sends the current form via `SuggestHookEdit` to refine the existing hook in place. `📦 模板库` opens `.hook-modal` from `hookTemplates`; the header `✦ AI 起草` calls `suggestHook()` (`SuggestHookFromDescription`) to prefill a new hook. `toggleHookSync` updates the row in place and refreshes `hooksStats`; `saveHook` re-syncs already-enabled targets after `SaveHook`.
 - VPN: overview/status hero, config editor, profiles editor, backup/restore, enhance rules/hosts/DNS view.
 
 ## CSS And Alpine Pitfalls

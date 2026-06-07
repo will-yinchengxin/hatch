@@ -58,6 +58,10 @@ export function DeleteCodexPreset(arg1) {
   return window['go']['main']['App']['DeleteCodexPreset'](arg1);
 }
 
+export function DeleteHook(arg1) {
+  return window['go']['main']['App']['DeleteHook'](arg1);
+}
+
 export function DeleteMCPServer(arg1) {
   return window['go']['main']['App']['DeleteMCPServer'](arg1);
 }
@@ -162,6 +166,18 @@ export function GetDocLinks() {
   return window['go']['main']['App']['GetDocLinks']();
 }
 
+export function GetHookEventSupport() {
+  return window['go']['main']['App']['GetHookEventSupport']();
+}
+
+export function GetHookTemplates() {
+  return window['go']['main']['App']['GetHookTemplates']();
+}
+
+export function GetHooksStats() {
+  return window['go']['main']['App']['GetHooksStats']();
+}
+
 export function GetMCPSettings() {
   return window['go']['main']['App']['GetMCPSettings']();
 }
@@ -252,6 +268,10 @@ export function InstallMCPFromGit(arg1, arg2) {
 
 export function ListAliasInventory() {
   return window['go']['main']['App']['ListAliasInventory']();
+}
+
+export function ListHooks() {
+  return window['go']['main']['App']['ListHooks']();
 }
 
 export function ListMCPServers() {
@@ -350,6 +370,10 @@ export function SaveExports(arg1) {
   return window['go']['main']['App']['SaveExports'](arg1);
 }
 
+export function SaveHook(arg1) {
+  return window['go']['main']['App']['SaveHook'](arg1);
+}
+
 export function SaveMCPServer(arg1) {
   return window['go']['main']['App']['SaveMCPServer'](arg1);
 }
@@ -418,12 +442,24 @@ export function SetCodexModelConfig(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetCodexModelConfig'](arg1, arg2, arg3);
 }
 
+export function SetHookEnabled(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetHookEnabled'](arg1, arg2, arg3);
+}
+
 export function SetMCPEnabled(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetMCPEnabled'](arg1, arg2, arg3);
 }
 
 export function SetSkillSync(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetSkillSync'](arg1, arg2, arg3);
+}
+
+export function SuggestHookEdit(arg1, arg2) {
+  return window['go']['main']['App']['SuggestHookEdit'](arg1, arg2);
+}
+
+export function SuggestHookFromDescription(arg1) {
+  return window['go']['main']['App']['SuggestHookFromDescription'](arg1);
 }
 
 export function SuggestScriptContent(arg1, arg2, arg3) {

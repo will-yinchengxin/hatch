@@ -42,6 +42,11 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `TestMCPConnection(id, target)` | Claude: `claude mcp get` real connection check; Codex: config readability only |
 | `UninstallMCPFromDisk(id)` | Remove from Hatch registry + Claude/Codex configs + delete local dir (git/local only) |
 | `UpdateMCPFromGit(id)` | `git pull` in local dir, re-infer command/args, resync to enabled targets |
+| `ListHooks / SaveHook / DeleteHook / GetHooksStats` | Command-hook registry CRUD; `SaveHook` preserves sync flags; `DeleteHook` also removes from enabled targets |
+| `SetHookEnabled(id, target, enabled)` | Sync one hook to `~/.claude/settings.json` (`hooks`) or `~/.codex/hooks.json`; first-time enable refuses to overwrite a matching hand-written hook; rejects Codex-unsupported events |
+| `GetHookTemplates / GetHookEventSupport` | Built-in hook template gallery; event catalog with per-target (claude/codex) support flags |
+| `SuggestHookFromDescription(desc)` | AI drafts a command `HookDef` from natural language; UI-only, never persisted |
+| `SuggestHookEdit(current, instruction)` | AI refines an existing `HookDef` per an instruction (preserves id); UI-only, never persisted |
 | `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |
 | `GetVPNEnhanceData` | Parse merge/rules profiles into prepend rules, hosts, DNS fake-IP filters |
 | `GetVPNConfigFile / SaveVPNConfigFile / GetVPNProfileContent / SaveVPNProfileContent` | VPN config/profile edit; saves validate YAML before overwrite (`.js` script profiles skip validation) and write a `.bak` |

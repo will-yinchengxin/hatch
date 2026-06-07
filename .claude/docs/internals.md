@@ -87,6 +87,14 @@ Positional keys change when the file is edited.
 - Skill import fingerprints the whole skill directory by relative path + file content. Same-name differences return conflicts for user choice; Hatch UI saves still resync master content to enabled Claude/Codex targets.
 - AI Tools writes Codex shortcuts into `~/.codex/config.toml`: top-level `model`, top-level `model_reasoning_effort`, and `[features] goals = true/false`. The merge helpers only touch those keys and preserve nested profiles.
 
+## Hooks
+
+- `app_hooks.go` manages a registry of `command`-type hooks (`Config.Hooks`). One `HookDef` syncs to two targets sharing the same hooks JSON schema: Claude Code reads `~/.claude/settings.json` `hooks`; Codex reads `~/.codex/hooks.json` (Hatch uses the dedicated file rather than inline `config.toml` `[hooks]` to avoid touching the MCP block).
+- Both writers operate on a generic hooks object (`map[event] -> []group`, each group `{matcher, hooks:[handler]}`) via `removeHatchHandler` / `insertHatchHandler`. Hatch handlers carry `hatchId`; removal targets one id (`writeClaudeHookConfig`) or all Hatch handlers (`writeCodexHooksFile` regenerates the whole Hatch portion). Hand-written handlers (no `hatchId`) are never removed; empty groups/events are pruned.
+- `SetHookEnabled` gates Codex-unsupported events (`hookEventSupportedBy`) and, on first-time enable only, refuses to overwrite a matching hand-written hook (`claudeHookEntryExists` / `codexHookEntryExists` match event+matcher+command on non-`hatchId` handlers). Re-syncing an already-enabled hook overwrites its own marked handler. For Codex, the desired full list is written to file before the registry flag is committed, so a failed write leaves state untouched.
+- `SaveHook` is pure (registry only, preserves sync flags); the frontend re-syncs already-enabled targets after save. `SuggestHookFromDescription` (draft from text) and `SuggestHookEdit` (refine an existing `HookDef` per an instruction, preserving its id) both go through `callAIOp` and return drafts for UI confirmation — they never persist. Both writers back up the target file via `backupIfExists` before writing.
+- `ListHooks` seeds a default `hello-test` hook once (guarded by `Config.HooksSeeded`): a `UserPromptSubmit` hook that injects a confirmation into the context when the prompt contains "hello". Seeding enables it for Claude (writes `~/.claude/settings.json`) unless a hand-written conflict exists, so the capability is demonstrable out of the box.
+
 ## Data Retention And Backup
 
 `GetAppDataInventory()` reports config, store, traces, runs, skills, pids, and backups with size, file count, oldest/newest mtime, and cleanable flag.

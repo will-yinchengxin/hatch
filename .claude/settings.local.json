@@ -84,7 +84,19 @@
       "Bash(gofmt -l app_vpn.go)",
       "Bash(cd *)",
       "Bash(gofmt -w app_vpn.go)",
-      "Bash(gofmt -l app_vpn.go app_vpn_test.go)"
+      "Bash(gofmt -l app_vpn.go app_vpn_test.go)",
+      "Bash(codex --version)",
+      "Bash(codex --help)",
+      "Bash(codex config *)",
+      "Bash(claude config *)",
+      "Bash(rm -rf /tmp/hatch-hook-verify)",
+      "Bash(HATCH_VERIFY_DIR=/tmp/hatch-hook-verify go test . -run TestZZGenerateVerifyFixtures -v)",
+      "Bash(CODEX_HOME=/tmp/hatch-hook-verify/.codex codex doctor)",
+      "Bash(codex debug *)",
+      "Bash(codex exec *)",
+      "Bash(CODEX_HOME=/tmp/hatch-hook-verify/.codex codex exec --dangerously-bypass-hook-trust --skip-git-repo-check \"say hi\")",
+      "Bash(HOME=/tmp/hatch-hook-verify timeout 30 claude doctor)",
+      "Bash(rm -f /Users/yinchengxin/MyHub/hatch/app_hooks_verify_test.go /tmp/hooks-good.json)"
     ]
   }
 }

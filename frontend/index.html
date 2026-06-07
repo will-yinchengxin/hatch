@@ -652,6 +652,12 @@
           <span>MCP</span>
           <span class="ai-sidenav-count" x-show="mcpServers.length > 0" x-text="mcpServers.length"></span>
         </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='hooks' ? 'active' : ''"
+          @click="aiSubTab='hooks'; loadHooks()">
+          <span class="ai-sidenav-icon">🪝</span>
+          <span>Hooks</span>
+          <span class="ai-sidenav-count" x-show="hooksStats.total > 0" x-text="hooksStats.total"></span>
+        </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='tools' ? 'active' : ''"
           @click="aiSubTab='tools'; loadAIUsageStatuses()">
           <span class="ai-sidenav-icon">⚡</span>
@@ -770,6 +776,18 @@
                 <div class="ai-dash-body">
                   <div class="ai-dash-stat" x-text="(mcpServers.length||0)"></div>
                   <div class="muted text-xs" x-text="'已启用 ' + mcpEnabledCount + ' 个'"></div>
+                </div>
+              </div>
+
+              <!-- Hooks -->
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='hooks'; loadHooks()" @keydown.enter="aiSubTab='hooks'; loadHooks()">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">🪝</span>
+                  <span class="ai-dash-title">Hooks</span>
+                </div>
+                <div class="ai-dash-body">
+                  <div class="ai-dash-stat" x-text="hooksStats.total || 0"></div>
+                  <div class="muted text-xs" x-text="'Claude ' + (hooksStats.claude||0) + ' · Codex ' + (hooksStats.codex||0)"></div>
                 </div>
               </div>
 
@@ -1550,6 +1568,173 @@
                       <button class="btn-sm" x-show="s.sourceType === 'git'" @click="updateMCPFromGit(s.id)" :aria-busy="!!mcpUpdateBusy[s.id]" title="git pull 更新">更新</button>
                       <button class="btn-sm" @click="openMCPServerEditor(s)">编辑</button>
                       <button class="btn-sm btn-danger" @click="openMCPDeleteModal(s)">删除</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ Hooks ═════════════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='hooks'">
+          <section class="settings-section ai-hooks-section">
+            <div class="section-header-row">
+              <h3>🪝 Hooks 管理</h3>
+              <div class="skills-header-actions">
+                <button class="btn-sm" @click="openHookTemplateGallery()">📦 模板库</button>
+                <button class="btn-sm btn-primary" @click="openNewHook()">+ 新建</button>
+                <button class="btn-sm" @click="loadHooks()" :aria-busy="hooksLoading">↻</button>
+              </div>
+            </div>
+
+            <p class="muted text-xs hook-intro">
+              钩子在一个地方编写一次，可分别同步到 Claude Code（<code>~/.claude/settings.json</code>）与 Codex（<code>~/.codex/hooks.json</code>）。仅支持 <code>command</code> 类型，双端行为一致。
+            </p>
+
+            <!-- AI 起草 -->
+            <div class="hook-suggest-bar">
+              <span class="se-ai-label">✦ AI</span>
+              <input type="text" class="hook-suggest-input" x-model="hookSuggestDesc"
+                placeholder="用自然语言描述：如「每次编辑文件后运行 prettier」「危险删除命令时拦截」" />
+              <button class="se-ai-btn" @click="suggestHook()" :aria-busy="hookSuggestBusy" :disabled="!hookSuggestDesc.trim()">✦ AI 起草</button>
+            </div>
+
+            <!-- 编辑表单 -->
+            <template x-if="hookEditOpen && hookForm">
+              <div class="hook-editor-panel">
+                <div class="se-ai-bar hook-ai-bar">
+                  <span class="se-ai-label">✦ AI</span>
+                  <input type="text" class="se-ai-input" x-model="hookAIInstruction"
+                    placeholder="优化指令：如「只对 .ts 文件生效」「拦截时给出更清晰的理由」「改成异步执行」「补全 matcher」" />
+                  <button class="se-ai-btn" @click="optimizeHookWithAI()" :aria-busy="hookAIBusy" :disabled="!hookAIInstruction.trim()">✦ AI 优化</button>
+                </div>
+                <div class="hook-form-grid">
+                  <label class="hook-field">
+                    <span class="hook-field-label">名称</span>
+                    <input type="text" x-model="hookForm.name" placeholder="如：编辑后格式化" />
+                  </label>
+                  <label class="hook-field">
+                    <span class="hook-field-label">事件</span>
+                    <select x-model="hookForm.event">
+                      <template x-for="e in hookEventSupport" :key="e.event">
+                        <option :value="e.event" x-text="e.label + ' (' + e.event + ')'"></option>
+                      </template>
+                    </select>
+                  </label>
+                  <label class="hook-field">
+                    <span class="hook-field-label">Matcher</span>
+                    <input type="text" x-model="hookForm.matcher" :placeholder="hookMatcherHint() || '工具/来源过滤，留空匹配全部'" />
+                  </label>
+                  <label class="hook-field">
+                    <span class="hook-field-label">超时（秒，0=默认）</span>
+                    <input type="number" min="0" x-model.number="hookForm.timeout" />
+                  </label>
+                </div>
+                <label class="hook-field hook-field-full">
+                  <span class="hook-field-label">命令（command）</span>
+                  <textarea x-model="hookForm.command" rows="2" spellcheck="false" placeholder="如：npx prettier --write ."></textarea>
+                </label>
+                <label class="hook-field hook-field-full">
+                  <span class="hook-field-label">参数（每行一个，可选 exec 形式）</span>
+                  <textarea x-model="hookForm.argsRaw" rows="2" spellcheck="false" placeholder="留空则以 shell 形式执行 command"></textarea>
+                </label>
+                <div class="hook-form-grid">
+                  <label class="hook-field">
+                    <span class="hook-field-label">状态提示语</span>
+                    <input type="text" x-model="hookForm.statusMessage" placeholder="运行时的 spinner 文案，可选" />
+                  </label>
+                  <label class="hook-field">
+                    <span class="hook-field-label">描述</span>
+                    <input type="text" x-model="hookForm.description" placeholder="一句话说明，可选" />
+                  </label>
+                </div>
+                <div class="hook-editor-footer">
+                  <button @click="saveHook()" :aria-busy="hookSaving">💾 保存</button>
+                  <button class="secondary" @click="closeHookEditor()">取消</button>
+                </div>
+              </div>
+            </template>
+
+            <!-- 模板库 -->
+            <template x-if="hookTemplateGalleryOpen">
+              <div class="hook-modal-backdrop" @click="closeHookTemplateGallery()">
+                <div class="hook-modal" @click.stop>
+                  <div class="section-header-row">
+                    <h4>Hook 模板库</h4>
+                    <button class="btn-sm" @click="closeHookTemplateGallery()">×</button>
+                  </div>
+                  <div class="hook-template-grid">
+                    <template x-for="t in hookTemplates" :key="t.id">
+                      <div class="hook-template-card" role="button" tabindex="0"
+                        @click="openHookTemplate(t)" @keydown.enter="openHookTemplate(t)">
+                        <div class="hook-template-name" x-text="t.name"></div>
+                        <div class="hook-template-event">
+                          <span class="hook-event-badge" x-text="t.event"></span>
+                          <span class="muted text-xs" x-show="t.matcher" x-text="t.matcher"></span>
+                        </div>
+                        <div class="hook-template-desc muted text-xs" x-text="t.description"></div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 过滤栏 -->
+            <div class="skill-filter-bar">
+              <div class="skill-filter-tabs">
+                <button class="skill-filter-tab" :class="hooksFilter==='all'    ? 'active' : ''" @click="hooksFilter='all'">全部</button>
+                <button class="skill-filter-tab" :class="hooksFilter==='claude' ? 'active' : ''" @click="hooksFilter='claude'">Claude</button>
+                <button class="skill-filter-tab" :class="hooksFilter==='codex'  ? 'active' : ''" @click="hooksFilter='codex'">Codex</button>
+              </div>
+              <input type="search" x-model="hooksSearch" placeholder="按名称/事件/命令搜索…" class="skill-search-input" />
+            </div>
+
+            <div x-show="hooksLoading" class="muted text-sm hook-state-row">加载中…</div>
+            <div x-show="!hooksLoading && hooks.length === 0" class="muted text-sm hook-state-row">
+              暂无 Hook。点击「+ 新建」、「📦 模板库」或用「✦ AI 起草」创建。
+            </div>
+            <div x-show="!hooksLoading && hooks.length > 0 && filteredHooks.length === 0" class="muted text-sm hook-state-row">
+              无匹配的 Hook。
+            </div>
+
+            <div class="skill-list" x-show="!hooksLoading && filteredHooks.length > 0">
+              <template x-for="h in filteredHooks" :key="h.id">
+                <div class="hook-item">
+                  <div class="hook-row">
+                    <div class="hook-info">
+                      <div class="hook-title-row">
+                        <span class="skill-name" x-text="h.name || h.id"></span>
+                        <span class="hook-event-badge" x-text="h.event"></span>
+                        <span class="hook-matcher" x-show="h.matcher" x-text="h.matcher"></span>
+                      </div>
+                      <code class="hook-cmd" x-text="h.command"></code>
+                      <span class="muted text-xs" x-show="h.description" x-text="h.description"></span>
+                    </div>
+                    <div class="skill-sync-group">
+                      <label class="skill-sync-toggle"
+                        :class="(hookSyncBusy[h.id+':claude'] ? 'sync-busy ' : '') + (hookEventSupports(h.event,'claude') ? '' : 'sync-disabled')">
+                        <input type="checkbox"
+                          :checked="h.enabledInClaude"
+                          :disabled="!!hookSyncBusy[h.id+':claude'] || !hookEventSupports(h.event,'claude')"
+                          @change="toggleHookSync(h.id, 'claude', $event.target.checked)"
+                        />
+                        <span class="sync-label" :class="h.enabledInClaude ? 'sync-on' : 'sync-off'">Claude</span>
+                      </label>
+                      <label class="skill-sync-toggle"
+                        :class="(hookSyncBusy[h.id+':codex'] ? 'sync-busy ' : '') + (hookEventSupports(h.event,'codex') ? '' : 'sync-disabled')">
+                        <input type="checkbox"
+                          :checked="h.enabledInCodex"
+                          :disabled="!!hookSyncBusy[h.id+':codex'] || !hookEventSupports(h.event,'codex')"
+                          @change="toggleHookSync(h.id, 'codex', $event.target.checked)"
+                        />
+                        <span class="sync-label" :class="h.enabledInCodex ? 'sync-on' : 'sync-off'">Codex</span>
+                      </label>
+                    </div>
+                    <div class="skill-actions">
+                      <button class="btn-sm" @click="openHookEditor(h)">编辑</button>
+                      <button class="btn-sm btn-danger" @click="deleteHook(h.id)">删除</button>
                     </div>
                   </div>
                 </div>

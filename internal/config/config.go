@@ -140,6 +140,24 @@ type MCPTestResult struct {
 	Mode      string `json:"mode,omitempty"` // connection | config
 }
 
+// HookDef represents one command hook managed by Hatch. A single definition is
+// authored once and synced to Claude Code (~/.claude/settings.json) and/or Codex
+// (~/.codex/hooks.json), where Hatch-owned handlers carry a "hatchId" marker.
+type HookDef struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description,omitempty"`
+	Event           string   `json:"event"`             // PreToolUse | PostToolUse | SessionStart | ...
+	Matcher         string   `json:"matcher,omitempty"` // tool/source filter; empty = match all
+	Command         string   `json:"command"`           // shell command or executable (type is always "command")
+	Args            []string `json:"args,omitempty"`    // exec-form arguments; when set, no shell
+	Timeout         int      `json:"timeout,omitempty"` // seconds; 0 = tool default
+	StatusMessage   string   `json:"statusMessage,omitempty"`
+	EnabledInClaude bool     `json:"enabledInClaude,omitempty"`
+	EnabledInCodex  bool     `json:"enabledInCodex,omitempty"`
+	UpdatedAt       int64    `json:"updatedAt,omitempty"`
+}
+
 type Config struct {
 	Directories             []Directory           `json:"directories"`
 	Exports                 []ExportVar           `json:"exports"`
@@ -164,6 +182,8 @@ type Config struct {
 	MCPDir                  string                `json:"mcpDir,omitempty"`                  // MCP master dir, default: ~/MyHub/mcp if present
 	MCPServers              []MCPServer           `json:"mcpServers,omitempty"`              // MCP registry managed by Hatch
 	MCPSeeded               bool                  `json:"mcpSeeded,omitempty"`               // true after first MCP directory discovery
+	Hooks                   []HookDef             `json:"hooks,omitempty"`                   // command hook registry managed by Hatch
+	HooksSeeded             bool                  `json:"hooksSeeded,omitempty"`             // true after the default hook is seeded once
 }
 
 func defaultPath() (string, error) {

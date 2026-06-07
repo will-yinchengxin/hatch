@@ -84,6 +84,15 @@ const TestMCPConnection     = (id, target)                  => window['go']['mai
 const GetMCPTemplates       = ()                            => window['go']['main']['App']['GetMCPTemplates']();
 const UninstallMCPFromDisk  = (id)                          => window['go']['main']['App']['UninstallMCPFromDisk'](id);
 const UpdateMCPFromGit      = (id)                          => window['go']['main']['App']['UpdateMCPFromGit'](id);
+const ListHooks             = ()                            => window['go']['main']['App']['ListHooks']();
+const SaveHook              = (hook)                        => window['go']['main']['App']['SaveHook'](hook);
+const DeleteHook            = (id)                          => window['go']['main']['App']['DeleteHook'](id);
+const SetHookEnabled        = (id, target, enabled)         => window['go']['main']['App']['SetHookEnabled'](id, target, enabled);
+const GetHookTemplates      = ()                            => window['go']['main']['App']['GetHookTemplates']();
+const GetHooksStats         = ()                            => window['go']['main']['App']['GetHooksStats']();
+const GetHookEventSupport   = ()                            => window['go']['main']['App']['GetHookEventSupport']();
+const SuggestHookFromDescription = (desc)                   => window['go']['main']['App']['SuggestHookFromDescription'](desc);
+const SuggestHookEdit       = (hook, instruction)          => window['go']['main']['App']['SuggestHookEdit'](hook, instruction);
 
 window.hatchApp = function () {
   return {
@@ -269,6 +278,25 @@ window.hatchApp = function () {
     mcpDeleteModal: { open: false, id: '', name: '', canCleanDisk: false, localPath: '' },
     mcpTemplateGalleryOpen: false,
     mcpUpdateBusy: {},           // { id: true }
+
+    // Hooks management
+    hooks: [],
+    hooksStats: { total: 0, claude: 0, codex: 0 },
+    hooksLoading: false,
+    hooksSearch: '',
+    hooksFilter: 'all',          // 'all' | 'claude' | 'codex'
+    hookEventSupport: [],        // [{event,label,claude,codex,matcherHint}]
+    hookTemplates: [],
+    hookTemplateGalleryOpen: false,
+    hookEditOpen: false,
+    hookEditIsNew: false,
+    hookForm: null,              // editing draft
+    hookSaving: false,
+    hookSyncBusy: {},            // { "id:target": true }
+    hookSuggestDesc: '',
+    hookSuggestBusy: false,
+    hookAIInstruction: '',       // AI optimize bar inside the editor
+    hookAIBusy: false,
 
     // AI sub-navigation
     aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'mcp' | 'tools'
@@ -1738,6 +1766,211 @@ window.hatchApp = function () {
       return lines;
     },
 
+    // ── Hooks management ──────────────────────────────────────────────
+    async loadHooks() {
+      this.hooksLoading = true;
+      try {
+        const [hooks, stats, support, templates] = await Promise.all([
+          ListHooks(),
+          GetHooksStats(),
+          GetHookEventSupport(),
+          GetHookTemplates(),
+        ]);
+        this.hooks = hooks || [];
+        this.hooksStats = stats || { total: 0, claude: 0, codex: 0 };
+        this.hookEventSupport = support || [];
+        this.hookTemplates = templates || [];
+      } catch (e) {
+        this.showError(`加载 Hooks 失败: ${e}`);
+      } finally {
+        this.hooksLoading = false;
+      }
+    },
+
+    hookEventSupports(event, target) {
+      const info = (this.hookEventSupport || []).find(e => e.event === event);
+      if (!info) return false;
+      return target === 'claude' ? !!info.claude : !!info.codex;
+    },
+
+    hookEventLabel(event) {
+      const info = (this.hookEventSupport || []).find(e => e.event === event);
+      return info ? info.label : event;
+    },
+
+    hookMatcherHint() {
+      const info = (this.hookEventSupport || []).find(e => e.event === (this.hookForm && this.hookForm.event));
+      return info ? info.matcherHint : '';
+    },
+
+    hookTargetLabel(target) {
+      return target === 'claude' ? 'Claude Code' : 'Codex';
+    },
+
+    blankHookForm() {
+      return { id: '', name: '', description: '', event: 'PostToolUse', matcher: '', command: '', argsRaw: '', timeout: 0, statusMessage: '' };
+    },
+
+    hookFormFrom(hook) {
+      return {
+        id: hook.id || '',
+        name: hook.name || '',
+        description: hook.description || '',
+        event: hook.event || 'PostToolUse',
+        matcher: hook.matcher || '',
+        command: hook.command || '',
+        argsRaw: (hook.args || []).join('\n'),
+        timeout: hook.timeout || 0,
+        statusMessage: hook.statusMessage || '',
+      };
+    },
+
+    hookFromForm() {
+      const f = this.hookForm || {};
+      return {
+        id: (f.id || '').trim(),
+        name: (f.name || '').trim(),
+        description: (f.description || '').trim(),
+        event: f.event || 'PostToolUse',
+        matcher: (f.matcher || '').trim(),
+        command: (f.command || '').trim(),
+        args: (f.argsRaw || '').split('\n').map(s => s.trim()).filter(Boolean),
+        timeout: Number(f.timeout || 0),
+        statusMessage: (f.statusMessage || '').trim(),
+      };
+    },
+
+    openNewHook() {
+      this.hookForm = this.blankHookForm();
+      this.hookEditIsNew = true;
+      this.hookEditOpen = true;
+    },
+
+    openHookEditor(hook) {
+      this.hookForm = this.hookFormFrom(hook);
+      this.hookEditIsNew = false;
+      this.hookEditOpen = true;
+    },
+
+    openHookTemplate(template) {
+      const copy = JSON.parse(JSON.stringify(template || {}));
+      this.hookForm = this.hookFormFrom(copy);
+      this.hookEditIsNew = true;
+      this.hookEditOpen = true;
+      this.hookTemplateGalleryOpen = false;
+    },
+
+    closeHookEditor() {
+      this.hookEditOpen = false;
+      this.hookForm = null;
+      this.hookEditIsNew = false;
+      this.hookAIInstruction = '';
+    },
+
+    openHookTemplateGallery() { this.hookTemplateGalleryOpen = true; },
+    closeHookTemplateGallery() { this.hookTemplateGalleryOpen = false; },
+
+    async saveHook() {
+      if (!this.hookForm) return;
+      this.hookSaving = true;
+      try {
+        const hook = this.hookFromForm();
+        const existing = this.hooks.find(h => h.id === hook.id);
+        await SaveHook(hook);
+        // Re-read the saved id (backend may generate one for new hooks).
+        const saved = (await ListHooks()).find(h =>
+          h.id === hook.id || (hook.id === '' && h.name === hook.name));
+        const id = saved ? saved.id : hook.id;
+        const resynced = [];
+        if (existing?.enabledInClaude && this.hookEventSupports(hook.event, 'claude')) {
+          await SetHookEnabled(id, 'claude', true);
+          resynced.push('Claude Code');
+        }
+        if (existing?.enabledInCodex && this.hookEventSupports(hook.event, 'codex')) {
+          await SetHookEnabled(id, 'codex', true);
+          resynced.push('Codex');
+        }
+        await this.loadHooks();
+        this.closeHookEditor();
+        const note = resynced.length ? `，已同步到 ${resynced.join(' / ')}` : '';
+        this.showSuccess(`Hook「${hook.name || id}」已保存${note}`);
+      } catch (e) {
+        this.showError(`保存 Hook 失败: ${e}`);
+      } finally {
+        this.hookSaving = false;
+      }
+    },
+
+    async deleteHook(id) {
+      try {
+        await DeleteHook(id);
+        await this.loadHooks();
+        this.showSuccess(`Hook「${id}」已删除`);
+      } catch (e) {
+        this.showError(`删除 Hook 失败: ${e}`);
+      }
+    },
+
+    async toggleHookSync(id, target, enabled) {
+      const key = id + ':' + target;
+      this.hookSyncBusy = { ...this.hookSyncBusy, [key]: true };
+      try {
+        await SetHookEnabled(id, target, enabled);
+        const idx = this.hooks.findIndex(h => h.id === id);
+        if (idx >= 0) {
+          const h = { ...this.hooks[idx] };
+          if (target === 'claude') h.enabledInClaude = enabled;
+          else h.enabledInCodex = enabled;
+          this.hooks = [...this.hooks.slice(0, idx), h, ...this.hooks.slice(idx + 1)];
+        }
+        await GetHooksStats().then(st => this.hooksStats = st).catch(() => {});
+        const label = this.hookTargetLabel(target);
+        this.showSuccess(enabled ? `Hook「${id}」已写入 ${label} 配置` : `Hook「${id}」已从 ${label} 配置移除`);
+      } catch (e) {
+        await this.loadHooks();
+        this.showError(`同步 Hook 失败: ${e}`);
+      } finally {
+        const b = { ...this.hookSyncBusy };
+        delete b[key];
+        this.hookSyncBusy = b;
+      }
+    },
+
+    async suggestHook() {
+      const desc = (this.hookSuggestDesc || '').trim();
+      if (!desc) { this.showError('请先填写钩子的自然语言描述'); return; }
+      this.hookSuggestBusy = true;
+      try {
+        const draft = await SuggestHookFromDescription(desc);
+        if (!this.hookForm) this.hookForm = this.blankHookForm();
+        this.hookForm = this.hookFormFrom(draft);
+        this.hookEditIsNew = true;
+        this.hookEditOpen = true;
+        this.showSuccess('AI 已生成钩子草稿，请确认后保存');
+      } catch (e) {
+        this.showError(`AI 起草失败: ${e}`);
+      } finally {
+        this.hookSuggestBusy = false;
+      }
+    },
+
+    async optimizeHookWithAI() {
+      const inst = (this.hookAIInstruction || '').trim();
+      if (!inst) { this.showError('请先填写优化指令'); return; }
+      if (!this.hookForm) return;
+      this.hookAIBusy = true;
+      try {
+        const draft = await SuggestHookEdit(this.hookFromForm(), inst);
+        this.hookForm = this.hookFormFrom(draft);
+        this.hookAIInstruction = '';
+        this.showSuccess('AI 已更新草稿，请确认后保存');
+      } catch (e) {
+        this.showError(`AI 优化失败: ${e}`);
+      } finally {
+        this.hookAIBusy = false;
+      }
+    },
+
     // ── AI providers ──────────────────────────────────────────────────
     async loadAIProviders() {
       try {
@@ -2393,6 +2626,7 @@ window.hatchApp = function () {
       try { if (!this.aiProviders.length) await this.loadAIProviders(); } catch (_) {}
       try { this.skillsStats = await GetSkillsStats(); } catch (_) {}
       try { if (!this.mcpServers.length) this.mcpServers = (await ListMCPServers()) || []; } catch (_) {}
+      try { this.hooksStats = await GetHooksStats(); } catch (_) {}
       try { if (!this.aiTraces.length) await this.loadAITraces(); } catch (_) {}
     },
 
@@ -2708,6 +2942,21 @@ window.hatchApp = function () {
       else if (this.skillFilter === 'codex')  list = list.filter(s => s.inCodex);
       const q = (this.skillSearch || '').trim().toLowerCase();
       if (q) list = list.filter(s => s.name.toLowerCase().includes(q));
+      return list;
+    },
+
+    get filteredHooks() {
+      let list = this.hooks || [];
+      if (this.hooksFilter === 'claude') list = list.filter(h => h.enabledInClaude);
+      else if (this.hooksFilter === 'codex') list = list.filter(h => h.enabledInCodex);
+      const q = (this.hooksSearch || '').trim().toLowerCase();
+      if (q) {
+        list = list.filter(h =>
+          (h.name || '').toLowerCase().includes(q) ||
+          (h.id || '').toLowerCase().includes(q) ||
+          (h.event || '').toLowerCase().includes(q) ||
+          (h.command || '').toLowerCase().includes(q));
+      }
       return list;
     },
 

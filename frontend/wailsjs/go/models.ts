@@ -108,6 +108,40 @@ export namespace config {
 	        this.args = source["args"];
 	    }
 	}
+	export class HookDef {
+	    id: string;
+	    name: string;
+	    description?: string;
+	    event: string;
+	    matcher?: string;
+	    command: string;
+	    args?: string[];
+	    timeout?: number;
+	    statusMessage?: string;
+	    enabledInClaude?: boolean;
+	    enabledInCodex?: boolean;
+	    updatedAt?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HookDef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.event = source["event"];
+	        this.matcher = source["matcher"];
+	        this.command = source["command"];
+	        this.args = source["args"];
+	        this.timeout = source["timeout"];
+	        this.statusMessage = source["statusMessage"];
+	        this.enabledInClaude = source["enabledInClaude"];
+	        this.enabledInCodex = source["enabledInCodex"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class MCPTestResult {
 	    target: string;
 	    status: string;
@@ -350,6 +384,8 @@ export namespace config {
 	    mcpDir?: string;
 	    mcpServers?: MCPServer[];
 	    mcpSeeded?: boolean;
+	    hooks?: HookDef[];
+	    hooksSeeded?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -380,6 +416,8 @@ export namespace config {
 	        this.mcpDir = source["mcpDir"];
 	        this.mcpServers = this.convertValues(source["mcpServers"], MCPServer);
 	        this.mcpSeeded = source["mcpSeeded"];
+	        this.hooks = this.convertValues(source["hooks"], HookDef);
+	        this.hooksSeeded = source["hooksSeeded"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -400,6 +438,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 	
 	
 	
@@ -869,6 +908,42 @@ export namespace main {
 	        this.healthLatencyMs = source["healthLatencyMs"];
 	        this.healthError = source["healthError"];
 	        this.hasAnnotations = source["hasAnnotations"];
+	    }
+	}
+	export class HookEventInfo {
+	    event: string;
+	    label: string;
+	    claude: boolean;
+	    codex: boolean;
+	    matcherHint: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HookEventInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.event = source["event"];
+	        this.label = source["label"];
+	        this.claude = source["claude"];
+	        this.codex = source["codex"];
+	        this.matcherHint = source["matcherHint"];
+	    }
+	}
+	export class HooksStats {
+	    total: number;
+	    claude: number;
+	    codex: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HooksStats(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.claude = source["claude"];
+	        this.codex = source["codex"];
 	    }
 	}
 	export class MCPSettings {
