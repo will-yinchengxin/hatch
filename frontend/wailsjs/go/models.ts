@@ -946,6 +946,102 @@ export namespace main {
 	        this.codex = source["codex"];
 	    }
 	}
+	export class MCPRecommendationCandidate {
+	    id: string;
+	    name: string;
+	    source: string;
+	    installMethod: string;
+	    version: string;
+	    versionNote: string;
+	    recommendation: string;
+	    fit: string;
+	    risk: string;
+	    installSteps: string[];
+	    server: config.MCPServer;
+	    requiredEnv: string[];
+	    optionalEnv: string[];
+	    quickEnv: Record<string, string>;
+	    claudeSupported: boolean;
+	    codexSupported: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPRecommendationCandidate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.source = source["source"];
+	        this.installMethod = source["installMethod"];
+	        this.version = source["version"];
+	        this.versionNote = source["versionNote"];
+	        this.recommendation = source["recommendation"];
+	        this.fit = source["fit"];
+	        this.risk = source["risk"];
+	        this.installSteps = source["installSteps"];
+	        this.server = this.convertValues(source["server"], config.MCPServer);
+	        this.requiredEnv = source["requiredEnv"];
+	        this.optionalEnv = source["optionalEnv"];
+	        this.quickEnv = source["quickEnv"];
+	        this.claudeSupported = source["claudeSupported"];
+	        this.codexSupported = source["codexSupported"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPRecommendationResult {
+	    query: string;
+	    summary: string;
+	    sourceNote: string;
+	    candidates: MCPRecommendationCandidate[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPRecommendationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.summary = source["summary"];
+	        this.sourceNote = source["sourceNote"];
+	        this.candidates = this.convertValues(source["candidates"], MCPRecommendationCandidate);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class MCPSettings {
 	    mcpDir: string;
 	    mcpDirIsSet: boolean;

@@ -38,6 +38,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - `scripts + !selectedDir`: 目录卡片 + workspace settings accordion。
 - `scripts + selectedDir`: 脚本列表。
 - `ai`: AI 侧边栏布局，含连接、skills、mcp、tools、prompts、data。
+- AI hero 顶部统计卡包含 AI 状态、模型、Skills、MCP、Hooks；保持同一套 `hero-stat-*` 卡片样式和响应式 grid。
 - `vpn`: VPN 侧边栏布局，含概览、配置、profiles、备份、自定义规则。
 - `editTarget != null`: 右侧编辑抽屉。
 - `?aiSubTab=mcp` 等 query 可直接打开 AI 子页，`?aiSubTab=mcp&mcpManual=1` 可打开 MCP 手册弹窗，便于本地截图验证。
@@ -48,7 +49,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - 编辑抽屉：`editTarget`、`editForm`、`editSaving`，所有 per-script 行为都从这里配置。
 - AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、AI tool model config state。
 - Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`、`skillImportResult`、`skillConflictBusy`。
-- MCP：`mcpSettings`、`mcpServers`、`mcpTemplates`、`mcpForm`、`mcpSyncBusy`、`mcpTestBusy`、`mcpManualOpen`、`filteredMCPServers`。MCP 页面分两段：获取/安装 与 配置同步；配置值默认明文展示。
+- MCP：`mcpSettings`、`mcpServers`、`mcpTemplates`、`mcpForm`、`mcpSyncBusy`、`mcpTestBusy`、`mcpManualOpen`、`mcpRecommendQuery`、`mcpRecommendation`、`mcpSelectedRecommendationID`、`filteredMCPServers`。MCP 页面包含 AI 推荐选型、获取/安装、配置同步；推荐候选只填入编辑器，不自动保存；配置值默认明文展示。
 - Data：`dataPaths`、`dataInventory`、`retention`。
 - VPN：`vpnStatus`、`vpnCurrentIP`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnSettingsForm`。
 - Workspace：`wsShellOpen`、`wsDirsOpen`、`wsEnvOpen`、`wsZshrcOpen`。

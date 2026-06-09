@@ -99,6 +99,8 @@ Positional keys change when the file is edited.
 
 Hatch stores MCP registry data in `Config.MCPServers` and defaults the source directory to `~/MyHub/mcp`. First load seeds records from that directory when the registry is empty, then sets `Config.MCPSeeded` so discovery does not repeatedly re-import removed entries. The UI intentionally separates acquisition/import (local directory, GitHub clone, npm/npx registration) from target sync (Claude Code/Codex switches).
 
+`SuggestMCPRecommendations(query)` returns ranked MCP candidates with version/source notes, install steps, required env, fit/risk notes, and a ready-to-edit `MCPServer`. It uses the active AI provider when configured and falls back to an offline curated catalog. Elasticsearch recommendations prefer Elastic Agent Builder's MCP endpoint when the user has Elastic 9.2+ or Serverless, otherwise prefer Elastic's official Docker stdio server for Claude Code/Codex compatibility, include streamable-HTTP for shared deployments, and keep third-party npx/local-build options as explicit alternatives. Recommendations only fill the frontend editor; they are not persisted until the user saves.
+
 Sync targets:
 
 - Claude Code: writes `~/.claude.json` top-level `mcpServers.<id>`.

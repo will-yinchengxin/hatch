@@ -83,6 +83,22 @@ type MCPTestResult struct {
     CheckedAt                        int64
     Mode                            string // connection | config
 }
+
+type MCPRecommendationResult struct {
+    Query, Summary, SourceNote string
+    Candidates                 []MCPRecommendationCandidate
+}
+
+type MCPRecommendationCandidate struct {
+    ID, Name, Source, InstallMethod string
+    Version, VersionNote            string
+    Recommendation, Fit, Risk       string
+    InstallSteps                    []string
+    Server                          MCPServer
+    RequiredEnv, OptionalEnv        []string
+    QuickEnv                        map[string]string
+    ClaudeSupported, CodexSupported bool
+}
 ```
 
 ## HookDef

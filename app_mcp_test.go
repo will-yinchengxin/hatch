@@ -309,3 +309,59 @@ func TestCloneMCPServersDeepCopiesMutableFields(t *testing.T) {
 		t.Fatalf("clone shared mutable fields: %#v", servers[0])
 	}
 }
+
+func TestCuratedMCPRecommendationsPreferElasticOfficialOptions(t *testing.T) {
+	result := curatedMCPRecommendations("es mcp")
+	if result.Query != "es mcp" {
+		t.Fatalf("query not preserved: %q", result.Query)
+	}
+	if len(result.Candidates) < 4 {
+		t.Fatalf("expected multiple candidates, got %#v", result.Candidates)
+	}
+	first := result.Candidates[0]
+	if first.ID != "elastic-agent-builder" || first.Version == "" {
+		t.Fatalf("first candidate = %#v, want agent builder with version line", first)
+	}
+	stdio := result.Candidates[1]
+	if stdio.ID != "elastic-official-stdio" {
+		t.Fatalf("second candidate = %q, want official stdio", stdio.ID)
+	}
+	if !stdio.ClaudeSupported || !stdio.CodexSupported {
+		t.Fatalf("official stdio should support both targets: %#v", stdio)
+	}
+	if stdio.Server.Command != "docker" || stdio.Server.Transport != mcpTransportStdio {
+		t.Fatalf("unexpected official server config: %#v", stdio.Server)
+	}
+	if !containsString(stdio.Server.Args, "docker.elastic.co/mcp/elasticsearch") || !containsString(stdio.Server.Args, "stdio") {
+		t.Fatalf("official args missing image or stdio: %#v", stdio.Server.Args)
+	}
+	if stdio.QuickEnv["ES_URL"] == "" {
+		t.Fatalf("ES_URL quick env missing: %#v", stdio.QuickEnv)
+	}
+}
+
+func TestSuggestMCPRecommendationsFallsBackWithoutAI(t *testing.T) {
+	a := &App{cfg: &config.Config{OverrideMeta: map[string]config.ScriptMeta{}}}
+	result, err := a.SuggestMCPRecommendations("elasticsearch for codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Candidates) == 0 {
+		t.Fatalf("expected fallback candidates")
+	}
+	if result.Candidates[0].ID != "elastic-agent-builder" || result.Candidates[1].Server.Command != "docker" {
+		t.Fatalf("expected agent builder then docker fallback, got %#v", result.Candidates[:2])
+	}
+	if !strings.Contains(result.SourceNote, "离线") {
+		t.Fatalf("expected offline source note, got %q", result.SourceNote)
+	}
+}
+
+func containsString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
+}

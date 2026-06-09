@@ -621,6 +621,26 @@
             </div>
           </div>
         </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">MCP</div>
+          <div class="hero-stat-body">
+            <span class="hero-stat-total" x-text="mcpServers.length || 0"></span>
+            <div class="hero-stat-breakdown">
+              <div>enabled: <strong x-text="mcpEnabledCount"></strong></div>
+              <div>failed: <strong x-text="mcpFailedCount"></strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">Hooks</div>
+          <div class="hero-stat-body">
+            <span class="hero-stat-total" x-text="hooksStats.total || 0"></span>
+            <div class="hero-stat-breakdown">
+              <div>claude: <strong x-text="hooksStats.claude || 0"></strong></div>
+              <div>codex: <strong x-text="hooksStats.codex || 0"></strong></div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1222,7 +1242,7 @@
                         <div><strong>MySQL</strong><code>@benborla29/mcp-server-mysql</code><span>127.0.0.1:3306</span></div>
                         <div><strong>Postgres</strong><code>@modelcontextprotocol/server-postgres</code><span>postgresql://localhost/mydb</span></div>
                         <div><strong>Redis</strong><code>@modelcontextprotocol/server-redis</code><span>127.0.0.1:6379</span></div>
-                        <div><strong>Elasticsearch</strong><code>@tocharianou/elasticsearch-mcp</code><span>http://localhost:9200</span></div>
+                        <div><strong>Elasticsearch</strong><code>docker.elastic.co/mcp/elasticsearch</code><span>官方 Docker stdio；npx 仅作备选</span></div>
                       </div>
                     </section>
                     <section>
@@ -1255,6 +1275,72 @@
               </div>
               <input class="field-input mcp-dir-input" x-model="mcpSettingsForm.mcpDir" :placeholder="mcpSettings.defaultMCPDir" />
               <button class="btn-sm btn-primary" @click="saveMCPSettings()" :aria-busy="mcpSettingsSaving">保存</button>
+            </div>
+
+            <div class="mcp-recommend-panel">
+              <div class="mcp-recommend-head">
+                <div>
+                  <span class="mcp-step-kicker">AI 推荐</span>
+                  <h3>按需求选择 MCP 和安装方式</h3>
+                </div>
+                <span class="muted text-xs">推荐结果只会填入编辑器，保存和同步仍由你确认。</span>
+              </div>
+              <div class="mcp-recommend-search">
+                <input class="field-input" x-model="mcpRecommendQuery" placeholder="例如：es 的 MCP，适配 Codex 和 Claude Code" @keydown.enter.prevent="suggestMCPRecommendations()" />
+                <button class="btn-sm btn-primary" @click="suggestMCPRecommendations()" :aria-busy="mcpRecommendBusy">生成推荐</button>
+              </div>
+              <template x-if="mcpRecommendation">
+                <div class="mcp-recommend-result">
+                  <div class="mcp-recommend-summary">
+                    <strong x-text="mcpRecommendation.summary"></strong>
+                    <span class="muted text-xs" x-text="mcpRecommendation.sourceNote"></span>
+                  </div>
+                  <div class="mcp-recommend-cards">
+                    <template x-for="c in (mcpRecommendation.candidates || [])" :key="c.id">
+                      <div class="mcp-recommend-card" :class="mcpSelectedRecommendationID === c.id ? 'active' : ''">
+                        <div class="mcp-recommend-card-head">
+                          <div>
+                            <strong x-text="c.name || c.id"></strong>
+                            <span class="muted text-xs" x-text="c.source"></span>
+                          </div>
+                          <span class="mcp-source-badge" x-text="c.installMethod"></span>
+                        </div>
+                        <div class="mcp-version-row" x-show="c.version || c.versionNote">
+                          <span x-show="c.version" x-text="c.version"></span>
+                          <code x-show="c.versionNote" x-text="c.versionNote"></code>
+                        </div>
+                        <p class="text-sm" x-text="c.recommendation"></p>
+                        <p class="muted text-sm" x-text="c.fit"></p>
+                        <p class="mcp-risk text-xs" x-text="c.risk"></p>
+                        <div class="mcp-support-row">
+                          <span class="mcp-enabled-badge" x-show="c.claudeSupported">Claude Code</span>
+                          <span class="mcp-enabled-badge mcp-enabled-codex" x-show="c.codexSupported">Codex</span>
+                        </div>
+                        <details class="mcp-install-details">
+                          <summary>安装方法与参数</summary>
+                          <ol>
+                            <template x-for="step in (c.installSteps || [])" :key="c.id + step">
+                              <li x-text="step"></li>
+                            </template>
+                          </ol>
+                          <div class="mcp-required-env">
+                            <span>必填</span>
+                            <code x-text="(c.requiredEnv || []).join(' / ') || '无'"></code>
+                          </div>
+                          <div class="mcp-required-env">
+                            <span>可选</span>
+                            <code x-text="(c.optionalEnv || []).join(' / ') || '无'"></code>
+                          </div>
+                        </details>
+                        <div class="mcp-recommend-actions">
+                          <button class="btn-sm" @click="mcpSelectedRecommendationID = c.id">选择</button>
+                          <button class="btn-sm btn-primary" @click="mcpSelectedRecommendationID = c.id; applyMCPRecommendation(c)">套用到编辑器</button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
             </div>
 
             <!-- Add MCP modal -->

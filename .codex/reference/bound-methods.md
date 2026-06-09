@@ -38,6 +38,7 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
 | `GetMCPSettings / SaveMCPSettings(mcpDir)` | Read/write MCP master dir (default `~/MyHub/mcp` if present); `SaveMCPSettings` creates the dir |
 | `ListMCPServers / SaveMCPServer / DeleteMCPServer / GetMCPTemplates` | MCP registry CRUD + built-in template gallery; first `ListMCPServers` seeds the registry from disk once (`MCPSeeded`) |
+| `SuggestMCPRecommendations(query)` | AI-assisted MCP option ranking with offline fallback; returns candidate server configs, install steps, required env, and fit/risk notes for user-confirmed editing |
 | `ImportMCPFromLocalDir / InstallMCPFromGit / SaveNpmMCPServer` | Add MCP from local dir / git clone / npm package |
 | `SetMCPEnabled(id, target, enabled)` | Sync MCP to `~/.claude.json` or `~/.codex/config.toml`; first-time enable refuses to overwrite a same-named hand-written entry (resync of an already-enabled MCP overwrites its own block) |
 | `TestMCPConnection(id, target)` | Compatible target: `claude mcp get` real connection check; Codex: config readability only |

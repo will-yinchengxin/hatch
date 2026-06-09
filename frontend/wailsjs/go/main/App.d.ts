@@ -235,6 +235,8 @@ export function SuggestHookEdit(arg1:config.HookDef,arg2:string):Promise<config.
 
 export function SuggestHookFromDescription(arg1:string):Promise<config.HookDef>;
 
+export function SuggestMCPRecommendations(arg1:string):Promise<main.MCPRecommendationResult>;
+
 export function SuggestScriptContent(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SuggestScriptContentStream(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;

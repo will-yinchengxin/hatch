@@ -30,6 +30,7 @@
 - `DeleteSkillEverywhere()` is the explicit destructive path for removing a skill from Hatch and all sync targets.
 - Skill import uses content fingerprints for same-name skills; differing content returns UI conflicts and must not overwrite Hatch master until the user chooses a side.
 - MCP env values are stored in plaintext in `config.json`, like AI keys, and the MCP UI intentionally displays config values in plaintext for local review; do not log or screenshot secrets.
+- MCP AI recommendations are drafts only: they can prefill `MCPServer` editor fields and quick env rows, but must not save registry entries or sync target configs until the user clicks save/enables a target.
 - MCP sync writes global config only: the compatible target uses `~/.claude.json` top-level `mcpServers`, Codex uses `~/.codex/config.toml` `[mcp_servers.*]`.
 - First-time MCP sync refuses to overwrite an existing same-name target entry; rename the Hatch MCP or remove the target entry first.
 - Deleting a synced MCP record removes the Hatch registry entry and its Hatch-managed global target entries; use the per-target switches first if you only want to disable one side.

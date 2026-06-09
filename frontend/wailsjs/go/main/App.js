@@ -462,6 +462,10 @@ export function SuggestHookFromDescription(arg1) {
   return window['go']['main']['App']['SuggestHookFromDescription'](arg1);
 }
 
+export function SuggestMCPRecommendations(arg1) {
+  return window['go']['main']['App']['SuggestMCPRecommendations'](arg1);
+}
+
 export function SuggestScriptContent(arg1, arg2, arg3) {
   return window['go']['main']['App']['SuggestScriptContent'](arg1, arg2, arg3);
 }

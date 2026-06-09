@@ -84,6 +84,7 @@ const TestMCPConnection     = (id, target)                  => window['go']['mai
 const GetMCPTemplates       = ()                            => window['go']['main']['App']['GetMCPTemplates']();
 const UninstallMCPFromDisk  = (id)                          => window['go']['main']['App']['UninstallMCPFromDisk'](id);
 const UpdateMCPFromGit      = (id)                          => window['go']['main']['App']['UpdateMCPFromGit'](id);
+const SuggestMCPRecommendations = (query)                   => window['go']['main']['App']['SuggestMCPRecommendations'](query);
 const ListHooks             = ()                            => window['go']['main']['App']['ListHooks']();
 const SaveHook              = (hook)                        => window['go']['main']['App']['SaveHook'](hook);
 const DeleteHook            = (id)                          => window['go']['main']['App']['DeleteHook'](id);
@@ -278,6 +279,10 @@ window.hatchApp = function () {
     mcpDeleteModal: { open: false, id: '', name: '', canCleanDisk: false, localPath: '' },
     mcpTemplateGalleryOpen: false,
     mcpUpdateBusy: {},           // { id: true }
+    mcpRecommendQuery: 'es 的 MCP，适配 Codex 和 Claude Code',
+    mcpRecommendBusy: false,
+    mcpRecommendation: null,
+    mcpSelectedRecommendationID: '',
 
     // Hooks management
     hooks: [],
@@ -1427,6 +1432,48 @@ window.hatchApp = function () {
       } finally {
         this.mcpLoading = false;
       }
+    },
+
+    async suggestMCPRecommendations() {
+      const query = (this.mcpRecommendQuery || '').trim();
+      if (!query) { this.showError('请先描述想要的 MCP，例如 Elasticsearch / ES'); return; }
+      this.mcpRecommendBusy = true;
+      try {
+        const result = await SuggestMCPRecommendations(query);
+        this.mcpRecommendation = result || null;
+        const first = (result?.candidates || [])[0];
+        this.mcpSelectedRecommendationID = first?.id || '';
+        if (first) this.showSuccess(`已生成 MCP 推荐：${first.name || first.id}`);
+      } catch (e) {
+        this.showError(`生成 MCP 推荐失败: ${e}`);
+      } finally {
+        this.mcpRecommendBusy = false;
+      }
+    },
+
+    selectedMCPRecommendation() {
+      const list = this.mcpRecommendation?.candidates || [];
+      return list.find(c => c.id === this.mcpSelectedRecommendationID) || list[0] || null;
+    },
+
+    applyMCPRecommendation(candidate) {
+      const c = candidate || this.selectedMCPRecommendation();
+      if (!c?.server) { this.showError('没有可应用的 MCP 推荐'); return; }
+      const copy = JSON.parse(JSON.stringify(c.server));
+      copy.enabledInClaude = false;
+      copy.enabledInCodex = false;
+      copy.lastTestResults = {};
+      this.openMCPServerEditor(copy);
+      if (c.quickEnv && this.mcpForm?.transport === 'stdio') {
+        const existing = {};
+        for (const row of this.mcpForm.envRows || []) {
+          const key = (row.key || '').trim();
+          if (key) existing[key] = row.value || '';
+        }
+        this.mcpForm.envRows = Object.entries({ ...c.quickEnv, ...existing })
+          .map(([key, value]) => ({ key, value }));
+      }
+      this.showSuccess(`已套用「${c.name || c.id}」，请补齐参数后保存`);
     },
 
     async saveMCPSettings() {
