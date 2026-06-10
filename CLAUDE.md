@@ -63,7 +63,7 @@ hatch/
 ├── app_fileio.go           # ReadScriptFile, WriteScriptFile, CreateScriptFile, OpenFile
 ├── app_claude.go           # Claude Code settings, presets, TOML helpers
 ├── app_codex.go            # Codex settings, presets
-├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
+├── app_vpn.go              # Clash Verge Rev health/config/profile/backup/IP/proxy helpers
 ├── app_skills.go           # SKILL.md master store and sync
 ├── app_hooks.go            # Command hook registry, Claude/Codex hook sync, AI draft
 ├── app_mcp.go              # MCP registry, AI recommendations, local/git/npm install, Claude/Codex sync, connection test

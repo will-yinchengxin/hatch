@@ -119,6 +119,8 @@ export function GetVPNCurrentIP():Promise<main.VPNCurrentIP>;
 
 export function GetVPNEnhanceData():Promise<main.VPNEnhanceData>;
 
+export function GetVPNHealthReport():Promise<main.VPNHealthReport>;
+
 export function GetVPNProfileContent(arg1:string):Promise<string>;
 
 export function GetVPNProfiles():Promise<Array<main.VPNProfile>>;
@@ -158,6 +160,8 @@ export function OpenVPNBackupDir():Promise<void>;
 export function OpenVPNDir():Promise<void>;
 
 export function ParseZshrc():Promise<Array<zshrc.Entry>>;
+
+export function PreviewVPNBackup(arg1:string):Promise<main.VPNBackupPreview>;
 
 export function ReadScriptFile(arg1:string):Promise<string>;
 
@@ -260,5 +264,7 @@ export function UninstallMCPFromDisk(arg1:string):Promise<void>;
 export function UpdateDirectoryExport(arg1:string,arg2:string):Promise<void>;
 
 export function UpdateMCPFromGit(arg1:string):Promise<config.MCPServer>;
+
+export function ValidateVPNSettings(arg1:string,arg2:string):Promise<main.VPNPathValidation>;
 
 export function WriteScriptFile(arg1:string,arg2:string):Promise<void>;

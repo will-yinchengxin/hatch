@@ -67,6 +67,9 @@ const GetVPNSettings        = ()                            => window['go']['mai
 const SaveVPNSettings       = (appDir, backupDir)           => window['go']['main']['App']['SaveVPNSettings'](appDir, backupDir);
 const GetVPNStatus          = ()                            => window['go']['main']['App']['GetVPNStatus']();
 const GetVPNCurrentIP       = ()                            => window['go']['main']['App']['GetVPNCurrentIP']();
+const GetVPNHealthReport    = ()                            => window['go']['main']['App']['GetVPNHealthReport']();
+const ValidateVPNSettings   = (appDir, backupDir)           => window['go']['main']['App']['ValidateVPNSettings'](appDir, backupDir);
+const PreviewVPNBackup      = (zipPath)                     => window['go']['main']['App']['PreviewVPNBackup'](zipPath);
 const GetClaudeSettings     = ()                            => window['go']['main']['App']['GetClaudeSettings']();
 const SaveClaudeSettings    = (content)                     => window['go']['main']['App']['SaveClaudeSettings'](content);
 const GetCodexConfig        = ()                            => window['go']['main']['App']['GetCodexConfig']();
@@ -317,8 +320,11 @@ window.hatchApp = function () {
     vpnStatus: null,
     vpnCurrentIP: null,
     vpnIPLoading: false,
+    vpnHealthReport: null,
+    vpnHealthLoading: false,
     vpnSettings: null,
     vpnSettingsForm: { appDir: '', backupDir: '' },
+    vpnPathValidation: null,
     vpnSettingsSaving: false,
     vpnConfigFile: 'verge.yaml',
     vpnConfigContent: '',
@@ -330,10 +336,11 @@ window.hatchApp = function () {
     vpnProfileError: '',
     vpnBackups: [],
     vpnBackupDir: '',
+    vpnBackupPreview: null,
+    vpnExternalZipPath: '',
     vpnBackupBusy: false,
     vpnRestoreBusy: false,
     vpnMsg: '',
-    vpnTUNExpanded: false,
     vpnStatusRefreshing: false,
     vpnEnhanceData: null,
     vpnEnhanceLoading: false,
@@ -3060,6 +3067,9 @@ window.hatchApp = function () {
     },
 
     vpnPillTitle() {
+      if (this.vpnHealthReport && this.vpnHealthReport.summary) {
+        return this.vpnHealthReport.summary + ' — 点击打开 VPN 体检';
+      }
       const s = this.vpnStatus;
       if (!s) return 'VPN 状态 — 点击打开配置中心';
       const sp = s.systemProxyEnabled ? '开' : '关';
@@ -3075,7 +3085,12 @@ window.hatchApp = function () {
     async refreshVPNStatus() {
       this.vpnStatusRefreshing = true;
       try {
-        this.vpnStatus = await GetVPNStatus();
+        const [status, report] = await Promise.all([
+          GetVPNStatus(),
+          GetVPNHealthReport(),
+        ]);
+        this.vpnStatus = status;
+        this.vpnHealthReport = report;
       } catch (e) {
         this.vpnMsg = '刷新失败: ' + e;
       } finally {
@@ -3086,19 +3101,27 @@ window.hatchApp = function () {
 
     async loadVPNOverview() {
       try {
-        const [profiles, dir, backups, status, settings] = await Promise.all([
+        this.vpnHealthLoading = true;
+        const [profilesRes, dirRes, backupsRes, statusRes, settingsRes, reportRes] = await Promise.allSettled([
           GetVPNProfiles(),
           GetVPNAppDir(),
           ListVPNBackups(),
           GetVPNStatus(),
           GetVPNSettings(),
+          GetVPNHealthReport(),
         ]);
+        if (profilesRes.status === 'rejected' && reportRes.status === 'rejected') {
+          throw profilesRes.reason;
+        }
+        const profiles = profilesRes.status === 'fulfilled' ? profilesRes.value : [];
+        const settings = settingsRes.status === 'fulfilled' ? settingsRes.value : null;
         this.vpnProfiles = profiles || [];
         this.vpnCurrentProfile = this.vpnProfiles.find(p => p.isCurrent) || null;
-        this.vpnAppDir = dir || '';
-        this.vpnBackups = backups || [];
-        this.vpnStatus = status || null;
+        this.vpnAppDir = dirRes.status === 'fulfilled' ? (dirRes.value || '') : '';
+        this.vpnBackups = backupsRes.status === 'fulfilled' ? (backupsRes.value || []) : [];
+        this.vpnStatus = statusRes.status === 'fulfilled' ? (statusRes.value || null) : null;
         this.vpnSettings = settings || null;
+        this.vpnHealthReport = reportRes.status === 'fulfilled' ? (reportRes.value || null) : null;
         // Fetch real exit IP in background (network call, takes a moment)
         this.refreshVPNCurrentIP();
         if (settings) {
@@ -3107,12 +3130,21 @@ window.hatchApp = function () {
         }
       } catch (e) {
         this.vpnMsg = '加载失败: ' + e;
+      } finally {
+        this.vpnHealthLoading = false;
       }
     },
 
     async saveVPNSettings() {
       this.vpnSettingsSaving = true;
+      this.vpnPathValidation = null;
       try {
+        const validation = await ValidateVPNSettings(this.vpnSettingsForm.appDir, this.vpnSettingsForm.backupDir);
+        this.vpnPathValidation = validation;
+        if (validation && validation.errors && validation.errors.length) {
+          this.vpnMsg = '目录设置未保存: ' + validation.errors.join('；');
+          return;
+        }
         await SaveVPNSettings(this.vpnSettingsForm.appDir, this.vpnSettingsForm.backupDir);
         await this.loadVPNOverview();
         this.vpnMsg = '目录设置已保存';
@@ -3214,6 +3246,7 @@ window.hatchApp = function () {
         const r = await ExportVPNBackup();
         this.vpnMsg = `备份成功: ${r.path} (${r.numFiles} 个文件)`;
         this.vpnBackups = await ListVPNBackups();
+        this.vpnHealthReport = await GetVPNHealthReport();
       } catch (e) {
         this.vpnMsg = '备份失败: ' + e;
       } finally {
@@ -3221,13 +3254,38 @@ window.hatchApp = function () {
       }
     },
 
+    async previewAndImportVPNBackup(zipPath) {
+      const target = (zipPath || '').trim();
+      if (!target) {
+        this.vpnMsg = '请输入备份 zip 路径';
+        return;
+      }
+      this.vpnBackupPreview = null;
+      try {
+        const preview = await PreviewVPNBackup(target);
+        this.vpnBackupPreview = preview;
+        const keyFiles = preview.keyFiles && preview.keyFiles.length ? preview.keyFiles.join(', ') : '未发现关键配置文件';
+        const warnings = preview.warnings && preview.warnings.length ? '\n\n提醒：\n' + preview.warnings.join('\n') : '';
+        if (!preview.valid) {
+          this.vpnMsg = '备份预览失败: 这不像 Clash Verge Rev 配置备份';
+          return;
+        }
+        if (!confirm(`确认恢复这个备份？\n${target}\n\n包含 ${preview.numFiles} 个文件\n关键文件：${keyFiles}\n\n恢复前 Hatch 会自动创建当前配置备份。建议先关闭 Clash Verge Rev。${warnings}`)) return;
+      } catch (e) {
+        this.vpnMsg = '备份预览失败: ' + e;
+        return;
+      }
+      await this.importVPNBackup(target);
+    },
+
     async importVPNBackup(zipPath) {
-      if (!confirm(`确认从以下备份恢复？\n${zipPath}\n\n建议先关闭 Clash Verge Rev。`)) return;
       this.vpnRestoreBusy = true;
       this.vpnMsg = '';
       try {
         const msg = await ImportVPNBackup(zipPath);
         this.vpnMsg = '恢复成功: ' + msg;
+        this.vpnBackups = await ListVPNBackups();
+        await this.loadVPNOverview();
       } catch (e) {
         this.vpnMsg = '恢复失败: ' + e;
       } finally {
@@ -3259,6 +3317,41 @@ window.hatchApp = function () {
     vpnFormatTs(ts) {
       if (!ts) return '—';
       return new Date(ts * 1000).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
+    },
+
+    vpnHealthClass(status) {
+      return {
+        ok: 'vpn-health-ok',
+        warn: 'vpn-health-warn',
+        error: 'vpn-health-error',
+      }[status] || 'vpn-health-warn';
+    },
+
+    vpnHealthLabel(status) {
+      return {
+        ok: '正常',
+        warn: '需检查',
+        error: '需处理',
+      }[status] || '未知';
+    },
+
+    vpnHealthPillText() {
+      const overall = this.vpnHealthReport && this.vpnHealthReport.overall;
+      if (overall) return 'VPN ' + this.vpnHealthLabel(overall);
+      if (this.vpnStatus && (this.vpnStatus.systemProxyEnabled || this.vpnStatus.tunEnabled)) return 'VPN 正常';
+      return 'VPN 体检';
+    },
+
+    vpnHealthGo(action) {
+      if (!action || !action.tab) return;
+      if (action.tab === 'advanced') {
+        this.vpnSubTab = 'config';
+        this.loadVPNConfig();
+        return;
+      }
+      this.vpnSubTab = action.tab;
+      if (action.tab === 'backup') this.loadVPNOverview();
+      if (action.tab === 'overview') this.refreshVPNStatus();
     },
 
     async loadVPNEnhanceData() {

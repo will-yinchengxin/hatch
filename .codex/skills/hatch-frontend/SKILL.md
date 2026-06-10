@@ -39,8 +39,9 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - `scripts + selectedDir`: 脚本列表。
 - `ai`: AI 侧边栏顺序：概览 → 连接 → **助手**（tools，🤖 Claude Code/Codex 状态与配置）→ Skills → MCP → Hooks → 文档 → **提示词**（prompts，system prompt 覆盖）→ 数据。
 - AI hero 顶部统计卡包含 AI 状态、模型、Skills、MCP、Hooks；保持同一套 `hero-stat-*` 卡片样式和响应式 grid。
-- `vpn`: VPN 侧边栏布局，含概览、配置、profiles、备份、自定义规则。
+- `vpn`: VPN 侧边栏布局，含体检、备份、自定义规则，以及高级配置/Profile 原文编辑；TUN 排除网段在 hero 卡片内紧凑常驻展示，不使用隐藏式双击交互。
 - `editTarget != null`: 右侧编辑抽屉。
+- `?aiSubTab=mcp` 等 query 可直接打开 AI 子页，`?aiSubTab=mcp&mcpManual=1` 可打开 MCP 手册弹窗，便于本地截图验证。
 
 ## 关键状态
 
@@ -51,7 +52,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - MCP：`mcpSettings`、`mcpServers`、`mcpTemplates`、`mcpForm`、`mcpSyncBusy`、`mcpTestBusy`、`mcpImportBusy`、`mcpManualOpen`、`mcpRecommendQuery`、`mcpRecommendation`、`mcpSelectedRecommendationID`、`filteredMCPServers`。MCP 页面包含 AI 推荐选型、获取/安装、配置同步；推荐候选只填入编辑器，不自动保存；配置值默认明文展示；批量启用/测试迭代 `filteredMCPServers`。
 - Hooks：`hooks`、`hooksStats`、`hooksSearch`、`hooksFilter`、`filteredHooks`、`hookEventSupport`、`hookForm`/`hookEditOpen`、`hookSyncBusy`、`hookTemplates`、`hookSuggestDesc`（头部起草）、`hookAIInstruction`/`hookAIBusy`（编辑器内 AI 优化）。`hookEventSupports(event,target)` 控制同步开关置灰；同步开关复用 `.skill-sync-toggle`，编辑用表单（`.hook-editor-panel`）而非 markdown 编辑器；`SuggestHookFromDescription` 起草新钩子，`SuggestHookEdit` 改进现有钩子。
 - Data：`dataPaths`、`dataInventory`、`retention`。
-- VPN：`vpnStatus`、`vpnCurrentIP`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnSettingsForm`。
+- VPN：`vpnStatus`、`vpnCurrentIP`、`vpnHealthReport`、`vpnPathValidation`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnBackupPreview`、`vpnSettingsForm`。
 - Workspace：`wsShellOpen`、`wsDirsOpen`、`wsEnvOpen`、`wsZshrcOpen`。
 
 ## CSS 规则

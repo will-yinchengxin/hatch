@@ -43,8 +43,9 @@ editTarget != null      -> edit drawer overlay
 | `autoLaunchEnabled` | Login autostart |
 | `wsShellOpen / wsDirsOpen / wsEnvOpen / wsZshrcOpen` | Workspace accordion |
 | `historyTarget / historyRecords / historyOpenId / historyLogText` | Run-history modal |
-| `vpnStatus / vpnCurrentIP / vpnProfiles / vpnCurrentProfile` | VPN status and profile state |
-| `vpnEnhanceData / vpnProfileEditing / vpnBackups / vpnSettingsForm` | VPN enhance, edit, backup, settings state |
+| `vpnStatus / vpnCurrentIP / vpnHealthReport / vpnPathValidation` | VPN live status, exit IP, ordinary-user health report, and directory validation |
+| `vpnProfiles / vpnCurrentProfile / vpnEnhanceData / vpnProfileEditing` | VPN profile, enhance, and advanced edit state |
+| `vpnBackups / vpnBackupPreview / vpnSettingsForm / vpnExternalZipPath` | VPN backup/restore preview, settings, and external zip restore state |
 | `success / successTimer / error` | Toasts |
 
 Call `showSuccess()` after write operations. `showError()` is for failures.
@@ -93,7 +94,7 @@ Core tokens:
   - 提示词 (`aiSubTab==='prompts'`): `promptOps` each entry has `{ key, label, group }`. Groups: 脚本 (SuggestScriptMeta, SuggestScriptContent), Zshrc (SuggestZshrcAnnotation, SuggestZshrcOrganization), Hooks (SuggestHookFromDescription, SuggestHookEdit), MCP (SuggestMCPRecommendations), 系统 (TestAIConfig). UI shows `.prompt-group-header` before each new group via `x-show="index === 0 || promptOps[index-1].group !== op.group"`. `GetDefaultPrompts()` exposes all 8 ops including the 3 new ones.
   - `duplicateProvider(p)` opens the provider editor prefilled (baseUrl/model, blank apiKey, "副本" name).
   - Hooks (`aiSubTab==='hooks'`, `.ai-hooks-section`): registry of `command` hooks. Each `.hook-item` shows event badge + matcher + command preview and two `.skill-sync-toggle` switches (Claude/Codex); a switch gets `.sync-disabled` when `hookEventSupports(h.event, target)` is false. Editing uses a form (`.hook-editor-panel` / `.hook-form-grid`), not a markdown editor. The editor has an inline AI bar (`.se-ai-bar`, `hookAIInstruction` / `hookAIBusy`): `optimizeHookWithAI()` sends the current form via `SuggestHookEdit` to refine the existing hook in place. `📦 模板库` opens `.hook-modal` from `hookTemplates`; the header `✦ AI 起草` calls `suggestHook()` (`SuggestHookFromDescription`) to prefill a new hook. `toggleHookSync` updates the row in place and refreshes `hooksStats`; `saveHook` re-syncs already-enabled targets after `SaveHook`.
-- VPN: overview/status hero, config editor, profiles editor, backup/restore, enhance rules/hosts/DNS view.
+- VPN: overview is a health/diagnostic dashboard for ordinary users; TUN excluded CIDRs are visible directly in a compact hero-card list; backup restore previews zip contents and creates a pre-restore backup; raw config/profile editors are labeled as advanced tools; enhance view explains rules/hosts/DNS overrides.
 
 ## CSS And Alpine Pitfalls
 

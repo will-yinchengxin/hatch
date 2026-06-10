@@ -1240,6 +1240,26 @@ export namespace main {
 	        this.both = source["both"];
 	    }
 	}
+	export class VPNBackupPreview {
+	    path: string;
+	    valid: boolean;
+	    numFiles: number;
+	    keyFiles: string[];
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNBackupPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.valid = source["valid"];
+	        this.numFiles = source["numFiles"];
+	        this.keyFiles = source["keyFiles"];
+	        this.warnings = source["warnings"];
+	    }
+	}
 	export class VPNBackupResult {
 	    path: string;
 	    size: number;
@@ -1312,6 +1332,96 @@ export namespace main {
 	        this.dnsFakeIPFilter = source["dnsFakeIPFilter"];
 	        this.hasData = source["hasData"];
 	        this.sourceFiles = source["sourceFiles"];
+	    }
+	}
+	export class VPNHealthAction {
+	    label: string;
+	    tab?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNHealthAction(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.tab = source["tab"];
+	    }
+	}
+	export class VPNHealthCheck {
+	    id: string;
+	    label: string;
+	    status: string;
+	    detail: string;
+	    suggestion?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNHealthCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.status = source["status"];
+	        this.detail = source["detail"];
+	        this.suggestion = source["suggestion"];
+	    }
+	}
+	export class VPNHealthReport {
+	    overall: string;
+	    summary: string;
+	    checks: VPNHealthCheck[];
+	    actions: VPNHealthAction[];
+	    lastBackup?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNHealthReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.overall = source["overall"];
+	        this.summary = source["summary"];
+	        this.checks = this.convertValues(source["checks"], VPNHealthCheck);
+	        this.actions = this.convertValues(source["actions"], VPNHealthAction);
+	        this.lastBackup = source["lastBackup"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class VPNPathValidation {
+	    appDirOk: boolean;
+	    backupDirOk: boolean;
+	    errors: string[];
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new VPNPathValidation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.appDirOk = source["appDirOk"];
+	        this.backupDirOk = source["backupDirOk"];
+	        this.errors = source["errors"];
+	        this.warnings = source["warnings"];
 	    }
 	}
 	export class VPNProfile {

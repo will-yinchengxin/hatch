@@ -49,10 +49,10 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetHookTemplates / GetHookEventSupport` | Built-in hook template gallery; event catalog with per-target (claude/codex) support flags |
 | `SuggestHookFromDescription(desc)` | AI drafts a command `HookDef` from natural language; UI-only, never persisted |
 | `SuggestHookEdit(current, instruction)` | AI refines an existing `HookDef` per an instruction (preserves id); UI-only, never persisted |
-| `GetVPNSettings / SaveVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP` | VPN settings and live status |
+| `GetVPNSettings / SaveVPNSettings / ValidateVPNSettings / GetVPNAppDir / GetVPNProfiles / GetVPNStatus / GetVPNCurrentIP / GetVPNHealthReport` | VPN settings, path validation, live status, and ordinary-user health report |
 | `GetVPNEnhanceData` | Parse merge/rules profiles into prepend rules, hosts, DNS fake-IP filters |
 | `GetVPNConfigFile / SaveVPNConfigFile / GetVPNProfileContent / SaveVPNProfileContent` | VPN config/profile edit; saves validate YAML before overwrite (`.js` script profiles skip validation) and write a `.bak` |
-| `ExportVPNBackup / ImportVPNBackup / ListVPNBackups / DeleteVPNBackup` | VPN backup/restore/delete; import is zip-slip guarded, delete only accepts `clash-verge-*.zip` inside the managed backup dir |
+| `ExportVPNBackup / PreviewVPNBackup / ImportVPNBackup / ListVPNBackups / DeleteVPNBackup` | VPN backup/preview/restore/delete; import is zip-slip guarded and creates a pre-restore backup when current config exists; delete only accepts `clash-verge-*.zip` inside the managed backup dir |
 | `OpenVPNDir / OpenVPNBackupDir` | Finder open helpers |
 
 ## Events

@@ -61,12 +61,12 @@ hatch/
 ├── app_observability.go    # AI tool status, AI trace persistence, macOS notify
 ├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI, paths, autolaunch, doc links
 ├── app_fileio.go           # ReadScriptFile, WriteScriptFile, CreateScriptFile, OpenFile
-├── app_claude.go           # Compatible-target settings, presets, TOML helpers
+├── app_claude.go           # Claude Code settings, presets, TOML helpers
 ├── app_codex.go            # Codex settings, presets
-├── app_vpn.go              # Clash Verge Rev config/profile/backup/IP/proxy helpers
+├── app_vpn.go              # Clash Verge Rev health/config/profile/backup/IP/proxy helpers
 ├── app_skills.go           # SKILL.md master store and sync
-├── app_hooks.go            # Command hook registry, multi-target hook sync, AI draft
-├── app_mcp.go              # MCP registry, local/git/npm install, multi-target sync, connection test
+├── app_hooks.go            # Command hook registry, Claude/Codex hook sync, AI draft
+├── app_mcp.go              # MCP registry, AI recommendations, local/git/npm install, Claude/Codex sync, connection test
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```
@@ -86,10 +86,10 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | zshrc managed block | `~/.zshrc` Hatch block only |
 | zshrc backups | `~/.zshrc.hatch-backup-<YYYYMMDD-HHMMSS>` |
 | App autostart | `~/Library/LaunchAgents/com.hatch.app.plist` |
-| External usage cache | `~/.cache/will-statusline/last.json` |
+| Claude usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
 | Codex hooks (Hatch-managed) | `~/.codex/hooks.json` |
-| Compatible hooks target (Hatch-managed) | `~/.claude/settings.json` `hooks` key |
+| Claude hooks (Hatch-managed) | `~/.claude/settings.json` `hooks` key |
 | Backup export | `~/Desktop/hatch-backup-<ts>.zip` by default |
 | VPN config | Clash Verge Rev app dir, auto-detected unless configured |
 | VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` by default |
@@ -107,7 +107,7 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 - AI suggestions populate UI for user confirmation; they must not silently persist metadata, notes, prompts, skills, or zshrc changes.
 - AI API keys are stored as local plaintext config; never print them in logs or expose them in screenshots.
 - MCP env values are stored as local plaintext config; sync writes global target config but Hatch does not keep MCP services running.
-- Hooks are `command`-type only. One `HookDef` is authored once and synced to supported targets. Hatch-owned handlers carry a `hatchId` marker so sync updates/removes only its own entries and never touches hand-written hooks; first-time enable refuses to overwrite a matching hand-written hook. Target-unsupported events (for example `Notification`, `SessionEnd`) are gated off where unsupported.
+- Hooks are `command`-type only (shared by Claude Code and Codex). One `HookDef` is authored once and synced to Claude (`~/.claude/settings.json` `hooks`) and/or Codex (`~/.codex/hooks.json`). Hatch-owned handlers carry a `hatchId` marker so sync updates/removes only its own entries and never touches hand-written hooks; first-time enable refuses to overwrite a matching hand-written hook. Codex-unsupported events (e.g. `Notification`, `SessionEnd`) are gated off for the Codex target.
 
 ## Frontend Rules
 

@@ -45,11 +45,26 @@ type VPNBackupResult struct {
 	NumFiles int    `json:"numFiles"`
 }
 
+type VPNBackupPreview struct {
+	Path     string   `json:"path"`
+	Valid    bool     `json:"valid"`
+	NumFiles int      `json:"numFiles"`
+	KeyFiles []string `json:"keyFiles"`
+	Warnings []string `json:"warnings"`
+}
+
 type VPNSettings struct {
 	AppDir      string `json:"appDir"`
 	BackupDir   string `json:"backupDir"`
 	AppDirIsSet bool   `json:"appDirIsSet"`
 	BackupIsSet bool   `json:"backupIsSet"`
+}
+
+type VPNPathValidation struct {
+	AppDirOK    bool     `json:"appDirOk"`
+	BackupDirOK bool     `json:"backupDirOk"`
+	Errors      []string `json:"errors"`
+	Warnings    []string `json:"warnings"`
 }
 
 type VPNProxyGroup struct {
@@ -86,6 +101,27 @@ type VPNCurrentIP struct {
 	City    string `json:"city"`
 	Org     string `json:"org"`
 	Error   string `json:"error,omitempty"`
+}
+
+type VPNHealthCheck struct {
+	ID         string `json:"id"`
+	Label      string `json:"label"`
+	Status     string `json:"status"` // ok | warn | error
+	Detail     string `json:"detail"`
+	Suggestion string `json:"suggestion,omitempty"`
+}
+
+type VPNHealthAction struct {
+	Label string `json:"label"`
+	Tab   string `json:"tab,omitempty"`
+}
+
+type VPNHealthReport struct {
+	Overall    string            `json:"overall"` // ok | warn | error
+	Summary    string            `json:"summary"`
+	Checks     []VPNHealthCheck  `json:"checks"`
+	Actions    []VPNHealthAction `json:"actions"`
+	LastBackup string            `json:"lastBackup,omitempty"`
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -163,6 +199,227 @@ func (a *App) SaveVPNSettings(appDir, backupDir string) error {
 	a.cfg.VPNAppDir = strings.TrimSpace(appDir)
 	a.cfg.VPNBackupDir = strings.TrimSpace(backupDir)
 	return a.cfg.Save()
+}
+
+func (a *App) ValidateVPNSettings(appDir, backupDir string) VPNPathValidation {
+	appDir = strings.TrimSpace(appDir)
+	backupDir = strings.TrimSpace(backupDir)
+	settings := a.GetVPNSettings()
+	if appDir == "" {
+		appDir = settings.AppDir
+	}
+	if backupDir == "" {
+		backupDir = settings.BackupDir
+	}
+
+	var result VPNPathValidation
+	if fi, err := os.Stat(appDir); err != nil {
+		result.Errors = append(result.Errors, "Clash Verge Rev 数据目录不存在: "+appDir)
+	} else if !fi.IsDir() {
+		result.Errors = append(result.Errors, "Clash Verge Rev 数据目录不是文件夹: "+appDir)
+	} else {
+		result.AppDirOK = true
+		for _, name := range []string{"verge.yaml", "profiles.yaml"} {
+			if _, err := os.Stat(filepath.Join(appDir, name)); err != nil {
+				result.Warnings = append(result.Warnings, "未找到 "+name+"，请确认这是 Clash Verge Rev 数据目录。")
+			}
+		}
+	}
+
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+		result.Errors = append(result.Errors, "备份目录不可创建: "+err.Error())
+	} else {
+		testPath := filepath.Join(backupDir, ".hatch-write-test")
+		if err := os.WriteFile(testPath, []byte("ok"), 0o600); err != nil {
+			result.Errors = append(result.Errors, "备份目录不可写: "+err.Error())
+		} else {
+			_ = os.Remove(testPath)
+			result.BackupDirOK = true
+		}
+	}
+
+	return result
+}
+
+func (a *App) GetVPNHealthReport() VPNHealthReport {
+	report := VPNHealthReport{Overall: "ok"}
+	addCheck := func(check VPNHealthCheck) {
+		report.Checks = append(report.Checks, check)
+		switch check.Status {
+		case "error":
+			report.Overall = "error"
+		case "warn":
+			if report.Overall != "error" {
+				report.Overall = "warn"
+			}
+		}
+	}
+
+	dir, dirErr := a.clashVergeDir()
+	if a.cfg.VPNAppDir != "" {
+		if fi, err := os.Stat(a.cfg.VPNAppDir); err != nil || !fi.IsDir() {
+			addCheck(VPNHealthCheck{
+				ID:         "app-dir",
+				Label:      "Clash 数据目录",
+				Status:     "error",
+				Detail:     "手动设置的数据目录不可用: " + a.cfg.VPNAppDir,
+				Suggestion: "在“高级”里清空该路径使用自动检测，或填写正确的数据目录。",
+			})
+			report.Summary = "手动设置的 Clash Verge Rev 数据目录不可用。"
+			report.Actions = []VPNHealthAction{{Label: "检查目录设置", Tab: "advanced"}}
+			return report
+		}
+	}
+	if dirErr != nil {
+		addCheck(VPNHealthCheck{
+			ID:         "app-dir",
+			Label:      "Clash 数据目录",
+			Status:     "error",
+			Detail:     dirErr.Error(),
+			Suggestion: "先安装并启动 Clash Verge Rev，或在“高级”里填写正确的数据目录。",
+		})
+		report.Summary = "未找到 Clash Verge Rev 配置，Hatch 还不能读取 VPN 状态。"
+		report.Actions = []VPNHealthAction{{Label: "检查目录设置", Tab: "advanced"}}
+		return report
+	}
+	addCheck(VPNHealthCheck{
+		ID:     "app-dir",
+		Label:  "Clash 数据目录",
+		Status: "ok",
+		Detail: dir,
+	})
+
+	profiles, profilesErr := a.GetVPNProfiles()
+	if profilesErr != nil {
+		addCheck(VPNHealthCheck{
+			ID:         "profile",
+			Label:      "当前订阅",
+			Status:     "error",
+			Detail:     profilesErr.Error(),
+			Suggestion: "打开 Clash Verge Rev 检查 Profile 列表，或从备份恢复配置。",
+		})
+	} else {
+		current := ""
+		for _, p := range profiles {
+			if p.IsCurrent {
+				current = orDefault(p.Name, p.UID)
+				break
+			}
+		}
+		if current == "" {
+			addCheck(VPNHealthCheck{
+				ID:         "profile",
+				Label:      "当前订阅",
+				Status:     "warn",
+				Detail:     fmt.Sprintf("检测到 %d 个 Profile，但没有激活项。", len(profiles)),
+				Suggestion: "在 Clash Verge Rev 里选择一个可用 Profile。",
+			})
+		} else {
+			addCheck(VPNHealthCheck{
+				ID:     "profile",
+				Label:  "当前订阅",
+				Status: "ok",
+				Detail: current,
+			})
+		}
+	}
+
+	status := a.GetVPNStatus()
+	if !status.SystemProxyEnabled && !status.TUNEnabled {
+		addCheck(VPNHealthCheck{
+			ID:         "mode",
+			Label:      "代理模式",
+			Status:     "warn",
+			Detail:     "系统代理和 TUN 都未开启。",
+			Suggestion: "如果浏览器无法访问外网，请在 Clash Verge Rev 中开启系统代理或 TUN。",
+		})
+	} else {
+		mode := []string{}
+		if status.SystemProxyEnabled {
+			mode = append(mode, "系统代理")
+		}
+		if status.TUNEnabled {
+			mode = append(mode, "TUN")
+		}
+		addCheck(VPNHealthCheck{
+			ID:     "mode",
+			Label:  "代理模式",
+			Status: "ok",
+			Detail: strings.Join(mode, " + "),
+		})
+	}
+
+	if _, err := a.queryClashUnixAPI("/version"); err != nil {
+		addCheck(VPNHealthCheck{
+			ID:         "core",
+			Label:      "Clash 核心连接",
+			Status:     "warn",
+			Detail:     "无法连接 Clash 核心 API。",
+			Suggestion: "如果 Clash 正在运行，请等待几秒后重新体检；节点信息可能只能显示缓存值。",
+		})
+	} else {
+		addCheck(VPNHealthCheck{
+			ID:     "core",
+			Label:  "Clash 核心连接",
+			Status: "ok",
+			Detail: "可读取实时节点和配置。",
+		})
+	}
+
+	if status.CurrentNode == "" {
+		addCheck(VPNHealthCheck{
+			ID:         "node",
+			Label:      "当前节点",
+			Status:     "warn",
+			Detail:     "未读到当前代理节点。",
+			Suggestion: "打开 Clash Verge Rev 确认节点选择是否正常。",
+		})
+	} else {
+		addCheck(VPNHealthCheck{
+			ID:     "node",
+			Label:  "当前节点",
+			Status: "ok",
+			Detail: status.CurrentNode,
+		})
+	}
+
+	if status.ExpireAt > 0 {
+		days := int(time.Until(time.Unix(status.ExpireAt, 0)).Hours() / 24)
+		switch {
+		case days < 0:
+			addCheck(VPNHealthCheck{ID: "subscription", Label: "订阅到期", Status: "error", Detail: "订阅已过期。", Suggestion: "续费或更换可用订阅。"})
+		case days <= 7:
+			addCheck(VPNHealthCheck{ID: "subscription", Label: "订阅到期", Status: "warn", Detail: fmt.Sprintf("约 %d 天后到期。", days), Suggestion: "建议提前续费，避免突然不可用。"})
+		default:
+			addCheck(VPNHealthCheck{ID: "subscription", Label: "订阅到期", Status: "ok", Detail: fmt.Sprintf("约 %d 天后到期。", days)})
+		}
+	}
+
+	backups := a.ListVPNBackups()
+	if len(backups) == 0 {
+		addCheck(VPNHealthCheck{
+			ID:         "backup",
+			Label:      "配置备份",
+			Status:     "warn",
+			Detail:     "还没有 Hatch 管理的 VPN 备份。",
+			Suggestion: "建议先创建一份备份，后续改错配置可以快速恢复。",
+		})
+		report.Actions = append(report.Actions, VPNHealthAction{Label: "创建备份", Tab: "backup"})
+	} else {
+		report.LastBackup = backups[0]
+		addCheck(VPNHealthCheck{ID: "backup", Label: "配置备份", Status: "ok", Detail: filepath.Base(backups[0])})
+	}
+
+	switch report.Overall {
+	case "ok":
+		report.Summary = "VPN 配置看起来正常。"
+	case "warn":
+		report.Summary = "VPN 可读取，但有几项建议检查。"
+	default:
+		report.Summary = "VPN 配置存在需要处理的问题。"
+	}
+	report.Actions = append(report.Actions, VPNHealthAction{Label: "重新体检", Tab: "overview"})
+	return report
 }
 
 // ─── Status ──────────────────────────────────────────────────────────────────
@@ -669,8 +926,7 @@ func (a *App) SaveVPNProfileContent(filename, content string) error {
 	return os.WriteFile(targetPath, []byte(content), 0o644)
 }
 
-// ExportVPNBackup zips the Clash Verge Rev config directory.
-func (a *App) ExportVPNBackup() (VPNBackupResult, error) {
+func (a *App) exportVPNBackupWithPrefix(prefix string) (VPNBackupResult, error) {
 	clashDir, err := a.clashVergeDir()
 	if err != nil {
 		return VPNBackupResult{}, err
@@ -682,7 +938,7 @@ func (a *App) ExportVPNBackup() (VPNBackupResult, error) {
 	}
 
 	stamp := time.Now().Format("20060102-150405")
-	zipPath := filepath.Join(backupDir, "clash-verge-"+stamp+".zip")
+	zipPath := filepath.Join(backupDir, prefix+stamp+".zip")
 
 	f, err := os.Create(zipPath)
 	if err != nil {
@@ -734,9 +990,65 @@ func (a *App) ExportVPNBackup() (VPNBackupResult, error) {
 	return VPNBackupResult{Path: zipPath, Size: fi.Size(), NumFiles: numFiles}, nil
 }
 
+// ExportVPNBackup zips the Clash Verge Rev config directory.
+func (a *App) ExportVPNBackup() (VPNBackupResult, error) {
+	return a.exportVPNBackupWithPrefix("clash-verge-")
+}
+
+// PreviewVPNBackup inspects a backup zip before restore, without writing files.
+func (a *App) PreviewVPNBackup(zipPath string) (VPNBackupPreview, error) {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return VPNBackupPreview{}, fmt.Errorf("打开 zip 失败: %w", err)
+	}
+	defer r.Close()
+
+	preview := VPNBackupPreview{Path: zipPath}
+	keySet := map[string]bool{}
+	hasConfig := false
+	hasProfilesDir := false
+	for _, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		name := filepath.Clean(f.Name)
+		if name == "." || strings.HasPrefix(name, ".."+string(os.PathSeparator)) || filepath.IsAbs(name) {
+			preview.Warnings = append(preview.Warnings, "跳过可疑路径: "+f.Name)
+			continue
+		}
+		preview.NumFiles++
+		switch name {
+		case "verge.yaml", "profiles.yaml", "config.yaml", "dns_config.yaml", "clash-verge.yaml":
+			keySet[name] = true
+			hasConfig = true
+		default:
+			if strings.HasPrefix(name, "profiles"+string(os.PathSeparator)) {
+				hasProfilesDir = true
+			}
+		}
+	}
+	for name := range keySet {
+		preview.KeyFiles = append(preview.KeyFiles, name)
+	}
+	sort.Strings(preview.KeyFiles)
+	if !keySet["profiles.yaml"] {
+		preview.Warnings = append(preview.Warnings, "未发现 profiles.yaml，恢复后可能没有订阅列表。")
+	}
+	if !hasProfilesDir {
+		preview.Warnings = append(preview.Warnings, "未发现 profiles/ 目录，恢复后可能缺少订阅内容。")
+	}
+	preview.Valid = preview.NumFiles > 0 && (hasConfig || hasProfilesDir)
+	if !preview.Valid {
+		preview.Warnings = append(preview.Warnings, "这不像 Clash Verge Rev 配置备份。")
+	}
+	return preview, nil
+}
+
 // ImportVPNBackup restores Clash Verge Rev configs from a backup zip.
 func (a *App) ImportVPNBackup(zipPath string) (string, error) {
 	clashDir, err := a.clashVergeDir()
+	canBackupCurrent := err == nil
+	preRestoreBackup := ""
 	if err != nil {
 		cfgDir, _ := os.UserConfigDir()
 		clashDir = filepath.Join(cfgDir, clashVergeAppID)
@@ -750,6 +1062,12 @@ func (a *App) ImportVPNBackup(zipPath string) (string, error) {
 		return "", fmt.Errorf("打开 zip 失败: %w", err)
 	}
 	defer r.Close()
+
+	if canBackupCurrent {
+		if r, backupErr := a.exportVPNBackupWithPrefix("clash-verge-pre-restore-"); backupErr == nil {
+			preRestoreBackup = r.Path
+		}
+	}
 
 	restored := 0
 	for _, f := range r.File {
@@ -780,6 +1098,9 @@ func (a *App) ImportVPNBackup(zipPath string) (string, error) {
 		restored++
 	}
 
+	if preRestoreBackup != "" {
+		return fmt.Sprintf("已恢复 %d 个文件；恢复前备份: %s", restored, preRestoreBackup), nil
+	}
 	return fmt.Sprintf("已恢复 %d 个文件", restored), nil
 }
 

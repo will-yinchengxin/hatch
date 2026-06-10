@@ -136,8 +136,14 @@ Each pre-script uses its own env if configured, but does not emit its own events
 
 ## VPN
 
-The VPN module targets Clash Verge Rev. It can read/edit configured YAML files, parse profiles, export/import backups, read live proxy groups over the Clash Unix socket, and inspect enhance data from `merge` and `rules` profiles.
+The VPN module targets Clash Verge Rev. It can read/edit configured YAML files, parse profiles, export/import backups, read live proxy groups over the Clash Unix socket, inspect enhance data from `merge` and `rules` profiles, and produce an ordinary-user health report.
 
 `GetVPNStatus()` should prefer live Clash API data. `profiles.yaml` selected nodes are fallback only.
 
+`GetVPNHealthReport()` aggregates directory availability, active profile, proxy/TUN mode, Clash core API reachability, current node, subscription expiry, and backup presence into `ok/warn/error` checks with Chinese suggestions. If a user-configured `VPNAppDir` is invalid, the health report surfaces that as an error rather than silently relying on auto-detection.
+
+`ValidateVPNSettings()` checks that the Clash data directory exists and looks like a Clash Verge Rev directory, and verifies the backup directory can be created and written before saving settings.
+
 `SaveVPNConfigFile` / `SaveVPNProfileContent` run `validateYAML` before overwriting so a malformed edit cannot break the Clash core; `.js` script profiles skip validation. `ImportVPNBackup` rejects entries that resolve outside the Clash dir (separator-boundary check). `DeleteVPNBackup` only removes `clash-verge-*.zip` files located directly inside the managed backup dir.
+
+`PreviewVPNBackup()` inspects a zip without writing files, reports key config files, warns about missing `profiles.yaml`/`profiles/`, and flags suspicious paths. `ImportVPNBackup()` creates a `clash-verge-pre-restore-<ts>.zip` backup first when current config exists, then restores safe zip entries.

@@ -230,6 +230,10 @@ export function GetVPNEnhanceData() {
   return window['go']['main']['App']['GetVPNEnhanceData']();
 }
 
+export function GetVPNHealthReport() {
+  return window['go']['main']['App']['GetVPNHealthReport']();
+}
+
 export function GetVPNProfileContent(arg1) {
   return window['go']['main']['App']['GetVPNProfileContent'](arg1);
 }
@@ -308,6 +312,10 @@ export function OpenVPNDir() {
 
 export function ParseZshrc() {
   return window['go']['main']['App']['ParseZshrc']();
+}
+
+export function PreviewVPNBackup(arg1) {
+  return window['go']['main']['App']['PreviewVPNBackup'](arg1);
 }
 
 export function ReadScriptFile(arg1) {
@@ -512,6 +520,10 @@ export function UpdateDirectoryExport(arg1, arg2) {
 
 export function UpdateMCPFromGit(arg1) {
   return window['go']['main']['App']['UpdateMCPFromGit'](arg1);
+}
+
+export function ValidateVPNSettings(arg1, arg2) {
+  return window['go']['main']['App']['ValidateVPNSettings'](arg1, arg2);
 }
 
 export function WriteScriptFile(arg1, arg2) {

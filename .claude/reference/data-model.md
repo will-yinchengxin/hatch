@@ -152,4 +152,29 @@ type VPNEnhanceData struct {
     HasData         bool
     SourceFiles     []string
 }
+
+type VPNHealthReport struct {
+    Overall    string // ok | warn | error
+    Summary    string
+    Checks     []VPNHealthCheck
+    Actions    []VPNHealthAction
+    LastBackup string
+}
+
+type VPNHealthCheck struct {
+    ID, Label, Status, Detail, Suggestion string
+}
+
+type VPNPathValidation struct {
+    AppDirOK, BackupDirOK bool
+    Errors, Warnings      []string
+}
+
+type VPNBackupPreview struct {
+    Path     string
+    Valid    bool
+    NumFiles int
+    KeyFiles []string
+    Warnings []string
+}
 ```

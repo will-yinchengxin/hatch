@@ -129,9 +129,7 @@
           <span class="vpn-hdr-dot" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-dot-on' : 'vpn-dot-off'" title="TUN"></span>
         </span>
         <span class="vpn-hdr-node"
-              x-text="vpnStatus && vpnStatus.currentNode
-                ? (vpnStatus.currentNode.length > 7 ? vpnStatus.currentNode.slice(0,7) + '…' : vpnStatus.currentNode)
-                : '🔒 VPN'"></span>
+              x-text="vpnHealthPillText()"></span>
       </button>
 
       <label class="autolaunch-toggle" :class="{active: autoLaunchEnabled}" title="开机自启动 (点击切换)">
@@ -2861,14 +2859,12 @@
             </div>
           </div>
 
-          <!-- TUN 模式 card (double-click to toggle excluded CIDRs) -->
+          <!-- TUN 模式 card -->
           <div class="hero-stat-card vpn-status-card vpn-tun-card"
-               :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-stat-on' : 'vpn-stat-off'"
-               @dblclick="vpnTUNExpanded = !vpnTUNExpanded"
-               title="双击查看排除网段">
+               :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-stat-on' : 'vpn-stat-off'">
             <div class="hero-stat-label">TUN 模式
               <span x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length"
-                    class="vpn-tun-hint">双击展开</span>
+                    class="vpn-tun-hint" x-text="(vpnStatus && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length || 0) + ' 个排除'"></span>
             </div>
             <div class="vpn-status-row">
               <span class="vpn-status-dot" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-dot-on' : 'vpn-dot-off'"></span>
@@ -2879,8 +2875,8 @@
             <!-- TUN interface info -->
             <div class="vpn-tun-iface" x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunInterface"
                  x-text="vpnStatus && vpnStatus.tunInterface"></div>
-            <!-- Excluded CIDRs expansion -->
-            <div class="vpn-tun-cidrs" x-show="vpnTUNExpanded && vpnStatus && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length">
+            <!-- Excluded CIDRs -->
+            <div class="vpn-tun-cidrs" x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length">
               <div class="vpn-tun-cidrs-title">排除网段</div>
               <div class="vpn-tun-cidrs-list">
                 <template x-for="cidr in (vpnStatus && vpnStatus.tunExcludedCidrs || [])">
@@ -2963,17 +2959,17 @@
         <button class="ai-sidenav-item" :class="vpnSubTab==='overview' ? 'active' : ''"
           @click="vpnSubTab='overview'; loadVPNOverview()">
           <span class="ai-sidenav-icon">📋</span>
-          <span>概览</span>
+          <span>体检</span>
         </button>
         <button class="ai-sidenav-item" :class="vpnSubTab==='config' ? 'active' : ''"
           @click="vpnSubTab='config'; loadVPNConfig()">
           <span class="ai-sidenav-icon">📝</span>
-          <span>配置编辑</span>
+          <span>高级配置</span>
         </button>
         <button class="ai-sidenav-item" :class="vpnSubTab==='profiles' ? 'active' : ''"
           @click="vpnSubTab='profiles'; loadVPNOverview()">
           <span class="ai-sidenav-icon">🗂</span>
-          <span>Profiles</span>
+          <span>Profile 原文</span>
           <span class="ai-sidenav-count" x-show="vpnProfiles.length > 0" x-text="vpnProfiles.length"></span>
         </button>
         <button class="ai-sidenav-item" :class="vpnSubTab==='backup' ? 'active' : ''"
@@ -2996,6 +2992,47 @@
 
         <!-- ══ 概览 ══════════════════════════════════════════════════ -->
         <div x-show="vpnSubTab==='overview'">
+
+          <!-- VPN 体检 -->
+          <section class="settings-section vpn-health-section">
+            <div class="section-header-row">
+              <h3>VPN 体检</h3>
+              <button class="btn-edit" @click="refreshVPNStatus()" :aria-busy="vpnStatusRefreshing" :disabled="vpnStatusRefreshing">
+                ↻ 重新体检
+              </button>
+            </div>
+            <template x-if="vpnHealthLoading">
+              <p class="settings-desc">正在检查 Clash 数据目录、代理模式、节点、订阅和备份…</p>
+            </template>
+            <template x-if="!vpnHealthLoading && vpnHealthReport">
+              <div>
+                <div class="vpn-health-summary" :class="vpnHealthClass(vpnHealthReport.overall)">
+                  <span class="vpn-health-status" x-text="vpnHealthLabel(vpnHealthReport.overall)"></span>
+                  <span x-text="vpnHealthReport.summary"></span>
+                </div>
+                <div class="vpn-health-grid">
+                  <template x-for="check in (vpnHealthReport.checks || [])" :key="check.id">
+                    <article class="vpn-health-card" :class="vpnHealthClass(check.status)">
+                      <div class="vpn-health-card-head">
+                        <span class="vpn-health-card-title" x-text="check.label"></span>
+                        <span class="vpn-health-mini" x-text="vpnHealthLabel(check.status)"></span>
+                      </div>
+                      <div class="vpn-health-detail" x-text="check.detail"></div>
+                      <p class="vpn-health-suggestion" x-show="check.suggestion" x-text="check.suggestion"></p>
+                    </article>
+                  </template>
+                </div>
+                <div class="vpn-health-actions" x-show="vpnHealthReport.actions && vpnHealthReport.actions.length">
+                  <template x-for="action in (vpnHealthReport.actions || [])" :key="action.label + action.tab">
+                    <button class="btn-edit" @click="vpnHealthGo(action)" x-text="action.label"></button>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <template x-if="!vpnHealthLoading && !vpnHealthReport">
+              <p class="settings-desc">点击「重新体检」读取当前 VPN 状态。</p>
+            </template>
+          </section>
 
           <!-- 当前激活 Profile -->
           <section class="settings-section">
@@ -3047,7 +3084,15 @@
                 <button class="btn-edit btn-primary" @click="saveVPNSettings()" :aria-busy="vpnSettingsSaving" :disabled="vpnSettingsSaving">
                   💾 保存目录设置
                 </button>
-                <span class="muted" style="font-size:11px" x-show="vpnAppDir">当前: <code x-text="vpnAppDir"></code></span>
+                <span class="muted vpn-settings-current" x-show="vpnAppDir">当前: <code x-text="vpnAppDir"></code></span>
+              </div>
+              <div class="vpn-path-validation" x-show="vpnPathValidation && ((vpnPathValidation.errors && vpnPathValidation.errors.length) || (vpnPathValidation.warnings && vpnPathValidation.warnings.length))">
+                <template x-for="err in (vpnPathValidation && vpnPathValidation.errors || [])">
+                  <div class="vpn-path-validation-row vpn-health-error" x-text="err"></div>
+                </template>
+                <template x-for="warn in (vpnPathValidation && vpnPathValidation.warnings || [])">
+                  <div class="vpn-path-validation-row vpn-health-warn" x-text="warn"></div>
+                </template>
               </div>
             </div>
           </section>
@@ -3075,8 +3120,8 @@
         <!-- ══ 配置编辑 ════════════════════════════════════════════ -->
         <div x-show="vpnSubTab==='config'">
           <section class="settings-section">
-            <h3>配置文件编辑</h3>
-            <p class="settings-desc">保存前会自动创建 <code>.bak</code> 备份文件。</p>
+            <h3>高级配置编辑</h3>
+            <p class="settings-desc">适合熟悉 Clash 配置的人使用。普通排障优先看「体检」和「备份恢复」。保存前会校验 YAML 并自动创建 <code>.bak</code> 备份文件。</p>
             <div class="vpn-config-toolbar">
               <select x-model="vpnConfigFile" @change="loadVPNConfig()" class="vpn-file-select">
                 <option value="verge.yaml">verge.yaml（应用设置）</option>
@@ -3102,7 +3147,8 @@
         <!-- ══ Profiles ═══════════════════════════════════════════ -->
         <div x-show="vpnSubTab==='profiles'">
           <section class="settings-section">
-            <h3>Profile 列表</h3>
+            <h3>Profile 原文编辑</h3>
+            <p class="settings-desc">这里直接编辑 Clash Verge Rev 的 Profile 文件。若只是想确认当前订阅是否可用，先回到「体检」查看结论。</p>
             <template x-if="vpnProfiles.length === 0">
               <p class="muted">暂无 Profile，请先加载。</p>
             </template>
@@ -3170,7 +3216,7 @@
               <template x-for="bk in vpnBackups" :key="bk">
                 <div class="vpn-backup-row">
                   <span class="vpn-backup-name" x-text="vpnBackupBasename(bk)"></span>
-                  <button class="btn-edit" @click="importVPNBackup(bk)" :aria-busy="vpnRestoreBusy" :disabled="vpnRestoreBusy">
+                  <button class="btn-edit" @click="previewAndImportVPNBackup(bk)" :aria-busy="vpnRestoreBusy" :disabled="vpnRestoreBusy">
                     ↩ 恢复
                   </button>
                   <button class="btn-edit btn-danger" @click="deleteVPNBackup(bk)" title="删除此备份文件">🗑 删除</button>
@@ -3181,12 +3227,24 @@
 
           <section class="settings-section">
             <h3>从外部 zip 恢复</h3>
-            <p class="settings-desc">输入备份 zip 的完整路径，点击恢复。</p>
+            <p class="settings-desc">输入备份 zip 的完整路径。恢复前会先预览文件内容，并自动备份当前配置。</p>
             <div class="vpn-restore-row">
-              <input type="text" x-ref="vpnZipInput" placeholder="/path/to/clash-verge-backup.zip" class="vpn-zip-input" />
-              <button class="btn-edit" @click="importVPNBackup($refs.vpnZipInput.value)" :disabled="vpnRestoreBusy">
+              <input type="text" x-model="vpnExternalZipPath" placeholder="/path/to/clash-verge-backup.zip" class="vpn-zip-input" />
+              <button class="btn-edit" @click="previewAndImportVPNBackup(vpnExternalZipPath)" :disabled="vpnRestoreBusy">
                 ↩ 恢复
               </button>
+            </div>
+            <div class="vpn-backup-preview" x-show="vpnBackupPreview">
+              <div class="vpn-backup-preview-title">最近预览</div>
+              <div class="vpn-backup-preview-body">
+                <span x-text="vpnBackupPreview && vpnBackupPreview.valid ? '可恢复' : '需检查'"></span>
+                <span x-text="'文件数: ' + (vpnBackupPreview && vpnBackupPreview.numFiles || 0)"></span>
+                <span x-show="vpnBackupPreview && vpnBackupPreview.keyFiles && vpnBackupPreview.keyFiles.length"
+                      x-text="'关键文件: ' + vpnBackupPreview.keyFiles.join(', ')"></span>
+              </div>
+              <template x-for="warn in (vpnBackupPreview && vpnBackupPreview.warnings || [])">
+                <div class="vpn-path-validation-row vpn-health-warn" x-text="warn"></div>
+              </template>
             </div>
           </section>
         </div>
