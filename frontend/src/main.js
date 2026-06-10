@@ -166,16 +166,19 @@ window.hatchApp = function () {
     retentionSaving: false,
 
     // v1.2: prompt templates
-    promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '' },
+    promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '', SuggestHookFromDescription: '', SuggestHookEdit: '', SuggestMCPRecommendations: '' },
     promptDefaults: {},
     promptDefaultsOpen: {},
     promptSaving: false,
     promptOps: [
-      { key: 'SuggestScriptMeta',         label: '脚本元信息分析' },
-      { key: 'SuggestScriptContent',      label: '脚本内容生成' },
-      { key: 'SuggestZshrcAnnotation',    label: 'zshrc 条目备注' },
-      { key: 'SuggestZshrcOrganization',  label: 'zshrc 整理重排' },
-      { key: 'TestAIConfig',              label: '配置连通性测试' },
+      { key: 'SuggestScriptMeta',           label: '脚本元信息分析',   group: '脚本' },
+      { key: 'SuggestScriptContent',        label: '脚本内容生成',     group: '脚本' },
+      { key: 'SuggestZshrcAnnotation',      label: 'zshrc 条目备注',   group: 'Zshrc' },
+      { key: 'SuggestZshrcOrganization',    label: 'zshrc 整理重排',   group: 'Zshrc' },
+      { key: 'SuggestHookFromDescription',  label: 'Hook 起草',        group: 'Hooks' },
+      { key: 'SuggestHookEdit',             label: 'Hook 优化',        group: 'Hooks' },
+      { key: 'SuggestMCPRecommendations',   label: 'MCP 选型',         group: 'MCP' },
+      { key: 'TestAIConfig',                label: '配置连通性测试',   group: '系统' },
     ],
 
     // v1.1: run history
@@ -304,7 +307,7 @@ window.hatchApp = function () {
     hookAIBusy: false,
 
     // AI sub-navigation
-    aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'mcp' | 'tools'
+    aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
 
     // VPN module
     vpnSubTab: 'overview',   // 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
@@ -345,7 +348,7 @@ window.hatchApp = function () {
     dataPathsForm: { traceLogDir: '', skillsDir: '' },
     dataPathsSaving: false,
 
-    // Doc links (AI > Tools quick-open documents)
+    // Doc links (AI > Docs quick-open documents)
     docLinks: [],
     docLinkForm: { path: '', label: '' },
     docLinksSaving: false,
@@ -489,7 +492,7 @@ window.hatchApp = function () {
     applyInitialRoute() {
       const params = new URLSearchParams(window.location.search || '');
       const ai = params.get('aiSubTab') || params.get('ai');
-      const allowedAI = ['overview', 'connect', 'skills', 'mcp', 'tools', 'prompts', 'data'];
+      const allowedAI = ['overview', 'connect', 'skills', 'mcp', 'hooks', 'docs', 'tools', 'prompts', 'data'];
       if (allowedAI.includes(ai)) {
         this.tab = 'ai';
         this.selectedDir = null;
@@ -2047,7 +2050,7 @@ window.hatchApp = function () {
         deepseek: { name: 'DeepSeek',  baseUrl: 'https://api.deepseek.com/v1',               model: 'deepseek-chat' },
         glm:      { name: 'GLM',       baseUrl: 'https://open.bigmodel.cn/api/paas/v4',       model: 'glm-4-plus' },
         openai:   { name: 'OpenAI',    baseUrl: 'https://api.openai.com/v1',                  model: 'gpt-4o-mini' },
-        claude:   { name: 'Claude',    baseUrl: 'https://api.anthropic.com/v1',               model: 'claude-sonnet-4-6' },
+        claude:   { name: 'Claude',    baseUrl: 'https://api.anthropic.com/v1',               model: 'claude-fable-5' },
         kimi:     { name: 'Kimi',      baseUrl: 'https://api.moonshot.cn/v1',                 model: 'moonshot-v1-8k' },
         qwen:     { name: 'Qwen',      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
       };
@@ -2378,26 +2381,27 @@ window.hatchApp = function () {
       return { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }[level] || '系统默认';
     },
 
-    // xhigh: Opus + Sonnet 支持（官方文档：extended thinking 要求）
+    // xhigh: Opus + Sonnet + Fable 支持（extended thinking）
     effortSupportsXhigh(model) {
       if (!model) return true; // 不知道模型时不限制
-      return model.includes('opus') || model.includes('sonnet');
+      return model.includes('opus') || model.includes('sonnet') || model.includes('fable');
     },
 
-    // max: 仅 Opus 支持
+    // max: Opus + Fable 支持
     effortSupportsMax(model) {
       if (!model) return true; // 不知道模型时不限制
-      return model.includes('opus');
+      return model.includes('opus') || model.includes('fable');
     },
 
     modelLabel(model) {
       const map = {
-        'claude-opus-4-8': 'Opus 4.8',
-        'claude-opus-4-7': 'Opus 4.7',
-        'claude-opus-4-6': 'Opus 4.6',
-        'claude-sonnet-4-6': 'Sonnet 4.6',
+        'claude-fable-5':   'Fable 5',
+        'claude-opus-4-8':  'Opus 4.8',
+        'claude-opus-4-7':  'Opus 4.7',
+        'claude-opus-4-6':  'Opus 4.6',
+        'claude-sonnet-4-6':'Sonnet 4.6',
         'claude-haiku-4-5': 'Haiku 4.5',
-        'claude-opus-4-5': 'Opus 4.5',
+        'claude-opus-4-5':  'Opus 4.5',
       };
       return map[model] || model || '默认';
     },
@@ -2674,6 +2678,7 @@ window.hatchApp = function () {
       try { this.skillsStats = await GetSkillsStats(); } catch (_) {}
       try { if (!this.mcpServers.length) this.mcpServers = (await ListMCPServers()) || []; } catch (_) {}
       try { this.hooksStats = await GetHooksStats(); } catch (_) {}
+      try { if (!this.docLinks.length) await this.loadDocLinks(); } catch (_) {}
       try { if (!this.aiTraces.length) await this.loadAITraces(); } catch (_) {}
     },
 
@@ -3048,7 +3053,9 @@ window.hatchApp = function () {
         this.loadAITraces();
         if (this.aiSubTab === 'overview') this.loadOverview();
         else if (this.aiSubTab === 'mcp') this.loadMCP();
+        else if (this.aiSubTab === 'hooks') this.loadHooks();
         else if (this.aiSubTab === 'skills') this.loadSkills();
+        else if (this.aiSubTab === 'docs') this.loadDocLinks();
       }
     },
 

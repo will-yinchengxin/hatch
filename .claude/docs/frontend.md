@@ -7,7 +7,7 @@ Use this with `.claude/skills/hatch-frontend/SKILL.md` before editing `frontend/
 ```text
 tab = 'scripts' | 'ai' | 'vpn'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 
 scripts + !selectedDir  -> directory cards + workspace-settings accordion
@@ -37,6 +37,7 @@ editTarget != null      -> edit drawer overlay
 | `hookEventSupport / hookForm / hookEditOpen / hookEditIsNew / hookSaving` | Hook event catalog + edit form state |
 | `hookSyncBusy / hookTemplates / hookTemplateGalleryOpen / hookSuggestDesc / hookSuggestBusy` | Hook sync busy keys, template gallery, header AI draft bar |
 | `hookAIInstruction / hookAIBusy` | In-editor AI optimize bar for refining an existing hook |
+| `docLinks / docLinkForm / docLinksSaving` | Doc links (AI > Docs quick-open documents) |
 | `dataPaths / dataPathsForm / dataInventory / retention` | Data paths, inventory, retention |
 | `zshrcEntries / zshrcFilter` | Parsed zshrc |
 | `autoLaunchEnabled` | Login autostart |
@@ -83,10 +84,13 @@ Core tokens:
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI: overview, connect/providers/traces, skills, MCP, hooks, tools/status, prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. MCP starts with a double-click operation manual, includes an AI recommendation panel for choosing a server/install method, separates local/Git/npm acquisition from Claude Code/Codex sync, shows MCP config values in plaintext for review, writes global target config, and shows CLI test results. Model shortcut panels share the `agent-*` config layout classes; the Goals toggle sits in the shared action row.
+- AI sidebar order: 概览 → 连接 → 助手（🤖, `aiSubTab==='tools'`）→ Skills → MCP → Hooks → 文档 → 提示词（`aiSubTab==='prompts'`）→ 数据。The "助手" tab (formerly 工具) covers Claude Code + Codex agent status and config. The "提示词" tab (formerly Prompt) covers system prompt overrides.
+- AI: overview, connect/providers/traces, 助手/agent-status, skills, MCP, hooks, docs, 提示词/system-prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. MCP starts with a double-click operation manual, includes an AI recommendation panel for choosing a server/install method, separates local/Git/npm acquisition from Claude Code/Codex sync, shows MCP config values in plaintext for review, writes global target config, and shows CLI test results. Docs (`aiSubTab==='docs'`) is a first-class sidebar tab for local document quick links (`docLinks`), at the same level as MCP/Hooks; the overview dashboard has a Docs card showing `docLinks.length` that navigates to it. Model shortcut panels share the `agent-*` config layout classes; both Claude Code and Codex show aligned recommended-combo chips (`.cc-rec-presets` / `.cc-rec-chip`) before saved presets; the Codex Goals toggle sits in the shared action row.
   - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, Claude/Codex install+usage, skills counts, MCP enabled/failed counts, hooks counts (total + Claude/Codex enabled), and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods (including `GetHooksStats`) and is called on the overview sidenav button and from `init()`.
   - Bulk actions (`.bulk-action-bar`) on skills and MCP: `bulkSkillSync` / `bulkSkillUnsyncAll` / `bulkMCPEnable` / `bulkTestMCP` iterate `filteredSkills` / `filteredMCPServers` serially.
   - `copyToClipboard(text, label)` is the shared clipboard helper (provider URL/model, MCP `renderMCPSnippet` Claude/Codex blocks, default prompts, trace blocks). `renderMCPSnippet(server, target)` mirrors backend `renderClaudeMCPServer`/`renderCodexMCPServer`.
+  - Claude Code model dropdown includes `claude-fable-5` (newest). `effortSupportsXhigh` and `effortSupportsMax` now also match `fable` models. `modelLabel` maps `claude-fable-5` → `Fable 5`. Default provider preset for Claude uses `claude-fable-5`.
+  - 提示词 (`aiSubTab==='prompts'`): `promptOps` each entry has `{ key, label, group }`. Groups: 脚本 (SuggestScriptMeta, SuggestScriptContent), Zshrc (SuggestZshrcAnnotation, SuggestZshrcOrganization), Hooks (SuggestHookFromDescription, SuggestHookEdit), MCP (SuggestMCPRecommendations), 系统 (TestAIConfig). UI shows `.prompt-group-header` before each new group via `x-show="index === 0 || promptOps[index-1].group !== op.group"`. `GetDefaultPrompts()` exposes all 8 ops including the 3 new ones.
   - `duplicateProvider(p)` opens the provider editor prefilled (baseUrl/model, blank apiKey, "副本" name).
   - Hooks (`aiSubTab==='hooks'`, `.ai-hooks-section`): registry of `command` hooks. Each `.hook-item` shows event badge + matcher + command preview and two `.skill-sync-toggle` switches (Claude/Codex); a switch gets `.sync-disabled` when `hookEventSupports(h.event, target)` is false. Editing uses a form (`.hook-editor-panel` / `.hook-form-grid`), not a markdown editor. The editor has an inline AI bar (`.se-ai-bar`, `hookAIInstruction` / `hookAIBusy`): `optimizeHookWithAI()` sends the current form via `SuggestHookEdit` to refine the existing hook in place. `📦 模板库` opens `.hook-modal` from `hookTemplates`; the header `✦ AI 起草` calls `suggestHook()` (`SuggestHookFromDescription`) to prefill a new hook. `toggleHookSync` updates the row in place and refreshes `hooksStats`; `saveHook` re-syncs already-enabled targets after `SaveHook`.
 - VPN: overview/status hero, config editor, profiles editor, backup/restore, enhance rules/hosts/DNS view.
@@ -98,6 +102,8 @@ Core tokens:
 - Override Pico `--pico-primary-*` variables to clay colors.
 - Override `button[aria-busy="true"]` so busy buttons do not turn Pico blue.
 - Reset non-button `[role="button"]` cards to Hatch card styles.
+- Recommended-combo chips: `.cc-rec-presets` wrapper (surface-0 background, shared by Claude Code and Codex via `codex-rec-presets` modifier), `.cc-rec-list` flex row, `.cc-rec-chip` pill button with hover clay/shadow; `.cc-rec-chip-fable` adds purple tint for Fable 5; `codex-rec-chip-max` adds cyan tint for GPT-5.3 Codex.
+- Doc Links section (`doc-links-section`) moved from AI > Tools to AI > Docs; `margin-top: 0` (was `16px`).
 - `setupEvents()` must call `EventsOff` before `EventsOn` to avoid HMR duplicates.
 - Nested Alpine `x-for` preset clicks should use inline handlers:
 

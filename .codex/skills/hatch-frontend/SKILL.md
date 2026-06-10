@@ -31,13 +31,13 @@ description: "Hatch 前端参考：修改 frontend/index.html、frontend/src/mai
 ```text
 tab = 'scripts' | 'ai' | 'vpn'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 ```
 
 - `scripts + !selectedDir`: 目录卡片 + workspace settings accordion。
 - `scripts + selectedDir`: 脚本列表。
-- `ai`: AI 侧边栏布局，含连接、skills、mcp、hooks、tools、prompts、data。
+- `ai`: AI 侧边栏顺序：概览 → 连接 → **助手**（tools，🤖 Claude Code/Codex 状态与配置）→ Skills → MCP → Hooks → 文档 → **提示词**（prompts，system prompt 覆盖）→ 数据。
 - AI hero 顶部统计卡包含 AI 状态、模型、Skills、MCP、Hooks；保持同一套 `hero-stat-*` 卡片样式和响应式 grid。
 - `vpn`: VPN 侧边栏布局，含概览、配置、profiles、备份、自定义规则。
 - `editTarget != null`: 右侧编辑抽屉。
@@ -65,7 +65,7 @@ header, nav, main, footer, section, article, aside { padding: 0; margin: 0; }
 - 覆盖 `--pico-primary-*` 到 Hatch clay 色。
 - 覆盖 `button[aria-busy="true"]`，否则 Pico 会变蓝。
 - 重置非按钮 `[role="button"]` 卡片样式。
-- AI/VPN 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局；AI Tools 快捷配置共用 `agent-*` 布局类，Goals 开关放在共享动作行内。
+- AI/VPN 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局；AI Docs 是 MCP/Hooks 平级侧栏页，概览应提供文档数量摘要和跳转；AI Tools 快捷配置共用 `agent-*` 布局类，Claude Code/Codex 推荐组合区块需对齐复用 `.cc-rec-*` chip 结构，Goals 开关放在共享动作行内。
 - 新 v1.1+ 功能类放在 `style.css` 末尾对应分区，保持命名可读。
 
 ## Alpine 注意事项

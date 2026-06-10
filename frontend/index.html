@@ -593,7 +593,7 @@
       <div>
         <p class="eyebrow">AI 工具中心</p>
         <h1>AI &amp; Skills</h1>
-        <p class="page-subtitle">管理模型连接、Skills 仓库，监控工具用量。</p>
+        <p class="page-subtitle">管理模型连接、Skills 仓库，配置 AI 助手与 MCP 工具链。</p>
       </div>
       <div class="hero-stats">
         <div class="hero-stat-card">
@@ -660,6 +660,11 @@
           <span>连接</span>
           <span class="ai-sidenav-badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '✓' : '!'"></span>
         </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='tools' ? 'active' : ''"
+          @click="aiSubTab='tools'; loadAIUsageStatuses()">
+          <span class="ai-sidenav-icon">🤖</span>
+          <span>助手</span>
+        </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='skills' ? 'active' : ''"
           @click="aiSubTab='skills'; loadSkills()">
           <span class="ai-sidenav-icon">📚</span>
@@ -678,15 +683,16 @@
           <span>Hooks</span>
           <span class="ai-sidenav-count" x-show="hooksStats.total > 0" x-text="hooksStats.total"></span>
         </button>
-        <button class="ai-sidenav-item" :class="aiSubTab==='tools' ? 'active' : ''"
-          @click="aiSubTab='tools'; loadAIUsageStatuses()">
-          <span class="ai-sidenav-icon">⚡</span>
-          <span>工具</span>
+        <button class="ai-sidenav-item" :class="aiSubTab==='docs' ? 'active' : ''"
+          @click="aiSubTab='docs'; loadDocLinks()">
+          <span class="ai-sidenav-icon">📎</span>
+          <span>文档</span>
+          <span class="ai-sidenav-count" x-show="docLinks.length > 0" x-text="docLinks.length"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='prompts' ? 'active' : ''"
           @click="aiSubTab='prompts'; loadPromptTemplates()">
           <span class="ai-sidenav-icon">📝</span>
-          <span>Prompt</span>
+          <span>提示词</span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='data' ? 'active' : ''"
           @click="aiSubTab='data'; loadDataInventory()">
@@ -811,6 +817,19 @@
                 </div>
               </div>
 
+              <!-- Docs -->
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='docs'; loadDocLinks()" @keydown.enter="aiSubTab='docs'; loadDocLinks()">
+                <div class="ai-dash-head">
+                  <span class="ai-dash-icon">📎</span>
+                  <span class="ai-dash-title">文档</span>
+                  <span class="badge" :class="docLinks.length > 0 ? 'badge-ok' : ''" x-text="docLinks.length > 0 ? '已配置' : '待添加'"></span>
+                </div>
+                <div class="ai-dash-body">
+                  <div class="ai-dash-stat" x-text="docLinks.length || 0"></div>
+                  <div class="muted text-xs">本地 PDF、HTML、Markdown 快捷打开</div>
+                </div>
+              </div>
+
               <!-- 最近报错 -->
               <div class="ai-dash-card ai-dash-card-wide" role="button" tabindex="0" @click="aiSubTab='connect'" @keydown.enter="aiSubTab='connect'">
                 <div class="ai-dash-head">
@@ -838,7 +857,8 @@
             <h3>快速开始</h3>
             <p class="hint">1. 前往「连接」配置 OpenAI 兼容的 API 密钥和模型。</p>
             <p class="hint">2. 前往「Skills」管理本地 Skill 仓库，一键同步到 Claude Code / Codex。</p>
-            <p class="hint">3. 前往「工具」检测 Claude Code 和 Codex 安装状态及用量。</p>
+            <p class="hint">3. 前往「MCP / Hooks / 文档」管理工具能力、自动化钩子和本地资料入口。</p>
+            <p class="hint">4. 前往「助手」检测 Claude Code 和 Codex 安装状态及用量。</p>
             <button class="secondary" @click="aiSubTab='connect'" x-show="!aiReady" style="margin-top:8px">
               → 去配置 AI 连接
             </button>
@@ -1829,7 +1849,7 @@
           </section>
         </div>
 
-        <!-- ══ 工具 ══════════════════════════════════════════════════ -->
+        <!-- ══ 助手 ══════════════════════════════════════════════════ -->
         <div x-show="aiSubTab==='tools'">
           <div class="ai-usage-row">
             <!-- Claude Code -->
@@ -1914,6 +1934,7 @@
                     <label class="cc-config-label agent-config-label">模型</label>
                     <select class="cc-config-select agent-config-select" x-model="claudeCodeConfig.model">
                       <option value="">系统默认</option>
+                      <option value="claude-fable-5">claude-fable-5 ✦ 新</option>
                       <option value="claude-opus-4-8">claude-opus-4-8</option>
                       <option value="claude-opus-4-7">claude-opus-4-7</option>
                       <option value="claude-opus-4-6">claude-opus-4-6</option>
@@ -1945,6 +1966,33 @@
                   <button class="btn-sm" @click="openNewPreset()">+ 新建</button>
                 </div>
 
+                <!-- 推荐组合 -->
+                <div class="cc-rec-presets">
+                  <span class="cc-rec-presets-label">推荐组合</span>
+                  <div class="cc-rec-list">
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='claude-haiku-4-5'; claudeCodeConfig.effortLevel='low'; saveClaudeCodeConfig()" title="Haiku 4.5 + low · 最快响应，适合简单任务">
+                      <span class="cc-rec-name">极速</span>
+                      <span class="badge cc-model-badge">Haiku 4.5</span>
+                      <span class="badge cc-effort-badge cc-effort-low">low</span>
+                    </button>
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='claude-sonnet-4-6'; claudeCodeConfig.effortLevel='medium'; saveClaudeCodeConfig()" title="Sonnet 4.6 + medium · 速度与质量均衡">
+                      <span class="cc-rec-name">均衡</span>
+                      <span class="badge cc-model-badge">Sonnet 4.6</span>
+                      <span class="badge cc-effort-badge cc-effort-medium">medium</span>
+                    </button>
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='claude-opus-4-8'; claudeCodeConfig.effortLevel='high'; saveClaudeCodeConfig()" title="Opus 4.8 + high · 复杂任务深度思考">
+                      <span class="cc-rec-name">精深</span>
+                      <span class="badge cc-model-badge">Opus 4.8</span>
+                      <span class="badge cc-effort-badge cc-effort-high">high</span>
+                    </button>
+                    <button class="cc-rec-chip cc-rec-chip-fable" @click="claudeCodeConfig.model='claude-fable-5'; claudeCodeConfig.effortLevel='xhigh'; saveClaudeCodeConfig()" title="Fable 5 + xhigh · 最强能力，挑战性工程任务">
+                      <span class="cc-rec-name">极限</span>
+                      <span class="badge cc-model-badge">Fable 5</span>
+                      <span class="badge cc-effort-badge cc-effort-xhigh">xhigh</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div class="cc-presets-list" x-show="claudeCodePresets.length > 0">
                   <template x-for="preset in claudeCodePresets" :key="preset.id">
                     <div class="cc-preset-card">
@@ -1972,6 +2020,7 @@
                     <input class="cc-preset-name-input" type="text" placeholder="预设名称" x-model="claudeCodePresetForm.name" />
                     <select class="cc-config-select" x-model="claudeCodePresetForm.model">
                       <option value="">系统默认</option>
+                      <option value="claude-fable-5">claude-fable-5 ✦ 新</option>
                       <option value="claude-opus-4-8">claude-opus-4-8</option>
                       <option value="claude-opus-4-7">claude-opus-4-7</option>
                       <option value="claude-opus-4-6">claude-opus-4-6</option>
@@ -2127,6 +2176,33 @@
                   <button class="btn-sm" @click="openNewCodexPreset()">+ 新建</button>
                 </div>
 
+                <!-- 推荐组合 -->
+                <div class="cc-rec-presets codex-rec-presets">
+                  <span class="cc-rec-presets-label">推荐组合</span>
+                  <div class="cc-rec-list">
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.4-mini'; codexModelConfig.effortLevel='low'; saveCodexModelConfig()" title="GPT-5.4 Mini + low · 快速轻量，适合简单改动">
+                      <span class="cc-rec-name">极速</span>
+                      <span class="badge codex-model-badge">5.4 Mini</span>
+                      <span class="badge codex-effort-badge codex-effort-low">low</span>
+                    </button>
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.5'; codexModelConfig.effortLevel='medium'; saveCodexModelConfig()" title="GPT-5.5 + medium · 日常编码与质量平衡">
+                      <span class="cc-rec-name">均衡</span>
+                      <span class="badge codex-model-badge">GPT-5.5</span>
+                      <span class="badge codex-effort-badge codex-effort-medium">medium</span>
+                    </button>
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.5'; codexModelConfig.effortLevel='high'; saveCodexModelConfig()" title="GPT-5.5 + high · 复杂改造与审查">
+                      <span class="cc-rec-name">精深</span>
+                      <span class="badge codex-model-badge">GPT-5.5</span>
+                      <span class="badge codex-effort-badge codex-effort-high">high</span>
+                    </button>
+                    <button class="cc-rec-chip codex-rec-chip-max" @click="codexModelConfig.model='gpt-5.3-codex'; codexModelConfig.effortLevel='xhigh'; saveCodexModelConfig()" title="GPT-5.3 Codex + xhigh · 长任务与深度推理">
+                      <span class="cc-rec-name">极限</span>
+                      <span class="badge codex-model-badge">5.3 Codex</span>
+                      <span class="badge codex-effort-badge codex-effort-xhigh">xhigh</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div class="codex-presets-list" x-show="codexPresets.length > 0">
                   <template x-for="preset in codexPresets" :key="preset.id">
                     <div class="codex-preset-card">
@@ -2190,7 +2266,10 @@
               </div>
             </section>
           </div>
+        </div>
 
+        <!-- ══ 文档 ══════════════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='docs'">
           <!-- ── 文档快链 ──────────────────────────────────────────────── -->
           <section class="settings-section doc-links-section">
             <div class="section-header-row">
@@ -2267,14 +2346,16 @@
           </section>
         </div>
 
-        <!-- ══ Prompt 模板（v1.2） ════════════════════════════════════ -->
+        <!-- ══ 提示词 ═════════════════════════════════════════════════ -->
         <div x-show="aiSubTab==='prompts'">
           <section class="ai-section">
-            <h3 class="ai-section-title">📝 自定义 Prompt 模板</h3>
+            <h3 class="ai-section-title">📝 自定义提示词模板</h3>
             <p class="ai-section-desc">
               覆盖每个 AI 操作的 system prompt。留空则用 Hatch 内置的默认提示。改完点保存即生效（无需重启）。
             </p>
-            <template x-for="op in promptOps" :key="op.key">
+            <template x-for="(op, index) in promptOps" :key="op.key">
+              <div>
+                <div class="prompt-group-header" x-show="index === 0 || promptOps[index-1].group !== op.group" x-text="op.group"></div>
               <div class="prompt-card">
                 <label class="field-label prompt-card-header">
                   <span class="prompt-card-title">
@@ -2302,6 +2383,7 @@
                   class="field-textarea"
                   rows="4"
                 ></textarea>
+              </div>
               </div>
             </template>
             <div class="prompt-actions-row">

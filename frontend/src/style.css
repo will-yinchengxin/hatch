@@ -4574,9 +4574,9 @@ details[open] .export-preview-toggle::before {
   margin-top: 6px;
 }
 
-/* ── Doc Links (AI > Tools) ────────────────────────────────────────────── */
+/* ── Doc Links (AI > Docs) ────────────────────────────────────────────── */
 .doc-links-section {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .doc-links-list {
@@ -4772,6 +4772,17 @@ details[open] .export-preview-toggle::before {
 .err-mark { color: #c04444; }
 
 /* ── Prompt-template editor cards ────────────────────────────────────── */
+.prompt-group-header {
+  margin: 16px 0 6px;
+  padding: 2px 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--surface-4);
+}
+
 .prompt-card {
   margin-bottom: 20px;
   padding: 12px;
@@ -6636,4 +6647,78 @@ details[open] .export-preview-toggle::before {
   .hook-form-grid,
   .hook-template-grid { grid-template-columns: 1fr; }
   .hook-cmd { max-width: 100%; }
+}
+
+/* ── cc-rec-presets: Claude Code 推荐组合区块 ──────────────────────────── */
+.cc-rec-presets {
+  margin: 8px 0 6px;
+  padding: 8px 12px 10px;
+  background: var(--surface-0);
+  border-radius: 8px;
+  border: 1px solid var(--surface-4);
+}
+
+.cc-rec-presets-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.cc-rec-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cc-rec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-4);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.cc-rec-chip:hover {
+  background: var(--surface-3);
+  border-color: var(--primary);
+  box-shadow: 0 1px 4px rgba(193,95,60,0.12);
+}
+
+.cc-rec-chip-fable {
+  border-color: rgba(123,92,125,0.35);
+  background: rgba(123,92,125,0.06);
+}
+
+.cc-rec-chip-fable:hover {
+  background: rgba(123,92,125,0.12);
+  border-color: var(--purple);
+  box-shadow: 0 1px 4px rgba(123,92,125,0.18);
+}
+
+.codex-rec-chip-max {
+  border-color: rgba(79,111,123,0.35);
+  background: rgba(79,111,123,0.07);
+}
+
+.codex-rec-chip-max:hover {
+  background: rgba(79,111,123,0.13);
+  border-color: var(--cyan);
+  box-shadow: 0 1px 4px rgba(79,111,123,0.18);
+}
+
+.cc-rec-name {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text);
+  margin-right: 1px;
 }

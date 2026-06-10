@@ -7,7 +7,7 @@ Use this with `.codex/skills/hatch-frontend/SKILL.md` before editing `frontend/i
 ```text
 tab = 'scripts' | 'ai' | 'vpn'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 
 scripts + !selectedDir  -> directory cards + workspace-settings accordion
@@ -83,7 +83,9 @@ Core tokens:
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI: overview, connect/providers/traces, skills, MCP, hooks, tools/status, prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. MCP starts with a double-click operation manual, has an AI recommendation panel for choosing a server/install method, separates local/Git/npm acquisition from target sync, shows MCP config values in plaintext for review, writes global target config, and shows CLI test results. Model shortcut panels share the `agent-*` config layout classes; the Goals toggle sits in the shared action row.
+- AI sidebar order: 概览 → 连接 → 助手（`tools`，🤖 Claude Code/Codex）→ Skills → MCP → Hooks → 文档 → 提示词（`prompts`）→ 数据。
+- AI: overview, connect/providers/traces, 助手/agent-status, skills, MCP, hooks, docs, 提示词/system-prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. MCP starts with a double-click operation manual, has an AI recommendation panel for choosing a server/install method, separates local/Git/npm acquisition from target sync, shows MCP config values in plaintext for review, writes global target config, and shows CLI test results. Docs is a first-class AI side tab beside MCP/Hooks for local document quick links, and the overview dashboard includes a document summary card that jumps to it. Model shortcut panels share the `agent-*` config layout classes; Claude Code and Codex both show aligned recommended-combo chips before saved presets; the Codex Goals toggle sits in the shared action row.
+  - 提示词 (`aiSubTab==='prompts'`): `promptOps` entries have `{ key, label, group }`. Groups: 脚本 (SuggestScriptMeta, SuggestScriptContent), Zshrc (SuggestZshrcAnnotation, SuggestZshrcOrganization), Hooks (SuggestHookFromDescription, SuggestHookEdit), MCP (SuggestMCPRecommendations), 系统 (TestAIConfig). `GetDefaultPrompts()` exposes all 8. UI shows `.prompt-group-header` per group boundary.
   - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, install+usage status, skills counts, MCP enabled/failed counts, hooks counts by target, and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods (including `GetHooksStats`) and is called on the overview sidenav button and from `init()`.
   - Bulk actions (`.bulk-action-bar`) on skills and MCP: `bulkSkillSync` / `bulkSkillUnsyncAll` / `bulkMCPEnable` / `bulkTestMCP` iterate `filteredSkills` / `filteredMCPServers` serially.
   - `copyToClipboard(text, label)` is the shared clipboard helper (provider URL/model, MCP `renderMCPSnippet` target blocks, default prompts, trace blocks). `renderMCPSnippet(server, target)` mirrors backend target renderers.
