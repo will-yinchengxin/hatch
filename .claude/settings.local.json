@@ -104,7 +104,17 @@
       "Bash(rg \"func \\\\\\(a \\\\*App\\\\\\)\" -oN app_vpn.go)",
       "Bash(rg -No \"func \\\\\\(a \\\\*App\\\\\\) \\(\\\\w+\\)\" -r '$1' app_mcp.go)",
       "Bash(rg -No \"func \\\\\\(a \\\\*App\\\\\\) \\(\\\\w+\\)\" -r '$1' app_hooks.go)",
-      "Bash(rg -No \"func \\\\\\(a \\\\*App\\\\\\) \\(\\\\w+\\)\" -r '$1' app_vpn.go)"
+      "Bash(rg -No \"func \\\\\\(a \\\\*App\\\\\\) \\(\\\\w+\\)\" -r '$1' app_vpn.go)",
+      "Skill(claude-api)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(screencapture -x /tmp/hatch-verify-sidenav.png)",
+      "Bash(open -a \"Hatch\")",
+      "Bash(open \"http://localhost:5173/?aiSubTab=prompts\")",
+      "Bash(screencapture -x /tmp/hatch-verify-prompts.png)",
+      "Bash(screencapture -x /tmp/hatch-app.png)",
+      "Bash(open \"http://localhost:34115/?aiSubTab=prompts\")",
+      "Bash(screencapture -x /tmp/hatch-prompts-browser.png)",
+      "Bash(screencapture -x /tmp/hatch-chrome-prompts.png)"
     ]
   }
 }
