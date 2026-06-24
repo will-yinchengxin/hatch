@@ -6,6 +6,10 @@ export function AddDirectory(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddDirectory'](arg1, arg2, arg3);
 }
 
+export function ApplyAIWorkspaceProfile(arg1) {
+  return window['go']['main']['App']['ApplyAIWorkspaceProfile'](arg1);
+}
+
 export function ApplyAllSchedules() {
   return window['go']['main']['App']['ApplyAllSchedules']();
 }
@@ -16,6 +20,10 @@ export function ApplyRetention() {
 
 export function ApplyZshrcOrganization(arg1) {
   return window['go']['main']['App']['ApplyZshrcOrganization'](arg1);
+}
+
+export function CaptureCurrentAIWorkspaceProfile(arg1, arg2) {
+  return window['go']['main']['App']['CaptureCurrentAIWorkspaceProfile'](arg1, arg2);
 }
 
 export function CheckCommandAvailable(arg1) {
@@ -48,6 +56,10 @@ export function CreateScriptFile(arg1, arg2, arg3) {
 
 export function CreateSkillTemplate(arg1) {
   return window['go']['main']['App']['CreateSkillTemplate'](arg1);
+}
+
+export function DeleteAIWorkspaceProfile(arg1) {
+  return window['go']['main']['App']['DeleteAIWorkspaceProfile'](arg1);
 }
 
 export function DeleteClaudeCodePreset(arg1) {
@@ -92,6 +104,10 @@ export function ExportBackup(arg1) {
 
 export function ExportVPNBackup() {
   return window['go']['main']['App']['ExportVPNBackup']();
+}
+
+export function GetAIEnvironmentHealth() {
+  return window['go']['main']['App']['GetAIEnvironmentHealth']();
 }
 
 export function GetAIProviders() {
@@ -270,6 +286,14 @@ export function InstallMCPFromGit(arg1, arg2) {
   return window['go']['main']['App']['InstallMCPFromGit'](arg1, arg2);
 }
 
+export function ListAIWorkspaceProfiles() {
+  return window['go']['main']['App']['ListAIWorkspaceProfiles']();
+}
+
+export function ListAIWorkspaceSnapshots() {
+  return window['go']['main']['App']['ListAIWorkspaceSnapshots']();
+}
+
 export function ListAliasInventory() {
   return window['go']['main']['App']['ListAliasInventory']();
 }
@@ -314,6 +338,10 @@ export function ParseZshrc() {
   return window['go']['main']['App']['ParseZshrc']();
 }
 
+export function PreviewAIWorkspaceProfileApply(arg1) {
+  return window['go']['main']['App']['PreviewAIWorkspaceProfileApply'](arg1);
+}
+
 export function PreviewVPNBackup(arg1) {
   return window['go']['main']['App']['PreviewVPNBackup'](arg1);
 }
@@ -334,6 +362,10 @@ export function ResolveSkillImportConflict(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveSkillImportConflict'](arg1, arg2, arg3);
 }
 
+export function RollbackAIWorkspaceSnapshot(arg1) {
+  return window['go']['main']['App']['RollbackAIWorkspaceSnapshot'](arg1);
+}
+
 export function RunScript(arg1, arg2, arg3) {
   return window['go']['main']['App']['RunScript'](arg1, arg2, arg3);
 }
@@ -348,6 +380,10 @@ export function SaveAIConfig(arg1) {
 
 export function SaveAIProviders(arg1, arg2) {
   return window['go']['main']['App']['SaveAIProviders'](arg1, arg2);
+}
+
+export function SaveAIWorkspaceProfile(arg1) {
+  return window['go']['main']['App']['SaveAIWorkspaceProfile'](arg1);
 }
 
 export function SaveAppDataPaths(arg1, arg2) {

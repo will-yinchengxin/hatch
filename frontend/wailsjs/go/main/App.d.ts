@@ -7,11 +7,15 @@ import {zshrc} from '../models';
 
 export function AddDirectory(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function ApplyAIWorkspaceProfile(arg1:string):Promise<main.AIWorkspaceSnapshotInfo>;
+
 export function ApplyAllSchedules():Promise<void>;
 
 export function ApplyRetention():Promise<void>;
 
 export function ApplyZshrcOrganization(arg1:string):Promise<main.ZshrcApplyResult>;
+
+export function CaptureCurrentAIWorkspaceProfile(arg1:string,arg2:string):Promise<config.AIWorkspaceProfile>;
 
 export function CheckCommandAvailable(arg1:string):Promise<boolean>;
 
@@ -28,6 +32,8 @@ export function ClearAITraces():Promise<void>;
 export function CreateScriptFile(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function CreateSkillTemplate(arg1:string):Promise<string>;
+
+export function DeleteAIWorkspaceProfile(arg1:string):Promise<void>;
 
 export function DeleteClaudeCodePreset(arg1:string):Promise<void>;
 
@@ -50,6 +56,8 @@ export function DeleteVPNBackup(arg1:string):Promise<void>;
 export function ExportBackup(arg1:string):Promise<main.BackupResult>;
 
 export function ExportVPNBackup():Promise<main.VPNBackupResult>;
+
+export function GetAIEnvironmentHealth():Promise<main.AIEnvironmentHealth>;
 
 export function GetAIProviders():Promise<main.AIProvidersResult>;
 
@@ -139,6 +147,10 @@ export function ImportVPNBackup(arg1:string):Promise<string>;
 
 export function InstallMCPFromGit(arg1:string,arg2:string):Promise<config.MCPServer>;
 
+export function ListAIWorkspaceProfiles():Promise<Array<config.AIWorkspaceProfile>>;
+
+export function ListAIWorkspaceSnapshots():Promise<Array<main.AIWorkspaceSnapshotInfo>>;
+
 export function ListAliasInventory():Promise<Array<main.AliasGroup>>;
 
 export function ListHooks():Promise<Array<config.HookDef>>;
@@ -161,6 +173,8 @@ export function OpenVPNDir():Promise<void>;
 
 export function ParseZshrc():Promise<Array<zshrc.Entry>>;
 
+export function PreviewAIWorkspaceProfileApply(arg1:string):Promise<main.AIWorkspacePreview>;
+
 export function PreviewVPNBackup(arg1:string):Promise<main.VPNBackupPreview>;
 
 export function ReadScriptFile(arg1:string):Promise<string>;
@@ -171,6 +185,8 @@ export function RemoveSchedule(arg1:string):Promise<void>;
 
 export function ResolveSkillImportConflict(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function RollbackAIWorkspaceSnapshot(arg1:string):Promise<void>;
+
 export function RunScript(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function RunWithPreScripts(arg1:string,arg2:string,arg3:Array<string>,arg4:Array<string>):Promise<void>;
@@ -178,6 +194,8 @@ export function RunWithPreScripts(arg1:string,arg2:string,arg3:Array<string>,arg
 export function SaveAIConfig(arg1:config.AIConfig):Promise<void>;
 
 export function SaveAIProviders(arg1:Array<config.AIProvider>,arg2:string):Promise<void>;
+
+export function SaveAIWorkspaceProfile(arg1:config.AIWorkspaceProfile):Promise<config.AIWorkspaceProfile>;
 
 export function SaveAppDataPaths(arg1:string,arg2:string):Promise<void>;
 

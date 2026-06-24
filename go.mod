@@ -3,6 +3,7 @@ module hatch
 go 1.23.0
 
 require (
+	github.com/pelletier/go-toml v1.9.5
 	github.com/wailsapp/wails/v2 v2.12.0
 	gopkg.in/yaml.v3 v3.0.1
 )

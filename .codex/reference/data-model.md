@@ -49,11 +49,31 @@ type Config struct {
     MCPSeeded        bool        // true after first MCP directory discovery
     Hooks            []HookDef
     HooksSeeded      bool        // true after the default hello-test hook is seeded once
+    AIWorkspaceProfiles    []AIWorkspaceProfile
+    LastAppliedWorkspaceID string
 }
 
 type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
 type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceRetainDays int }
 ```
+
+## AI Workspace Profiles
+
+`AIWorkspaceProfile` is a manually applied project profile. It stores a name, absolute project root, Claude/Codex model settings (including Codex Goals), and target-specific `AgentResourceSelection` entries for Skills, MCP servers, and Hooks. It intentionally excludes raw config and credentials.
+
+```go
+type AgentResourceSelection struct { ID string; Claude, Codex bool }
+type AIWorkspaceProfile struct {
+    ID, Name, RootPath string
+    ClaudeModel, ClaudeEffort string
+    CodexModel, CodexEffort string
+    CodexGoals bool
+    Skills, MCPServers, Hooks []AgentResourceSelection
+    UpdatedAt int64
+}
+```
+
+Before application Hatch writes a private snapshot under `Hatch/ai-workspace-snapshots/`, retaining the latest 20. Snapshots contain affected target-file bytes and Skill directories and are used for rollback.
 
 ## MCP Types
 

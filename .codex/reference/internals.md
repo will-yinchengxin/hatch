@@ -95,6 +95,12 @@ Positional keys change when the file is edited.
 - `SaveHook` is pure (registry only, preserves sync flags); the frontend re-syncs already-enabled targets after save. `SuggestHookFromDescription` (draft from text) and `SuggestHookEdit` (refine an existing `HookDef` per an instruction, preserving its id) both go through `callAIOp` and return drafts for UI confirmation — they never persist. Both writers back up the target file via `backupIfExists` before writing.
 - `ListHooks` seeds a default `hello-test` hook once (guarded by `Config.HooksSeeded`): a `UserPromptSubmit` hook that injects a confirmation into the context when the prompt contains "hello". Seeding enables it for Claude (writes `~/.claude/settings.json`) unless a hand-written conflict exists, so the capability is demonstrable out of the box.
 
+## AI Workspace Profiles
+
+- Profiles are manually previewed and applied; they never auto-switch from the current directory. They combine the project root, agent model settings, and target switches for Hatch-managed Skills, MCP, and Hooks.
+- Applying snapshots Claude/Codex config files and master-known Skill targets before reusing normal sync methods. A failed apply restores the snapshot; the newest 20 private snapshots are retained.
+- A divergent target Skill is never overwritten or removed: it is warned when deselected and blocks a selected sync. `SaveCodexConfig` validates TOML before writing.
+
 ## MCP
 
 Hatch stores MCP registry data in `Config.MCPServers` and defaults the source directory to `~/MyHub/mcp`. First load seeds records from that directory when the registry is empty, then sets `Config.MCPSeeded` so discovery does not repeatedly re-import removed entries. The UI intentionally separates acquisition/import (local directory, GitHub clone, npm/npx registration) from target sync (Claude Code/Codex switches).

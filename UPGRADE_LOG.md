@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-06-24：Hatch 破壳鸡蛋 Logo 更换
+
+### 目标
+
+将 Hatch 的应用与前端 Logo 更换为“破壳鸡蛋”，对应产品名称的 hatch 语义，并保持暖米色、陶土橙和金黄色的现有视觉方向。
+
+### 交付资源
+
+| 位置 | 用途 | 规格 |
+|---|---|---|
+| `build/appicon.png` | Wails/macOS 构建图标源 | 1024×1024，RGBA 透明背景 |
+| `frontend/src/assets/images/logo.png` | 页面页眉与 favicon | 256×256，RGBA 透明背景 |
+| `frontend/src/assets/images/logo-universal.png` | 前端通用备用 Logo | 256×256，RGBA 透明背景 |
+
+图标为一枚打开的暖白色鸡蛋：底壳、三片上壳与金色内芯构成清晰轮廓；不包含文字、边框或额外元素，适合 Dock 和小尺寸页眉展示。
+
+### 构建与安装验证
+
+- `npm run build` 已通过，前端产物引用新的 Logo 资源。
+- `make build` 重新生成了 `build/bin/Hatch.app`；`Contents/Resources/iconfile.icns` 已验证为新鸡蛋图标。
+- 新应用已安装到 `/Applications/Hatch.app`。
+
+### macOS 显示注意事项
+
+- 已运行的应用进程会继续使用启动时加载的旧 Dock 图标；覆盖安装后必须完全退出并重新启动 Hatch。
+- 若 Dock 仍缓存旧图标，移除旧 Dock 项后把 `/Applications/Hatch.app` 再拖入 Dock；应用包本身无需再次构建。
+
+---
+
 ## 整体路线图
 
 | 版本 | 主题 | 任务数 |

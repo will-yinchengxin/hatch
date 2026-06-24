@@ -1,12 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"hatch/internal/config"
+
+	"github.com/pelletier/go-toml"
 )
 
 // ─── Codex settings ──────────────────────────────────────────────────────────
@@ -23,6 +26,9 @@ func (a *App) GetCodexConfig() string {
 
 // SaveCodexConfig validates and writes ~/.codex/config.toml.
 func (a *App) SaveCodexConfig(content string) error {
+	if _, err := toml.Load(content); err != nil {
+		return fmt.Errorf("invalid TOML: %w", err)
+	}
 	home, _ := os.UserHomeDir()
 	path := home + "/.codex/config.toml"
 	if err := backupIfExists(path); err != nil {

@@ -59,6 +59,7 @@ hatch/
 ├── app_zshrc.go            # zshrc parse, annotations, AI organization, ListAliasInventory
 ├── app_ai.go               # OpenAI-compatible providers, Suggest*, callAIOp, streaming, prompts
 ├── app_observability.go    # AI tool status, AI trace persistence, macOS notify
+├── app_ai_workspace.go     # Project-scoped Claude/Codex tool profiles, preview, snapshots, health
 ├── app_datadir.go          # Data inventory, cleanup, retention, Skill AI, paths, autolaunch, doc links
 ├── app_fileio.go           # ReadScriptFile, WriteScriptFile, CreateScriptFile, OpenFile
 ├── app_claude.go           # Claude Code settings, presets, TOML helpers
@@ -89,6 +90,7 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | Claude usage cache | `~/.cache/will-statusline/last.json` |
 | Codex sessions | `~/.codex/sessions/` |
 | Codex hooks (Hatch-managed) | `~/.codex/hooks.json` |
+| AI workspace snapshots | `~/Library/Application Support/Hatch/ai-workspace-snapshots/` (latest 20) |
 | Claude hooks (Hatch-managed) | `~/.claude/settings.json` `hooks` key |
 | Backup export | `~/Desktop/hatch-backup-<ts>.zip` by default |
 | VPN config | Clash Verge Rev app dir, auto-detected unless configured |
@@ -108,6 +110,7 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 - AI API keys are stored as local plaintext config; never print them in logs or expose them in screenshots.
 - MCP env values are stored as local plaintext config; sync writes global target config but Hatch does not keep MCP services running.
 - Hooks are `command`-type only (shared by Claude Code and Codex). One `HookDef` is authored once and synced to Claude (`~/.claude/settings.json` `hooks`) and/or Codex (`~/.codex/hooks.json`). Hatch-owned handlers carry a `hatchId` marker so sync updates/removes only its own entries and never touches hand-written hooks; first-time enable refuses to overwrite a matching hand-written hook. Codex-unsupported events (e.g. `Notification`, `SessionEnd`) are gated off for the Codex target.
+- AI workspace profiles are manually previewed and applied; they never auto-switch from the current directory. Application creates a snapshot and only removes Skills whose target content matches Hatch's master copy.
 
 ## Frontend Rules
 

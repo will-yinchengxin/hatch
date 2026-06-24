@@ -103,6 +103,32 @@ type CodexPreset struct {
 	EffortLevel string `json:"effortLevel"`
 }
 
+// AgentResourceSelection describes whether one Hatch-managed resource should be
+// enabled for Claude Code and/or Codex in an AI workspace profile.
+type AgentResourceSelection struct {
+	ID     string `json:"id"`
+	Claude bool   `json:"claude"`
+	Codex  bool   `json:"codex"`
+}
+
+// AIWorkspaceProfile is a manually applied, project-scoped combination of
+// agent model settings and Hatch-managed tools. It intentionally does not
+// store credentials or raw target configuration.
+type AIWorkspaceProfile struct {
+	ID           string                   `json:"id"`
+	Name         string                   `json:"name"`
+	RootPath     string                   `json:"rootPath"`
+	ClaudeModel  string                   `json:"claudeModel,omitempty"`
+	ClaudeEffort string                   `json:"claudeEffort,omitempty"`
+	CodexModel   string                   `json:"codexModel,omitempty"`
+	CodexEffort  string                   `json:"codexEffort,omitempty"`
+	CodexGoals   bool                     `json:"codexGoals"`
+	Skills       []AgentResourceSelection `json:"skills,omitempty"`
+	MCPServers   []AgentResourceSelection `json:"mcpServers,omitempty"`
+	Hooks        []AgentResourceSelection `json:"hooks,omitempty"`
+	UpdatedAt    int64                    `json:"updatedAt"`
+}
+
 // MCPServer represents one MCP server managed by Hatch.
 type MCPServer struct {
 	ID                string                   `json:"id"`
@@ -184,6 +210,8 @@ type Config struct {
 	MCPSeeded               bool                  `json:"mcpSeeded,omitempty"`               // true after first MCP directory discovery
 	Hooks                   []HookDef             `json:"hooks,omitempty"`                   // command hook registry managed by Hatch
 	HooksSeeded             bool                  `json:"hooksSeeded,omitempty"`             // true after the default hook is seeded once
+	AIWorkspaceProfiles     []AIWorkspaceProfile  `json:"aiWorkspaceProfiles,omitempty"`     // manually applied project AI profiles
+	LastAppliedWorkspaceID  string                `json:"lastAppliedWorkspaceId,omitempty"`  // last successfully applied profile
 }
 
 func defaultPath() (string, error) {

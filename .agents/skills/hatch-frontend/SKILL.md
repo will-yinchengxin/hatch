@@ -31,7 +31,7 @@ description: "Hatch 前端参考：修改 frontend/index.html、frontend/src/mai
 ```text
 tab = 'scripts' | 'ai' | 'vpn'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'tools' | 'workspace' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 ```
 
@@ -48,6 +48,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - 脚本运行：`statuses`、`runningSet`、`scriptLogs`、`scriptExitCodes`、`logTarget`。
 - 编辑抽屉：`editTarget`、`editForm`、`editSaving`，所有 per-script 行为都从这里配置。
 - AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、AI tool model config state。
+- AI 工作区：`workspaceProfiles`、`workspaceSnapshots`、`workspaceHealth`、`workspacePreview`、`workspaceForm`。应用只能走后端预检与确认，不在前端直接同步资源。
 - Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`、`skillImportResult`、`skillConflictBusy`。
 - MCP：`mcpSettings`、`mcpServers`、`mcpTemplates`、`mcpForm`、`mcpSyncBusy`、`mcpTestBusy`、`mcpImportBusy`、`mcpManualOpen`、`mcpRecommendQuery`、`mcpRecommendation`、`mcpSelectedRecommendationID`、`filteredMCPServers`。MCP 页面包含 AI 推荐选型、获取/安装、配置同步；推荐候选只填入编辑器，不自动保存；配置值默认明文展示；批量启用/测试迭代 `filteredMCPServers`。
 - Hooks：`hooks`、`hooksStats`、`hooksSearch`、`hooksFilter`、`filteredHooks`、`hookEventSupport`、`hookForm`/`hookEditOpen`、`hookSyncBusy`、`hookTemplates`、`hookSuggestDesc`（头部起草）、`hookAIInstruction`/`hookAIBusy`（编辑器内 AI 优化）。`hookEventSupports(event,target)` 控制同步开关置灰；同步开关复用 `.skill-sync-toggle`，编辑用表单（`.hook-editor-panel`）而非 markdown 编辑器；`SuggestHookFromDescription` 起草新钩子，`SuggestHookEdit` 改进现有钩子。

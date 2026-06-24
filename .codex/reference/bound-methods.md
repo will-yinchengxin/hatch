@@ -33,6 +33,9 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetAppDataInventory / CleanupDataDir / GetRetentionPolicy / SaveRetentionPolicy` | Data dashboard |
 | `GetClaudeSettings / SaveClaudeSettings / GetClaudeCodeConfig / SetClaudeCodeConfig` | Claude config editors |
 | `GetCodexConfig / SaveCodexConfig / GetCodexModelConfig / SetCodexModelConfig` | Codex config editors, including model, reasoning effort, and `[features].goals` |
+| `ListAIWorkspaceProfiles / SaveAIWorkspaceProfile / DeleteAIWorkspaceProfile` | Project-scoped AI profile CRUD |
+| `CaptureCurrentAIWorkspaceProfile / PreviewAIWorkspaceProfileApply / ApplyAIWorkspaceProfile` | Capture current managed state; preflight/de-sensitized diff; confirmed apply with snapshot |
+| `ListAIWorkspaceSnapshots / RollbackAIWorkspaceSnapshot / GetAIEnvironmentHealth` | Rollback inventory and AI CLI/config/profile-drift diagnostics |
 | `GetClaudeCodePresets / SaveClaudeCodePreset / DeleteClaudeCodePreset` | Claude preset management |
 | `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | Codex preset management |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |

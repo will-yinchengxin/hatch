@@ -41,3 +41,5 @@
 - Codex hooks go in the dedicated `~/.codex/hooks.json` (Hatch-owned, merges around hand-written handlers), never inline `config.toml` `[hooks]` — that file is reserved for the MCP block and model/effort merges.
 - `SetHookEnabled` first-time enable refuses to overwrite a matching hand-written hook (event+matcher+command on a non-`hatchId` handler); re-syncing an already-enabled hook overwrites its own handler. Codex-unsupported events (`Notification`, `SessionEnd`) are rejected for the Codex target and greyed out in the UI.
 - `SaveHook()` is registry-only; the frontend `saveHook()` re-syncs already-enabled targets afterward (same pattern as `saveMCPForm`). `SuggestHookFromDescription()` is UI-draft only and must not persist.
+- AI workspace profiles are manually previewed before applying global Claude/Codex state; do not add automatic directory switching.
+- macOS application icon changes require replacing `build/appicon.png`, running `make build`, and installing the rebuilt `Hatch.app`. An already-running process and its Dock item retain the old icon until Hatch is fully quit and relaunched; if needed, remove and re-add the Dock item.

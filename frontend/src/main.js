@@ -97,6 +97,14 @@ const GetHooksStats         = ()                            => window['go']['mai
 const GetHookEventSupport   = ()                            => window['go']['main']['App']['GetHookEventSupport']();
 const SuggestHookFromDescription = (desc)                   => window['go']['main']['App']['SuggestHookFromDescription'](desc);
 const SuggestHookEdit       = (hook, instruction)          => window['go']['main']['App']['SuggestHookEdit'](hook, instruction);
+const ListAIWorkspaceProfiles = ()                         => window['go']['main']['App']['ListAIWorkspaceProfiles']();
+const SaveAIWorkspaceProfile = (profile)                   => window['go']['main']['App']['SaveAIWorkspaceProfile'](profile);
+const DeleteAIWorkspaceProfile = (id)                      => window['go']['main']['App']['DeleteAIWorkspaceProfile'](id);
+const PreviewAIWorkspaceProfileApply = (id)                => window['go']['main']['App']['PreviewAIWorkspaceProfileApply'](id);
+const ApplyAIWorkspaceProfile = (id)                       => window['go']['main']['App']['ApplyAIWorkspaceProfile'](id);
+const ListAIWorkspaceSnapshots = ()                        => window['go']['main']['App']['ListAIWorkspaceSnapshots']();
+const RollbackAIWorkspaceSnapshot = (id)                   => window['go']['main']['App']['RollbackAIWorkspaceSnapshot'](id);
+const GetAIEnvironmentHealth = ()                          => window['go']['main']['App']['GetAIEnvironmentHealth']();
 
 window.hatchApp = function () {
   return {
@@ -309,8 +317,19 @@ window.hatchApp = function () {
     hookAIInstruction: '',       // AI optimize bar inside the editor
     hookAIBusy: false,
 
+    // AI workspace profiles
+    workspaceProfiles: [],
+    workspaceSnapshots: [],
+    workspaceHealth: null,
+    workspaceLoading: false,
+    workspacePreview: null,
+    workspacePreviewing: false,
+    workspaceApplying: false,
+    workspaceFormOpen: false,
+    workspaceForm: null,
+
     // AI sub-navigation
-    aiSubTab: 'overview',    // 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
+    aiSubTab: 'overview',    // 'overview' | 'connect' | 'tools' | 'workspace' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
 
     // VPN module
     vpnSubTab: 'overview',   // 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
@@ -489,6 +508,7 @@ window.hatchApp = function () {
       this.loadAIProviders();
       if (this.tab === 'ai' && this.aiSubTab === 'mcp') this.loadMCP();
       if (this.tab === 'ai' && this.aiSubTab === 'skills') this.loadSkills();
+      if (this.tab === 'ai' && this.aiSubTab === 'workspace') this.loadWorkspace();
       if (this.tab === 'ai' && this.aiSubTab === 'overview') this.loadOverview();
       this.setupEvents();
       this.setupSearchShortcuts();
@@ -499,7 +519,7 @@ window.hatchApp = function () {
     applyInitialRoute() {
       const params = new URLSearchParams(window.location.search || '');
       const ai = params.get('aiSubTab') || params.get('ai');
-      const allowedAI = ['overview', 'connect', 'skills', 'mcp', 'hooks', 'docs', 'tools', 'prompts', 'data'];
+      const allowedAI = ['overview', 'connect', 'tools', 'workspace', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
       if (allowedAI.includes(ai)) {
         this.tab = 'ai';
         this.selectedDir = null;
@@ -2224,6 +2244,97 @@ window.hatchApp = function () {
     },
 
     // ── Claude Code / Codex usage status ──────────────────────────────
+    // ── AI workspace profiles ─────────────────────────────────────────
+    async loadWorkspace() {
+      this.workspaceLoading = true;
+      try {
+        const [profiles, snapshots, health, skills, mcps, hooks] = await Promise.all([
+          ListAIWorkspaceProfiles(), ListAIWorkspaceSnapshots(), GetAIEnvironmentHealth(),
+          this.skills.length ? Promise.resolve(this.skills) : GetSkills(),
+          this.mcpServers.length ? Promise.resolve(this.mcpServers) : ListMCPServers(),
+          this.hooks.length ? Promise.resolve(this.hooks) : ListHooks(),
+        ]);
+        this.workspaceProfiles = profiles || [];
+        this.workspaceSnapshots = snapshots || [];
+        this.workspaceHealth = health;
+        this.skills = skills || [];
+        this.mcpServers = mcps || [];
+        this.hooks = hooks || [];
+      } catch (e) { this.showError(`加载工作区失败: ${e}`); }
+      finally { this.workspaceLoading = false; }
+    },
+
+    workspaceSelections(items, key) {
+      return (items || []).map(item => ({ id: item[key], claude: !!item.inClaude || !!item.enabledInClaude, codex: !!item.inCodex || !!item.enabledInCodex }));
+    },
+
+    openWorkspaceForm(profile = null) {
+      this.workspacePreview = null;
+      this.workspaceForm = profile ? JSON.parse(JSON.stringify(profile)) : {
+        id: '', name: '', rootPath: '', claudeModel: this.claudeCodeConfig.model || '', claudeEffort: this.claudeCodeConfig.effortLevel || '',
+        codexModel: this.codexModelConfig.model || '', codexEffort: this.codexModelConfig.effortLevel || '', codexGoals: !!this.codexModelConfig.goalsEnabled,
+        skills: this.workspaceSelections(this.skills, 'name'), mcpServers: this.workspaceSelections(this.mcpServers, 'id'), hooks: this.workspaceSelections(this.hooks, 'id'),
+      };
+      this.workspaceFormOpen = true;
+    },
+
+    workspaceSelection(list, id) {
+      return (list || []).find(x => x.id === id) || { id, claude: false, codex: false };
+    },
+
+    toggleWorkspaceSelection(kind, id, target, enabled) {
+      const list = [...(this.workspaceForm[kind] || [])];
+      let item = list.find(x => x.id === id);
+      if (!item) { item = { id, claude: false, codex: false }; list.push(item); }
+      item[target] = enabled;
+      this.workspaceForm = { ...this.workspaceForm, [kind]: list.filter(x => x.claude || x.codex) };
+    },
+
+    async saveWorkspaceProfile() {
+      if (!this.workspaceForm?.name?.trim() || !this.workspaceForm?.rootPath?.trim()) { this.showError('请填写工作区名称和目录'); return; }
+      try {
+        const saved = await SaveAIWorkspaceProfile(this.workspaceForm);
+        this.workspaceForm = saved;
+        this.workspaceFormOpen = false;
+        await this.loadWorkspace();
+        this.showSuccess('工作区画像已保存');
+      } catch (e) { this.showError(`保存工作区失败: ${e}`); }
+    },
+
+    async previewWorkspaceProfile(profile) {
+      this.workspacePreviewing = true;
+      this.workspacePreview = null;
+      try { this.workspacePreview = await PreviewAIWorkspaceProfileApply(profile.id); }
+      catch (e) { this.showError(`预检失败: ${e}`); }
+      finally { this.workspacePreviewing = false; }
+    },
+
+    async applyWorkspaceProfile() {
+      const profile = this.workspacePreview?.profile;
+      if (!profile?.id || !this.workspacePreview?.canApply) return;
+      this.workspaceApplying = true;
+      try {
+        await ApplyAIWorkspaceProfile(profile.id);
+        this.workspacePreview = null;
+        await this.loadWorkspace();
+        this.showSuccess(`已应用工作区画像「${profile.name}」`);
+      } catch (e) { this.showError(`应用失败: ${e}`); }
+      finally { this.workspaceApplying = false; }
+    },
+
+    async deleteWorkspaceProfile(profile) {
+      if (!confirm(`删除工作区画像「${profile.name}」？不会改动当前 Claude/Codex 配置。`)) return;
+      try { await DeleteAIWorkspaceProfile(profile.id); await this.loadWorkspace(); this.showSuccess('工作区画像已删除'); }
+      catch (e) { this.showError(`删除失败: ${e}`); }
+    },
+
+    async rollbackWorkspaceSnapshot(snapshot) {
+      if (!confirm(`回滚到「${snapshot.profileName}」应用前的状态？当前 Hatch 管理的 AI 配置会被恢复。`)) return;
+      try { await RollbackAIWorkspaceSnapshot(snapshot.id); await this.loadWorkspace(); this.showSuccess('已回滚 AI 工作区快照'); }
+      catch (e) { this.showError(`回滚失败: ${e}`); }
+    },
+
+    // ── AI tool status ─────────────────────────────────────────────────
     async loadAIUsageStatuses() {
       if (!this.claudeStatus) this.loadClaudeStatus();
       if (!this.codexStatus) this.loadCodexStatus();
@@ -3062,6 +3173,7 @@ window.hatchApp = function () {
         else if (this.aiSubTab === 'mcp') this.loadMCP();
         else if (this.aiSubTab === 'hooks') this.loadHooks();
         else if (this.aiSubTab === 'skills') this.loadSkills();
+        else if (this.aiSubTab === 'workspace') this.loadWorkspace();
         else if (this.aiSubTab === 'docs') this.loadDocLinks();
       }
     },

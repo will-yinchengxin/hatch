@@ -7,7 +7,7 @@ Use this with `.codex/skills/hatch-frontend/SKILL.md` before editing `frontend/i
 ```text
 tab = 'scripts' | 'ai' | 'vpn'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'tools' | 'workspace' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 
 scripts + !selectedDir  -> directory cards + workspace-settings accordion
@@ -34,6 +34,7 @@ editTarget != null      -> edit drawer overlay
 | `mcpForm / mcpSyncBusy / mcpTestBusy / mcpImportBusy / mcpManualOpen` | MCP editor, target sync, connection checks, separated source-install state, and operation-manual modal |
 | `mcpRecommendQuery / mcpRecommendBusy / mcpRecommendation / mcpSelectedRecommendationID` | MCP AI recommendation panel and selected draft candidate |
 | `hooks / hooksStats / hooksSearch / hooksFilter / filteredHooks` | Hook list and filter UI |
+| `workspaceProfiles / workspaceSnapshots / workspaceHealth / workspacePreview` | AI workspace profiles, rollback inventory, diagnostics, and apply preview |
 | `hookEventSupport / hookForm / hookEditOpen / hookEditIsNew / hookSaving` | Hook event catalog + edit form state |
 | `hookSyncBusy / hookTemplates / hookTemplateGalleryOpen / hookSuggestDesc / hookSuggestBusy` | Hook sync busy keys, template gallery, header AI draft bar |
 | `hookAIInstruction / hookAIBusy` | In-editor AI optimize bar for refining an existing hook |
@@ -85,7 +86,7 @@ Core tokens:
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI sidebar order: 概览 → 连接 → 助手（🤖, `aiSubTab==='tools'`）→ Skills → MCP → Hooks → 文档 → 提示词（`aiSubTab==='prompts'`）→ 数据。The "助手" tab (formerly 工具) covers Claude Code + Codex agent status and config. The "提示词" tab (formerly Prompt) covers system prompt overrides.
+- AI sidebar order: 概览 → 连接 → 助手（🤖, `aiSubTab==='tools'`）→ 工作区 → Skills → MCP → Hooks → 文档 → 提示词（`aiSubTab==='prompts'`）→ 数据。工作区画像保存项目根目录与双端模型/工具组合，必须预览后手动应用；页面显示脱敏变更、环境体检和可回滚快照。
 - AI: overview, connect/providers/traces, 助手/agent-status, skills, MCP, hooks, docs, 提示词/system-prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. MCP starts with a double-click operation manual, includes an AI recommendation panel for choosing a server/install method, separates local/Git/npm acquisition from Claude Code/Codex sync, shows MCP config values in plaintext for review, writes global target config, and shows CLI test results. Docs (`aiSubTab==='docs'`) is a first-class sidebar tab for local document quick links (`docLinks`), at the same level as MCP/Hooks; the overview dashboard has a Docs card showing `docLinks.length` that navigates to it. Model shortcut panels share the `agent-*` config layout classes; both Claude Code and Codex show aligned recommended-combo chips (`.cc-rec-presets` / `.cc-rec-chip`) before saved presets; the Codex Goals toggle sits in the shared action row.
   - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, Claude/Codex install+usage, skills counts, MCP enabled/failed counts, hooks counts (total + Claude/Codex enabled), and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods (including `GetHooksStats`) and is called on the overview sidenav button and from `init()`.
   - Bulk actions (`.bulk-action-bar`) on skills and MCP: `bulkSkillSync` / `bulkSkillUnsyncAll` / `bulkMCPEnable` / `bulkTestMCP` iterate `filteredSkills` / `filteredMCPServers` serially.

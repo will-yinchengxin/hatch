@@ -663,6 +663,12 @@
           <span class="ai-sidenav-icon">🤖</span>
           <span>助手</span>
         </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='workspace' ? 'active' : ''"
+          @click="aiSubTab='workspace'; loadWorkspace()">
+          <span class="ai-sidenav-icon">🗂</span>
+          <span>工作区</span>
+          <span class="ai-sidenav-count" x-show="workspaceProfiles.length > 0" x-text="workspaceProfiles.length"></span>
+        </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='skills' ? 'active' : ''"
           @click="aiSubTab='skills'; loadSkills()">
           <span class="ai-sidenav-icon">📚</span>
@@ -1033,6 +1039,124 @@
                   </div>
                 </template>
               </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ 工作区画像 ═══════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='workspace'">
+          <section class="settings-section workspace-section">
+            <div class="section-header-row">
+              <div>
+                <h3>🗂 AI 工作区画像</h3>
+                <p class="muted text-sm workspace-intro">按项目目录保存 Claude Code、Codex、Skills、MCP 与 Hooks 的组合。应用前始终预览差异，Hatch 会保留回滚快照。</p>
+              </div>
+              <div class="workspace-actions">
+                <button class="btn-sm" @click="loadWorkspace()" :aria-busy="workspaceLoading">↻</button>
+                <button class="btn-sm btn-primary" @click="openWorkspaceForm()">+ 新建画像</button>
+              </div>
+            </div>
+
+            <div class="workspace-health" x-show="workspaceHealth">
+              <div class="workspace-health-head">
+                <strong>环境体检</strong>
+                <span class="workspace-health-state" :class="'is-'+workspaceHealth?.overall" x-text="workspaceHealth?.overall === 'ok' ? '正常' : workspaceHealth?.overall === 'warn' ? '需关注' : '需修复'"></span>
+              </div>
+              <div class="workspace-health-grid">
+                <template x-for="check in (workspaceHealth?.checks || [])" :key="check.id">
+                  <div class="workspace-check" :class="'is-'+check.status">
+                    <strong x-text="check.label"></strong>
+                    <span x-text="check.detail"></span>
+                    <small x-show="check.suggestion" x-text="check.suggestion"></small>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="workspace-profile-list" x-show="workspaceProfiles.length > 0">
+              <template x-for="profile in workspaceProfiles" :key="profile.id">
+                <article class="workspace-profile-card">
+                  <div class="workspace-profile-main">
+                    <strong x-text="profile.name"></strong>
+                    <code x-text="profile.rootPath"></code>
+                    <span class="muted text-sm" x-text="'Claude: ' + (profile.claudeModel || '默认') + ' · Codex: ' + (profile.codexModel || '默认')"></span>
+                  </div>
+                  <div class="workspace-profile-actions">
+                    <button class="btn-sm btn-primary" @click="previewWorkspaceProfile(profile)" :aria-busy="workspacePreviewing">预览应用</button>
+                    <button class="btn-sm" @click="openWorkspaceForm(profile)">编辑</button>
+                    <button class="btn-sm btn-danger" @click="deleteWorkspaceProfile(profile)">删除</button>
+                  </div>
+                </article>
+              </template>
+            </div>
+            <p class="muted text-sm workspace-empty" x-show="!workspaceLoading && workspaceProfiles.length === 0">暂无画像。新建一个项目画像后，可将全局 AI 工具链安全地切换到该项目需要的组合。</p>
+
+            <div class="workspace-preview" x-show="workspacePreview" x-transition>
+              <div class="workspace-preview-head">
+                <strong x-text="'应用预览：' + workspacePreview?.profile?.name"></strong>
+                <button class="icon-btn" @click="workspacePreview=null" title="关闭">✕</button>
+              </div>
+              <div class="workspace-preview-group" x-show="workspacePreview?.changes?.length">
+                <span>将变更</span>
+                <ul><template x-for="change in (workspacePreview?.changes || [])" :key="change"><li x-text="change"></li></template></ul>
+              </div>
+              <div class="workspace-preview-group is-warning" x-show="workspacePreview?.warnings?.length">
+                <span>提示</span>
+                <ul><template x-for="warning in (workspacePreview?.warnings || [])" :key="warning"><li x-text="warning"></li></template></ul>
+              </div>
+              <div class="workspace-preview-group is-error" x-show="workspacePreview?.errors?.length">
+                <span>阻止应用</span>
+                <ul><template x-for="error in (workspacePreview?.errors || [])" :key="error"><li x-text="error"></li></template></ul>
+              </div>
+              <div class="workspace-preview-footer">
+                <span class="muted text-sm">密钥和 MCP 环境变量不会显示在预览中。</span>
+                <button class="btn-primary" :disabled="!workspacePreview?.canApply" :aria-busy="workspaceApplying" @click="applyWorkspaceProfile()">确认应用并创建快照</button>
+              </div>
+            </div>
+
+            <div class="workspace-editor" x-show="workspaceFormOpen" x-transition>
+              <div class="workspace-editor-head">
+                <strong x-text="workspaceForm?.id ? '编辑工作区画像' : '新建工作区画像'"></strong>
+                <button class="icon-btn" @click="workspaceFormOpen=false" title="关闭">✕</button>
+              </div>
+              <div class="workspace-form-grid">
+                <label><span>名称</span><input class="field-input" x-model="workspaceForm.name" placeholder="例如：Hatch 后端开发" /></label>
+                <label><span>项目目录</span><input class="field-input" x-model="workspaceForm.rootPath" placeholder="/Users/you/project" /></label>
+                <label><span>Claude 模型</span><input class="field-input" x-model="workspaceForm.claudeModel" placeholder="留空使用默认" /></label>
+                <label><span>Claude effort</span><input class="field-input" x-model="workspaceForm.claudeEffort" placeholder="low / medium / high" /></label>
+                <label><span>Codex 模型</span><input class="field-input" x-model="workspaceForm.codexModel" placeholder="留空使用默认" /></label>
+                <label><span>Codex effort</span><input class="field-input" x-model="workspaceForm.codexEffort" placeholder="low / medium / high" /></label>
+              </div>
+              <label class="workspace-goals"><input type="checkbox" x-model="workspaceForm.codexGoals" /> Codex Goals</label>
+              <template x-for="section in [{key:'skills',label:'Skills',items:skills,id:'name'}, {key:'mcpServers',label:'MCP',items:mcpServers,id:'id'}, {key:'hooks',label:'Hooks',items:hooks,id:'id'}]" :key="section.key">
+                <div class="workspace-resource-section">
+                  <strong x-text="section.label"></strong>
+                  <div class="workspace-resource-list">
+                    <template x-for="item in section.items" :key="item[section.id]">
+                      <div class="workspace-resource-row">
+                        <span x-text="item.name || item[section.id]"></span>
+                        <label><input type="checkbox" :checked="workspaceSelection(workspaceForm[section.key], item[section.id]).claude" @change="toggleWorkspaceSelection(section.key, item[section.id], 'claude', $event.target.checked)" /> Claude</label>
+                        <label><input type="checkbox" :checked="workspaceSelection(workspaceForm[section.key], item[section.id]).codex" @change="toggleWorkspaceSelection(section.key, item[section.id], 'codex', $event.target.checked)" /> Codex</label>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <div class="workspace-editor-footer">
+                <button class="secondary" @click="workspaceFormOpen=false">取消</button>
+                <button class="btn-primary" @click="saveWorkspaceProfile()">保存画像</button>
+              </div>
+            </div>
+
+            <div class="workspace-snapshots" x-show="workspaceSnapshots.length > 0">
+              <strong>最近应用快照</strong>
+              <template x-for="snapshot in workspaceSnapshots" :key="snapshot.id">
+                <div class="workspace-snapshot-row">
+                  <span x-text="snapshot.profileName"></span>
+                  <small x-text="new Date(snapshot.createdAt * 1000).toLocaleString()"></small>
+                  <button class="btn-sm" @click="rollbackWorkspaceSnapshot(snapshot)">回滚</button>
+                </div>
+              </template>
             </div>
           </section>
         </div>
