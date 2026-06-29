@@ -399,6 +399,11 @@ window.hatchApp = function () {
     memoPreviewCache: {},
     vocabEntries: [],
     vocabSearch: '',
+    vocabSort: 'alpha',       // alpha | created
+    vocabDateFilter: '',
+    vocabPage: 1,
+    vocabPageSize: 10,
+    vocabDeleteConfirmID: '',
     vocabFormOpen: false,
     vocabEditingID: '',
     vocabForm: { word: '', chinese: '', phonetic: '', partOfSpeech: '', collocationsRaw: '', example: '', audioUrl: '', tagsRaw: '' },
@@ -481,11 +486,55 @@ window.hatchApp = function () {
 
     get filteredVocabEntries() {
       const q = (this.vocabSearch || '').trim().toLowerCase();
-      if (!q) return this.vocabEntries;
-      return this.vocabEntries.filter(v =>
-        [v.word, v.chinese, v.phonetic, v.partOfSpeech, v.example, ...(v.tags || [])]
-          .some(x => (x || '').toLowerCase().includes(q))
-      );
+      const items = (this.vocabEntries || []).filter(v => {
+        if (this.vocabDateFilter && this.vocabEntryDate(v) !== this.vocabDateFilter) return false;
+        if (!q) return true;
+        return [v.word, v.chinese, v.phonetic, v.partOfSpeech, v.example, ...(v.tags || [])]
+          .some(x => (x || '').toLowerCase().includes(q));
+      });
+      return items.sort((a, b) => {
+        if (this.vocabSort === 'created') return (b.createdAt || 0) - (a.createdAt || 0);
+        const aw = (a.word || '').toLowerCase();
+        const bw = (b.word || '').toLowerCase();
+        if (aw !== bw) return aw.localeCompare(bw);
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
+    },
+
+    get groupedVocabEntries() {
+      const byDay = new Map();
+      for (const entry of this.pagedVocabEntries) {
+        const key = this.vocabEntryDate(entry) || 'unknown';
+        const label = key === 'unknown' ? '未记录日期' : this.vocabDayLabel(key);
+        if (!byDay.has(key)) {
+          byDay.set(key, { key, label, items: [] });
+        }
+        byDay.get(key).items.push(entry);
+      }
+      return [...byDay.values()].sort((a, b) => {
+        if (a.key === 'unknown') return 1;
+        if (b.key === 'unknown') return -1;
+        return b.key.localeCompare(a.key);
+      });
+    },
+
+    get vocabTotalPages() {
+      return Math.max(1, Math.ceil(this.filteredVocabEntries.length / this.vocabPageSize));
+    },
+
+    get pagedVocabEntries() {
+      const page = Math.min(Math.max(this.vocabPage, 1), this.vocabTotalPages);
+      const start = (page - 1) * this.vocabPageSize;
+      return this.filteredVocabEntries.slice(start, start + this.vocabPageSize);
+    },
+
+    get vocabPageStart() {
+      if (!this.filteredVocabEntries.length) return 0;
+      return (Math.min(this.vocabPage, this.vocabTotalPages) - 1) * this.vocabPageSize + 1;
+    },
+
+    get vocabPageEnd() {
+      return Math.min(this.filteredVocabEntries.length, Math.min(this.vocabPage, this.vocabTotalPages) * this.vocabPageSize);
     },
 
     get reviewDueEntries() {
@@ -3098,6 +3147,7 @@ window.hatchApp = function () {
         this.memoDashboard = dash || this.memoDashboard;
         this.memos = memos || [];
         this.vocabEntries = vocab || [];
+        this.clampVocabPage();
         this.memoSettings = settings || this.memoSettings;
         this.loadMemoImagePreviews();
       } catch (e) {
@@ -3110,6 +3160,52 @@ window.hatchApp = function () {
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
       return `${d.getFullYear()}-${mm}-${dd}`;
+    },
+
+    vocabEntryDate(entry) {
+      const unix = entry?.createdAt || entry?.updatedAt || 0;
+      if (!unix) return '';
+      const d = new Date(unix * 1000);
+      if (Number.isNaN(d.getTime())) return '';
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${mm}-${dd}`;
+    },
+
+    vocabDayLabel(day) {
+      if (!day) return '全部日期';
+      const [year, month, date] = day.split('-');
+      if (!year || !month || !date) return day;
+      return `${Number(month)} 月 ${Number(date)} 日`;
+    },
+
+    resetVocabPage() {
+      this.vocabPage = 1;
+      this.vocabDeleteConfirmID = '';
+    },
+
+    clampVocabPage() {
+      this.vocabPage = Math.min(Math.max(this.vocabPage || 1, 1), this.vocabTotalPages);
+    },
+
+    setVocabSearch(value) {
+      this.vocabSearch = value;
+      this.resetVocabPage();
+    },
+
+    setVocabSort(value) {
+      this.vocabSort = value || 'alpha';
+      this.resetVocabPage();
+    },
+
+    setVocabDateFilter(value) {
+      this.vocabDateFilter = value || '';
+      this.resetVocabPage();
+    },
+
+    gotoVocabPage(page) {
+      this.vocabPage = Math.min(Math.max(page, 1), this.vocabTotalPages);
+      this.vocabDeleteConfirmID = '';
     },
 
     unixToLocalInput(unix) {
@@ -3285,12 +3381,14 @@ window.hatchApp = function () {
 
     openNewVocab() {
       this.vocabEditingID = '';
+      this.vocabDeleteConfirmID = '';
       this.vocabFormOpen = true;
       this.vocabForm = { word: '', chinese: '', phonetic: '', partOfSpeech: '', collocationsRaw: '', example: '', audioUrl: '', tagsRaw: '' };
     },
 
     editVocab(entry) {
       this.vocabEditingID = entry.id;
+      this.vocabDeleteConfirmID = '';
       this.vocabFormOpen = true;
       this.vocabForm = {
         word: entry.word || '',
@@ -3389,10 +3487,19 @@ window.hatchApp = function () {
       }
     },
 
-    async deleteVocab(entry) {
-      if (!confirm(`删除单词「${entry.word}」？`)) return;
+    requestDeleteVocab(entry) {
+      this.vocabDeleteConfirmID = entry?.id || '';
+    },
+
+    cancelDeleteVocab() {
+      this.vocabDeleteConfirmID = '';
+    },
+
+    async confirmDeleteVocab(entry) {
+      if (!entry?.id || this.vocabDeleteConfirmID !== entry.id) return;
       try {
         await DeleteVocabEntry(entry.id);
+        this.vocabDeleteConfirmID = '';
         await this.loadMemoModule();
         this.showSuccess('单词已删除');
       } catch (e) {

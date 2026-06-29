@@ -56,7 +56,7 @@ memoSubTab = 'today' | 'all' | 'words' | 'review' | 'storage'
 - Hooks：`hooks`、`hooksStats`、`hooksSearch`、`hooksFilter`、`filteredHooks`、`hookEventSupport`、`hookForm`/`hookEditOpen`、`hookSyncBusy`、`hookTemplates`、`hookSuggestDesc`（头部起草）、`hookAIInstruction`/`hookAIBusy`（编辑器内 AI 优化）。`hookEventSupports(event,target)` 控制同步开关置灰；同步开关复用 `.skill-sync-toggle`，编辑用表单（`.hook-editor-panel`）而非 markdown 编辑器；`SuggestHookFromDescription` 起草新钩子，`SuggestHookEdit` 改进现有钩子。
 - Data：`dataPaths`、`dataInventory`、`retention`。
 - VPN：`vpnStatus`、`vpnCurrentIP`、`vpnHealthReport`、`vpnPathValidation`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnBackupPreview`、`vpnSettingsForm`。
-- Memo：`memoDashboard`、`memos`、`memoForm`、`memoSettings`、`memoPreviewCache`、`vocabEntries`、`vocabForm`、`reviewReveal`。
+- Memo：`memoDashboard`、`memos`、`memoForm`、`memoSettings`、`memoPreviewCache`、`vocabEntries`、`vocabSearch`、`vocabSort`、`vocabDateFilter`、`vocabPage`、`vocabPageSize`、`vocabDeleteConfirmID`、`vocabForm`、`reviewReveal`。
 - Workspace：`wsShellOpen`、`wsDirsOpen`、`wsEnvOpen`、`wsZshrcOpen`。
 
 ## CSS 规则

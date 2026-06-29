@@ -6977,6 +6977,21 @@ details[open] .export-preview-toggle::before {
 .memo-path-input { flex: 2 1 240px; }
 .memo-label-input { flex: 1 1 140px; }
 .memo-filter-select { flex: 0 0 120px; }
+.vocab-toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: center;
+  gap: 10px;
+}
+.vocab-toolbar .field-input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+.vocab-toolbar-clear {
+  min-height: 38px;
+  white-space: nowrap;
+}
 .memo-item {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
@@ -7099,6 +7114,25 @@ details[open] .export-preview-toggle::before {
   border-radius: var(--radius);
   background: var(--surface-2);
 }
+.vocab-day-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vocab-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.vocab-day-header small {
+  color: var(--text-dim);
+  font-weight: 500;
+}
 .vocab-head {
   display: flex;
   align-items: flex-start;
@@ -7116,6 +7150,41 @@ details[open] .export-preview-toggle::before {
 }
 .vocab-meta {
   margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.vocab-action-row,
+.vocab-confirm-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.vocab-confirm-row .btn-sm {
+  min-height: 30px;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+.vocab-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.vocab-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.vocab-page-indicator {
+  min-width: 58px;
+  text-align: center;
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -7163,6 +7232,9 @@ details[open] .export-preview-toggle::before {
   .memo-storage-form {
     grid-template-columns: 1fr;
   }
+  .vocab-toolbar {
+    grid-template-columns: 1fr;
+  }
   .memo-attachment-add,
   .memo-toolbar {
     flex-direction: column;
@@ -7171,9 +7243,17 @@ details[open] .export-preview-toggle::before {
   .memo-kind-input,
   .memo-path-input,
   .memo-label-input,
-  .memo-filter-select {
+  .memo-filter-select,
+  .vocab-toolbar-clear {
     flex-basis: auto;
     width: 100%;
+  }
+  .vocab-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .vocab-page-actions {
+    justify-content: space-between;
   }
   .memo-item {
     grid-template-columns: 28px minmax(0, 1fr);

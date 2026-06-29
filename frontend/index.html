@@ -3209,39 +3209,71 @@
               <h3>单词库</h3>
               <button class="btn-sm btn-primary" @click="openNewVocab()">+ 新增</button>
             </div>
-            <div class="memo-toolbar">
-              <input class="field-input" type="search" x-model="vocabSearch" placeholder="搜索英文、中文、标签" />
+            <div class="memo-toolbar vocab-toolbar">
+              <input class="field-input vocab-toolbar-search" type="search" :value="vocabSearch" @input="setVocabSearch($event.target.value)" placeholder="搜索英文、中文、标签" />
+              <select class="field-input vocab-toolbar-control" :value="vocabSort" @change="setVocabSort($event.target.value)">
+                <option value="alpha">按首字母</option>
+                <option value="created">按添加时间</option>
+              </select>
+              <input class="field-input vocab-toolbar-control" type="date" :value="vocabDateFilter" @input="setVocabDateFilter($event.target.value)" />
+              <button class="btn-sm secondary vocab-toolbar-clear" x-show="vocabDateFilter" @click="setVocabDateFilter('')">清除日期</button>
             </div>
             <div class="vocab-list">
-              <template x-for="entry in filteredVocabEntries" :key="entry.id">
-                <div class="vocab-card">
-                  <div class="vocab-head">
-                    <div>
-                      <strong class="vocab-word" x-text="entry.word"></strong>
-                      <span class="muted" x-text="entry.phonetic"></span>
-                    </div>
-                    <div class="vocab-actions">
-                      <button class="icon-btn" @click="playVocabAudio(entry)" title="发音">▶</button>
-                      <button class="icon-btn" @click="editVocab(entry)" title="编辑">✎</button>
-                      <button class="icon-btn danger" @click="deleteVocab(entry)" title="删除">✕</button>
-                    </div>
+              <template x-for="group in groupedVocabEntries" :key="group.key">
+                <div class="vocab-day-group">
+                  <div class="vocab-day-header">
+                    <span x-text="group.label"></span>
+                    <small x-text="group.items.length + ' 个单词'"></small>
                   </div>
-                  <div class="vocab-meaning" x-text="entry.chinese || '未填写中文释义'"></div>
-                  <div class="vocab-meta">
-                    <span x-show="entry.partOfSpeech" x-text="entry.partOfSpeech"></span>
-                    <span x-text="'记录: ' + formatTime(entry.createdAt)"></span>
-                  </div>
-                  <div class="vocab-collocations" x-show="entry.collocations && entry.collocations.length">
-                    <template x-for="c in entry.collocations" :key="c.pattern + c.example">
-                      <div class="vocab-collocation">
-                        <strong x-text="c.pattern"></strong>
-                        <span x-text="c.meaning"></span>
-                        <span class="muted" x-text="c.example"></span>
+                  <template x-for="entry in group.items" :key="entry.id">
+                    <div class="vocab-card">
+                      <div class="vocab-head">
+                        <div>
+                          <strong class="vocab-word" x-text="entry.word"></strong>
+                          <span class="muted" x-text="entry.phonetic"></span>
+                        </div>
+                        <div class="vocab-actions">
+                          <template x-if="vocabDeleteConfirmID !== entry.id">
+                            <div class="vocab-action-row">
+                              <button class="icon-btn" @click="playVocabAudio(entry)" title="发音">▶</button>
+                              <button class="icon-btn" @click="editVocab(entry)" title="编辑">✎</button>
+                              <button class="icon-btn danger" @click="requestDeleteVocab(entry)" title="删除">✕</button>
+                            </div>
+                          </template>
+                          <template x-if="vocabDeleteConfirmID === entry.id">
+                            <div class="vocab-confirm-row">
+                              <button class="btn-sm btn-danger" @click="confirmDeleteVocab(entry)">确认删除</button>
+                              <button class="btn-sm secondary" @click="cancelDeleteVocab()">取消</button>
+                            </div>
+                          </template>
+                        </div>
                       </div>
-                    </template>
-                  </div>
+                      <div class="vocab-meaning" x-text="entry.chinese || '未填写中文释义'"></div>
+                      <div class="vocab-meta">
+                        <span x-show="entry.partOfSpeech" x-text="entry.partOfSpeech"></span>
+                        <span x-text="'记录: ' + formatTime(entry.createdAt)"></span>
+                      </div>
+                      <div class="vocab-collocations" x-show="entry.collocations && entry.collocations.length">
+                        <template x-for="c in entry.collocations" :key="c.pattern + c.example">
+                          <div class="vocab-collocation">
+                            <strong x-text="c.pattern"></strong>
+                            <span x-text="c.meaning"></span>
+                            <span class="muted" x-text="c.example"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </template>
+            </div>
+            <div class="vocab-pagination" x-show="filteredVocabEntries.length">
+              <span class="muted" x-text="`第 ${vocabPageStart}-${vocabPageEnd} 个，共 ${filteredVocabEntries.length} 个`"></span>
+              <div class="vocab-page-actions">
+                <button class="btn-sm secondary" @click="gotoVocabPage(vocabPage - 1)" :disabled="vocabPage <= 1">上一页</button>
+                <span class="vocab-page-indicator" x-text="`${vocabPage} / ${vocabTotalPages}`"></span>
+                <button class="btn-sm secondary" @click="gotoVocabPage(vocabPage + 1)" :disabled="vocabPage >= vocabTotalPages">下一页</button>
+              </div>
             </div>
             <div class="data-empty" x-show="!filteredVocabEntries.length">暂无单词记录。</div>
           </section>
