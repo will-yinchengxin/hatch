@@ -290,6 +290,8 @@ export function SetMCPEnabled(arg1:string,arg2:string,arg3:boolean):Promise<void
 
 export function SetSkillSync(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function SpeakVocabWord(arg1:string):Promise<void>;
+
 export function SuggestHookEdit(arg1:config.HookDef,arg2:string):Promise<config.HookDef>;
 
 export function SuggestHookFromDescription(arg1:string):Promise<config.HookDef>;

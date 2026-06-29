@@ -41,7 +41,7 @@ memoSubTab = 'today' | 'all' | 'words' | 'review' | 'storage'
 - `ai`: AI 侧边栏顺序：概览 → 连接 → **助手**（tools，🤖 Claude Code/Codex 状态与配置）→ Skills → MCP → Hooks → 文档 → **提示词**（prompts，system prompt 覆盖）→ 数据。
 - AI hero 顶部统计卡包含 AI 状态、模型、Skills、MCP、Hooks；保持同一套 `hero-stat-*` 卡片样式和响应式 grid。
 - `vpn`: VPN 侧边栏布局，含体检、备份、自定义规则，以及高级配置/Profile 原文编辑；TUN 排除网段在 hero 卡片内紧凑常驻展示，不使用隐藏式双击交互。
-- `memo`: 备忘录侧边栏布局，含今日、全部、单词、复盘、存储；提醒只在 Hatch 运行时触发，附件导入到托管目录后展示/清理。
+- `memo`: 备忘录侧边栏布局，含今日、全部、单词、复盘、存储；提醒只在 Hatch 运行时触发，附件导入到托管目录后展示/清理；单词发音优先音频 URL，缺失或播放失败时调用 `SpeakVocabWord` 走 macOS 系统发音。
 - `editTarget != null`: 右侧编辑抽屉。
 - `?aiSubTab=mcp` 等 query 可直接打开 AI 子页，`?aiSubTab=mcp&mcpManual=1` 可打开 MCP 手册弹窗，便于本地截图验证。
 

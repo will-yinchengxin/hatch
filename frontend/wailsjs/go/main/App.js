@@ -570,6 +570,10 @@ export function SetSkillSync(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetSkillSync'](arg1, arg2, arg3);
 }
 
+export function SpeakVocabWord(arg1) {
+  return window['go']['main']['App']['SpeakVocabWord'](arg1);
+}
+
 export function SuggestHookEdit(arg1, arg2) {
   return window['go']['main']['App']['SuggestHookEdit'](arg1, arg2);
 }

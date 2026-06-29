@@ -41,7 +41,7 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
 | `GetMemoDashboard / ListMemos / SaveMemo / DeleteMemo / MarkMemoDone` | Memo/todo dashboard and CRUD; reminders are rescheduled after saves |
 | `ImportMemoAttachment / DeleteMemoAttachment / OpenMemoAttachment / GetMemoAttachmentPreview` | Memo link/file/image attachment import, managed-file cleanup, opening, and image preview |
-| `ListVocabEntries / SaveVocabEntry / DeleteVocabEntry / ReviewVocabEntry / LookupVocabWord / SuggestVocabEntry` | Vocab CRUD, review scheduling, online DictionaryAPI lookup, and AI draft completion |
+| `ListVocabEntries / SaveVocabEntry / DeleteVocabEntry / ReviewVocabEntry / LookupVocabWord / SpeakVocabWord / SuggestVocabEntry` | Vocab CRUD, review scheduling, online DictionaryAPI lookup, macOS `say` pronunciation fallback, and AI draft completion |
 | `GetMemoSettings / SaveMemoSettings / CleanupMemoFiles` | Memo attachment storage directory and retention policy |
 | `GetMCPSettings / SaveMCPSettings(mcpDir)` | Read/write MCP master dir (default `~/MyHub/mcp` if present); `SaveMCPSettings` creates the dir |
 | `ListMCPServers / SaveMCPServer / DeleteMCPServer / GetMCPTemplates` | MCP registry CRUD + built-in template gallery; first `ListMCPServers` seeds the registry from disk once (`MCPSeeded`) |

@@ -146,7 +146,7 @@ Reminders are best-effort and in-process only. On startup, `ScheduleMemoReminder
 
 `CleanupMemoFiles` removes only paths that are still inside the configured memo attachment directory. It marks the attachment `CleanedAt` and keeps the memo text record. `ApplyRetention` calls memo retention hourly and on startup when auto-cleanup is enabled.
 
-`LookupVocabWord` calls DictionaryAPI.dev at runtime and parses phonetic, audio URL, first part of speech, and a few definitions/examples. Tests use fixtures and do not depend on network. `SuggestVocabEntry` uses the active AI provider to return a JSON draft and never persists it automatically.
+`LookupVocabWord` calls DictionaryAPI.dev at runtime and parses phonetic, audio URL, first part of speech, and a few definitions/examples. Tests use fixtures and do not depend on network. Vocab pronunciation uses saved audio URLs when present and `SpeakVocabWord` falls back to macOS `/usr/bin/say` when a URL is missing or playback fails. `SuggestVocabEntry` uses the active AI provider to return a JSON draft and never persists it automatically.
 
 ## Pre-Script Chain
 

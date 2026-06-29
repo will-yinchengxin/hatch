@@ -576,6 +576,33 @@ func (a *App) LookupVocabWord(word string) (VocabLookupResult, error) {
 	return parseDictionaryLookup(word, payload), nil
 }
 
+func (a *App) SpeakVocabWord(word string) error {
+	word = strings.TrimSpace(word)
+	if word == "" {
+		return fmt.Errorf("英文单词不能为空")
+	}
+	runes := []rune(word)
+	if len(runes) > 120 {
+		word = string(runes[:120])
+	}
+	sayPath := "/usr/bin/say"
+	if _, err := os.Stat(sayPath); err != nil {
+		var lookErr error
+		sayPath, lookErr = exec.LookPath("say")
+		if lookErr != nil {
+			return fmt.Errorf("macOS say command not found")
+		}
+	}
+	cmd := exec.Command(sayPath, word)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() {
+		_ = cmd.Wait()
+	}()
+	return nil
+}
+
 func (a *App) SuggestVocabEntry(entry memo.VocabEntry) (memo.VocabEntry, error) {
 	a.mu.RLock()
 	ai := a.activeAIConfig()

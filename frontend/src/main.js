@@ -120,6 +120,7 @@ const DeleteVocabEntry     = (id)                          => window['go']['main
 const ReviewVocabEntry     = (id, result)                  => window['go']['main']['App']['ReviewVocabEntry'](id, result);
 const LookupVocabWord      = (word)                        => window['go']['main']['App']['LookupVocabWord'](word);
 const SuggestVocabEntry    = (entry)                       => window['go']['main']['App']['SuggestVocabEntry'](entry);
+const SpeakVocabWord       = (word)                        => window['go']['main']['App']['SpeakVocabWord'](word);
 const GetMemoSettings      = ()                            => window['go']['main']['App']['GetMemoSettings']();
 const SaveMemoSettings     = (dir, days, auto)             => window['go']['main']['App']['SaveMemoSettings'](dir, days, auto);
 const CleanupMemoFiles     = ()                            => window['go']['main']['App']['CleanupMemoFiles']();
@@ -3399,10 +3400,23 @@ window.hatchApp = function () {
       }
     },
 
+    async speakVocabWord(entry) {
+      const word = (entry?.word || '').trim();
+      if (!word) { this.showError('英文单词不能为空'); return; }
+      try {
+        await SpeakVocabWord(word);
+      } catch (e) {
+        this.showError(`系统发音失败: ${e}`);
+      }
+    },
+
     playVocabAudio(entry) {
       const url = entry.audioUrl || entry.audioURL;
-      if (!url) { this.showError('这个单词还没有音频链接'); return; }
-      new Audio(url).play().catch(e => this.showError(`播放失败: ${e}`));
+      if (!url) {
+        this.speakVocabWord(entry);
+        return;
+      }
+      new Audio(url).play().catch(() => this.speakVocabWord(entry));
     },
 
     async reviewVocab(entry, result) {
