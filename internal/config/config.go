@@ -72,6 +72,14 @@ type DataRetention struct {
 	RunsKeepPerName int `json:"runsKeepPerName,omitempty"` // 0 → default (50)
 }
 
+// MemoSettings controls where memo attachments are copied and when Hatch may
+// clean up managed attachment files.
+type MemoSettings struct {
+	FilesDir    string `json:"filesDir,omitempty"`
+	RetainDays  int    `json:"retainDays,omitempty"`  // 0 → default (90)
+	AutoCleanup bool   `json:"autoCleanup,omitempty"` // false keeps records but skips file pruning
+}
+
 // AIProvider represents one named AI backend connection.
 type AIProvider struct {
 	ID      string `json:"id"`
@@ -198,6 +206,7 @@ type Config struct {
 	ActiveProviderID        string                `json:"activeProviderId,omitempty"`
 	PromptTemplates         map[string]string     `json:"promptTemplates,omitempty"`         // v1.2: op -> override system prompt
 	Retention               DataRetention         `json:"retention,omitempty"`               // v1.3+: data cleanup policy
+	Memo                    MemoSettings          `json:"memo,omitempty"`                    // v1.4+: memo attachment storage policy
 	VPNAppDir               string                `json:"vpnAppDir,omitempty"`               // Clash Verge Rev data dir (default: auto-detect)
 	VPNBackupDir            string                `json:"vpnBackupDir,omitempty"`            // VPN backup dir (default: Hatch/vpn-backups)
 	ClaudeCodePresets       []ClaudeCodePreset    `json:"claudeCodePresets,omitempty"`       // saved model+effort presets

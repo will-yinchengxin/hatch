@@ -68,6 +68,7 @@ hatch/
 ├── app_skills.go           # SKILL.md master store and sync
 ├── app_hooks.go            # Command hook registry, Claude/Codex hook sync, AI draft
 ├── app_mcp.go              # MCP registry, AI recommendations, local/git/npm install, Claude/Codex sync, connection test
+├── app_memo.go             # Memo/todo/vocab CRUD, reminders, attachments, retention
 ├── internal/               # config, scanner, executor, scheduler, autostart, store, zshrc
 └── frontend/               # Alpine templates, state, CSS, assets, generated wailsjs
 ```
@@ -80,6 +81,8 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 |---|---|
 | Config | `~/Library/Application Support/Hatch/config.json` |
 | Script cache | `~/Library/Application Support/Hatch/scripts.json` |
+| Memo store | `~/Library/Application Support/Hatch/memos.json` |
+| Memo attachments | `~/Library/Application Support/Hatch/memo-files/` by default |
 | AI traces | `~/Library/Application Support/Hatch/traces/<date>.jsonl` by default |
 | Run history | `~/Library/Application Support/Hatch/runs/<script>/<id>.{log,json}` |
 | Master skills | `~/Library/Application Support/Hatch/skills/` by default |
@@ -96,7 +99,7 @@ Never manually edit `frontend/wailsjs/**`; Wails regenerates it during `wails de
 | VPN config | Clash Verge Rev app dir, auto-detected unless configured |
 | VPN backups | `~/Library/Application Support/Hatch/vpn-backups/` by default |
 
-Retention is applied on startup and hourly: AI trace days, run-history days, and run-history per-script cap.
+Retention is applied on startup and hourly: AI trace days, run-history days, run-history per-script cap, and memo attachment days when memo auto-cleanup is enabled.
 
 ## Backend Rules
 
@@ -111,6 +114,8 @@ Retention is applied on startup and hourly: AI trace days, run-history days, and
 - MCP env values are stored as local plaintext config; sync writes global target config but Hatch does not keep MCP services running.
 - Hooks are `command`-type only (shared by Claude Code and Codex). One `HookDef` is authored once and synced to Claude (`~/.claude/settings.json` `hooks`) and/or Codex (`~/.codex/hooks.json`). Hatch-owned handlers carry a `hatchId` marker so sync updates/removes only its own entries and never touches hand-written hooks; first-time enable refuses to overwrite a matching hand-written hook. Codex-unsupported events (e.g. `Notification`, `SessionEnd`) are gated off for the Codex target.
 - AI workspace profiles are manually previewed and applied; they never auto-switch from the current directory. Application creates a snapshot and only removes Skills whose target content matches Hatch's master copy.
+- Memo reminders are in-process only: they fire while Hatch is running, emit `memo:reminder`, and use macOS banner/sound best-effort.
+- Memo local files are copied into the managed attachment directory before display/cleanup; retention deletes only managed files and leaves memo text records.
 
 ## Frontend Rules
 

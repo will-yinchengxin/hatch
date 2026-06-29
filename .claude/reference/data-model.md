@@ -42,6 +42,7 @@ type Config struct {
     DocLinks         []DocLink
     PromptTemplates  map[string]string
     Retention        DataRetention
+    Memo             MemoSettings
     VPNAppDir        string
     VPNBackupDir     string
     MCPDir           string
@@ -49,11 +50,71 @@ type Config struct {
     MCPSeeded        bool        // true after first MCP directory discovery
     Hooks            []HookDef
     HooksSeeded      bool        // true after the default hello-test hook is seeded once
+    AIWorkspaceProfiles    []AIWorkspaceProfile
+    LastAppliedWorkspaceID string
 }
 
 type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
+type MemoSettings   struct { FilesDir string; RetainDays int; AutoCleanup bool }
 type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceRetainDays int }
 ```
+
+## Memo Types
+
+Memo/todo/vocab data is stored outside `config.json` in `~/Library/Application Support/Hatch/memos.json`. Managed attachments default to `~/Library/Application Support/Hatch/memo-files/`.
+
+```go
+type MemoSettings struct {
+    FilesDir    string // default Hatch/memo-files
+    RetainDays  int    // 0 -> default 90
+    AutoCleanup bool   // when true, hourly retention prunes managed files
+}
+
+type MemoItem struct {
+    ID, Title, Body, Date, Status, Priority string
+    Tags                                   []string
+    ReminderAt, ReminderSentAt             int64
+    ReminderMode                           string // banner | sound | both
+    Attachments                            []MemoAttachment
+    CreatedAt, UpdatedAt                   int64
+}
+
+type MemoAttachment struct {
+    ID, Kind, Label string // kind: link | image | file
+    URL, SourcePath, ManagedPath, Mime string
+    Size, CreatedAt, CleanedAt int64
+}
+
+type VocabEntry struct {
+    ID, Word, Chinese, Phonetic, PartOfSpeech string
+    Collocations                              []Collocation
+    Example, AudioURL                         string
+    Tags                                      []string
+    ReviewLevel                               int
+    NextReviewAt, LastReviewedAt              int64
+    CreatedAt, UpdatedAt                      int64
+}
+```
+
+Memo retention deletes only files under the managed attachment directory and marks the attachment `CleanedAt`; it does not delete memo text records.
+
+## AI Workspace Profiles
+
+`AIWorkspaceProfile` is a manually applied project profile. It stores a name, absolute project root, Claude/Codex model settings (including Codex Goals), and target-specific `AgentResourceSelection` entries for Skills, MCP servers, and Hooks. It intentionally excludes raw config and credentials.
+
+```go
+type AgentResourceSelection struct { ID string; Claude, Codex bool }
+type AIWorkspaceProfile struct {
+    ID, Name, RootPath string
+    ClaudeModel, ClaudeEffort string
+    CodexModel, CodexEffort string
+    CodexGoals bool
+    Skills, MCPServers, Hooks []AgentResourceSelection
+    UpdatedAt int64
+}
+```
+
+Before application Hatch writes a private snapshot under `Hatch/ai-workspace-snapshots/`, retaining the latest 20. Snapshots contain affected target-file bytes and Skill directories and are used for rollback.
 
 ## MCP Types
 

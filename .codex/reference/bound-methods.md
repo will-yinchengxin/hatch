@@ -39,6 +39,10 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `GetClaudeCodePresets / SaveClaudeCodePreset / DeleteClaudeCodePreset` | Claude preset management |
 | `GetCodexPresets / SaveCodexPreset / DeleteCodexPreset` | Codex preset management |
 | `GetDocLinks / SaveDocLinks / OpenFile / ReadScriptFile / WriteScriptFile / CreateScriptFile` | File and doc-link operations |
+| `GetMemoDashboard / ListMemos / SaveMemo / DeleteMemo / MarkMemoDone` | Memo/todo dashboard and CRUD; reminders are rescheduled after saves |
+| `ImportMemoAttachment / DeleteMemoAttachment / OpenMemoAttachment / GetMemoAttachmentPreview` | Memo link/file/image attachment import, managed-file cleanup, opening, and image preview |
+| `ListVocabEntries / SaveVocabEntry / DeleteVocabEntry / ReviewVocabEntry / LookupVocabWord / SuggestVocabEntry` | Vocab CRUD, review scheduling, online DictionaryAPI lookup, and AI draft completion |
+| `GetMemoSettings / SaveMemoSettings / CleanupMemoFiles` | Memo attachment storage directory and retention policy |
 | `GetMCPSettings / SaveMCPSettings(mcpDir)` | Read/write MCP master dir (default `~/MyHub/mcp` if present); `SaveMCPSettings` creates the dir |
 | `ListMCPServers / SaveMCPServer / DeleteMCPServer / GetMCPTemplates` | MCP registry CRUD + built-in template gallery; first `ListMCPServers` seeds the registry from disk once (`MCPSeeded`) |
 | `SuggestMCPRecommendations(query)` | Return AI/offline MCP recommendation candidates and install notes; UI draft only |
@@ -67,5 +71,6 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `executor:status` | `{id, status}` | service running/stopped/error |
 | `ai:trace` | `AICallTrace` | Each AI call recorded |
 | `ai:stream` | `{id, chunk, done, error}` | Streaming suggest output |
+| `memo:reminder` | `MemoItem` | Memo reminder fires while Hatch is running |
 
 Executor event `id` is the script absolute path.

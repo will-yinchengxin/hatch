@@ -26,7 +26,7 @@
 - Run-history directories group by `filepath.Base(scriptPath)`, so same-name scripts in different dirs share a bucket.
 - Pre-scripts intentionally do not emit standalone events; they appear in the main script log.
 - `saveSkillContent()` auto-resyncs to enabled skill targets after master save.
-- `DeleteSkill()` is Hatch-local only; it removes the master store copy and must not remove `~/.claude/skills` or `~/.codex/skills`.
+- `DeleteSkill()` is Hatch-local only; it removes the master store copy and must not remove `~/.claude/skills` or `~/.claude/skills`.
 - `DeleteSkillEverywhere()` is the explicit destructive path for removing a skill from Hatch, Claude, and Codex.
 - Skill import uses content fingerprints for same-name skills; differing content returns UI conflicts and must not overwrite Hatch master until the user chooses a side.
 - MCP env values are stored in plaintext in `config.json`, like AI keys, and the MCP UI intentionally displays config values in plaintext for local review; do not log or screenshot secrets.
@@ -41,3 +41,7 @@
 - Codex hooks go in the dedicated `~/.codex/hooks.json` (Hatch-owned, merges around hand-written handlers), never inline `config.toml` `[hooks]` — that file is reserved for the MCP block and model/effort merges.
 - `SetHookEnabled` first-time enable refuses to overwrite a matching hand-written hook (event+matcher+command on a non-`hatchId` handler); re-syncing an already-enabled hook overwrites its own handler. Codex-unsupported events (`Notification`, `SessionEnd`) are rejected for the Codex target and greyed out in the UI.
 - `SaveHook()` is registry-only; the frontend `saveHook()` re-syncs already-enabled targets afterward (same pattern as `saveMCPForm`). `SuggestHookFromDescription()` is UI-draft only and must not persist.
+- AI workspace profiles are manually previewed before applying global Claude/Codex state; do not add automatic directory switching.
+- Memo reminders are not LaunchAgent/system reminders; they fire only while Hatch is running. Missed reminders surface as overdue on next load.
+- Memo attachment retention deletes only managed files inside the configured memo-files directory and leaves memo records intact.
+- macOS application icon changes require replacing `build/appicon.png`, running `make build`, and installing the rebuilt `Hatch.app`. An already-running process and its Dock item retain the old icon until Hatch is fully quit and relaunched; if needed, remove and re-add the Dock item.

@@ -39,6 +39,8 @@ Services:
 
 `ApplyAllSchedules()` rebuilds schedules on startup and after every `SaveScriptMeta`. The startup delay is intentional so the store has current script metadata.
 
+Memo reminders do not use `internal/scheduler`; `app_memo.go` owns one `time.Timer` per future memo reminder so `ApplyAllSchedules()` cannot remove memo jobs.
+
 ## zshrc
 
 Managed block:
@@ -118,12 +120,13 @@ First-time sync refuses to overwrite an existing same-name target MCP entry. Aft
 
 ## Data Retention And Backup
 
-`GetAppDataInventory()` reports config, store, traces, runs, skills, pids, and backups with size, file count, oldest/newest mtime, and cleanable flag.
+`GetAppDataInventory()` reports config, store, traces, runs, skills, memo attachments, pids, and backups with size, file count, oldest/newest mtime, and cleanable flag.
 
 `CleanupDataDir`:
 
 - `traces`: deletes all trace JSONL.
 - `runs`: deletes run `.log` and `.json` files.
+- `memo-files`: deletes expired managed memo attachments via `CleanupMemoFiles`.
 - `pids`: removes only stale PID files.
 
 Retention fields:
@@ -131,8 +134,19 @@ Retention fields:
 - `AI.TraceRetainDays`, default 3.
 - `Retention.RunsRetainDays`, default 14.
 - `Retention.RunsKeepPerName`, default 50.
+- `Memo.RetainDays`, default 90; applied only when `Memo.AutoCleanup` is true.
 
 `ExportBackup(targetDir)` zips `config.json`, `scripts.json`, and skills. `ImportBackup(zipPath)` overlays those files back into the current data locations and reloads memory config; app restart remains recommended.
+
+## Memo
+
+`app_memo.go` stores todos and vocab entries in `Hatch/memos.json` through `internal/memo.Store`. Managed attachments default to `Hatch/memo-files/`; URL attachments remain external links. `ImportMemoAttachment` copies local files into a month subdirectory and infers `image` vs `file` from MIME type when the UI passes `file`.
+
+Reminders are best-effort and in-process only. On startup, `ScheduleMemoReminders()` registers future, unfinished reminders. `SaveMemo` re-registers the item; `DeleteMemo` and `MarkMemoDone` remove or refresh its timer. Firing a reminder optionally runs `osascript beep`, sends a macOS notification through `sendMacNotification`, marks `ReminderSentAt`, and emits `memo:reminder`.
+
+`CleanupMemoFiles` removes only paths that are still inside the configured memo attachment directory. It marks the attachment `CleanedAt` and keeps the memo text record. `ApplyRetention` calls memo retention hourly and on startup when auto-cleanup is enabled.
+
+`LookupVocabWord` calls DictionaryAPI.dev at runtime and parses phonetic, audio URL, first part of speech, and a few definitions/examples. Tests use fixtures and do not depend on network. `SuggestVocabEntry` uses the active AI provider to return a JSON draft and never persists it automatically.
 
 ## Pre-Script Chain
 

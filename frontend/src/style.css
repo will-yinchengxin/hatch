@@ -6914,3 +6914,279 @@ details[open] .export-preview-toggle::before {
   .workspace-resource-row { grid-template-columns: 1fr auto; }
   .workspace-resource-row > span { grid-column: 1 / -1; }
 }
+
+/* ── Memo module ───────────────────────────────────────────────────── */
+.memo-main .settings-section { margin-bottom: 14px; }
+.memo-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+}
+.memo-form-main,
+.memo-form-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.memo-attachment-editor {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.memo-attachment-list,
+.memo-list,
+.vocab-list,
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.memo-attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.memo-attachment-icon { flex: 0 0 auto; font-size: 16px; }
+.memo-attachment-info {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.memo-attachment-label,
+.memo-attachment-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memo-attachment-label { font-size: 13px; font-weight: 600; }
+.memo-attachment-add,
+.memo-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+}
+.memo-kind-input { flex: 0 0 96px; }
+.memo-path-input { flex: 2 1 240px; }
+.memo-label-input { flex: 1 1 140px; }
+.memo-filter-select { flex: 0 0 120px; }
+.memo-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.memo-item.is-done {
+  border-left-color: var(--green);
+  opacity: 0.72;
+}
+.memo-check {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--green);
+  font-weight: 700;
+  line-height: 1;
+}
+.memo-item-body { min-width: 0; }
+.memo-item-title {
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.memo-item.is-done .memo-item-title { text-decoration: line-through; }
+.memo-item-text {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.memo-tags,
+.memo-item-meta,
+.memo-attachment-strip,
+.vocab-meta,
+.vocab-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.memo-tags { margin-top: 7px; }
+.memo-tag,
+.memo-priority,
+.memo-reminder {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.memo-priority.priority-high { color: var(--red); background: #f8e5dd; }
+.memo-priority.priority-low { color: var(--green); background: #e4ecdf; }
+.memo-item-meta {
+  justify-content: flex-end;
+  min-width: 120px;
+}
+.memo-attachment-strip { margin-top: 8px; }
+.memo-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.memo-attachment-chip span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memo-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  max-width: 420px;
+}
+.memo-image-thumb {
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.memo-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vocab-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.vocab-card,
+.review-card {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.vocab-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.vocab-word {
+  font-size: 19px;
+  letter-spacing: 0;
+}
+.vocab-meaning {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+.vocab-meta {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.vocab-collocations {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+}
+.vocab-collocation {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12px;
+}
+.vocab-collocation .muted {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+.review-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+}
+.memo-storage-form {
+  grid-template-columns: minmax(0, 1fr) 150px 180px auto;
+}
+.memo-storage-toggle {
+  align-self: end;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  margin: 0;
+  font-size: 13px;
+}
+
+@media (max-width: 820px) {
+  .memo-form-grid,
+  .vocab-form-grid,
+  .memo-storage-form {
+    grid-template-columns: 1fr;
+  }
+  .memo-attachment-add,
+  .memo-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .memo-kind-input,
+  .memo-path-input,
+  .memo-label-input,
+  .memo-filter-select {
+    flex-basis: auto;
+    width: 100%;
+  }
+  .memo-item {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .memo-item-meta {
+    grid-column: 2;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+  .vocab-collocation {
+    grid-template-columns: 1fr;
+  }
+  .vocab-collocation .muted {
+    grid-column: auto;
+  }
+}

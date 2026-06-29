@@ -8,6 +8,7 @@ import (
 
 	"hatch/internal/config"
 	"hatch/internal/executor"
+	"hatch/internal/memo"
 	"hatch/internal/scheduler"
 	"hatch/internal/store"
 
@@ -35,11 +36,16 @@ type App struct {
 	traceSeq int64
 
 	sched *scheduler.Scheduler // v1.2
+
+	memoStore  *memo.Store
+	memoTimers map[string]*time.Timer
+	memoMu     sync.Mutex
 }
 
 func NewApp() *App {
 	return &App{
-		services: make(map[string]*executor.ServiceManager),
+		services:   make(map[string]*executor.ServiceManager),
+		memoTimers: make(map[string]*time.Timer),
 	}
 }
 
@@ -58,8 +64,14 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.store = st
 
+	ms, err := memo.New(a.memoStorePath())
+	if err == nil {
+		a.memoStore = ms
+	}
+
 	a.restoreServices()
 	a.migrateAIProviders()
+	a.ScheduleMemoReminders()
 
 	go func() {
 		if dir, err := a.traceDir(); err == nil {

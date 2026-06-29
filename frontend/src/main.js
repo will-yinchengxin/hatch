@@ -105,6 +105,24 @@ const ApplyAIWorkspaceProfile = (id)                       => window['go']['main
 const ListAIWorkspaceSnapshots = ()                        => window['go']['main']['App']['ListAIWorkspaceSnapshots']();
 const RollbackAIWorkspaceSnapshot = (id)                   => window['go']['main']['App']['RollbackAIWorkspaceSnapshot'](id);
 const GetAIEnvironmentHealth = ()                          => window['go']['main']['App']['GetAIEnvironmentHealth']();
+const GetMemoDashboard     = ()                            => window['go']['main']['App']['GetMemoDashboard']();
+const ListMemos            = ()                            => window['go']['main']['App']['ListMemos']();
+const SaveMemo             = (item)                        => window['go']['main']['App']['SaveMemo'](item);
+const DeleteMemo           = (id)                          => window['go']['main']['App']['DeleteMemo'](id);
+const MarkMemoDone         = (id, done)                    => window['go']['main']['App']['MarkMemoDone'](id, done);
+const ImportMemoAttachment = (path, label, kind)           => window['go']['main']['App']['ImportMemoAttachment'](path, label, kind);
+const DeleteMemoAttachment = (memoID, attachmentID)        => window['go']['main']['App']['DeleteMemoAttachment'](memoID, attachmentID);
+const OpenMemoAttachment   = (att)                         => window['go']['main']['App']['OpenMemoAttachment'](att);
+const GetMemoAttachmentPreview = (att)                     => window['go']['main']['App']['GetMemoAttachmentPreview'](att);
+const ListVocabEntries     = ()                            => window['go']['main']['App']['ListVocabEntries']();
+const SaveVocabEntry       = (entry)                       => window['go']['main']['App']['SaveVocabEntry'](entry);
+const DeleteVocabEntry     = (id)                          => window['go']['main']['App']['DeleteVocabEntry'](id);
+const ReviewVocabEntry     = (id, result)                  => window['go']['main']['App']['ReviewVocabEntry'](id, result);
+const LookupVocabWord      = (word)                        => window['go']['main']['App']['LookupVocabWord'](word);
+const SuggestVocabEntry    = (entry)                       => window['go']['main']['App']['SuggestVocabEntry'](entry);
+const GetMemoSettings      = ()                            => window['go']['main']['App']['GetMemoSettings']();
+const SaveMemoSettings     = (dir, days, auto)             => window['go']['main']['App']['SaveMemoSettings'](dir, days, auto);
+const CleanupMemoFiles     = ()                            => window['go']['main']['App']['CleanupMemoFiles']();
 
 window.hatchApp = function () {
   return {
@@ -364,6 +382,30 @@ window.hatchApp = function () {
     vpnEnhanceData: null,
     vpnEnhanceLoading: false,
 
+    // Memo module
+    memoSubTab: 'today',      // 'today' | 'all' | 'words' | 'review' | 'storage'
+    memoDashboard: { today: 0, overdue: 0, reminders: 0, reviewDue: 0, totalMemos: 0, totalVocab: 0 },
+    memos: [],
+    memoSearch: '',
+    memoFilter: 'open',       // open | done | all
+    memoFormOpen: false,
+    memoEditingID: '',
+    memoForm: { title: '', body: '', date: '', priority: 'normal', tagsRaw: '', reminderLocal: '', reminderMode: 'both', attachments: [] },
+    memoAttachmentForm: { path: '', label: '', kind: 'file' },
+    memoSaving: false,
+    memoSettings: { filesDir: '', retainDays: 90, autoCleanup: true },
+    memoSettingsSaving: false,
+    memoPreviewCache: {},
+    vocabEntries: [],
+    vocabSearch: '',
+    vocabFormOpen: false,
+    vocabEditingID: '',
+    vocabForm: { word: '', chinese: '', phonetic: '', partOfSpeech: '', collocationsRaw: '', example: '', audioUrl: '', tagsRaw: '' },
+    vocabLookupBusy: false,
+    vocabAIBusy: false,
+    vocabSaving: false,
+    reviewReveal: {},
+
     // Workspace-settings accordion state
     wsShellOpen: false,
     wsDirsOpen: true,
@@ -417,6 +459,37 @@ window.hatchApp = function () {
         (s.tags || []).some(t => t.toLowerCase().includes(q)) ||
         (s.commands || []).some(c => c.toLowerCase().includes(q))
       );
+    },
+
+    get todayMemos() {
+      const today = this.todayDate();
+      return this.memos
+        .filter(m => m.date === today && m.status !== 'done')
+        .sort((a, b) => (a.reminderAt || 0) - (b.reminderAt || 0));
+    },
+
+    get filteredMemos() {
+      const q = (this.memoSearch || '').trim().toLowerCase();
+      return this.memos.filter(m => {
+        if (this.memoFilter === 'open' && m.status === 'done') return false;
+        if (this.memoFilter === 'done' && m.status !== 'done') return false;
+        if (!q) return true;
+        return [m.title, m.body, ...(m.tags || [])].some(v => (v || '').toLowerCase().includes(q));
+      });
+    },
+
+    get filteredVocabEntries() {
+      const q = (this.vocabSearch || '').trim().toLowerCase();
+      if (!q) return this.vocabEntries;
+      return this.vocabEntries.filter(v =>
+        [v.word, v.chinese, v.phonetic, v.partOfSpeech, v.example, ...(v.tags || [])]
+          .some(x => (x || '').toLowerCase().includes(q))
+      );
+    },
+
+    get reviewDueEntries() {
+      const now = Math.floor(Date.now() / 1000);
+      return this.vocabEntries.filter(v => !v.nextReviewAt || v.nextReviewAt <= now);
     },
 
     get totalPages() {
@@ -510,6 +583,7 @@ window.hatchApp = function () {
       if (this.tab === 'ai' && this.aiSubTab === 'skills') this.loadSkills();
       if (this.tab === 'ai' && this.aiSubTab === 'workspace') this.loadWorkspace();
       if (this.tab === 'ai' && this.aiSubTab === 'overview') this.loadOverview();
+      if (this.tab === 'memo') this.loadMemoModule();
       this.setupEvents();
       this.setupSearchShortcuts();
       setInterval(() => this.refreshStatuses(), 3000);
@@ -519,11 +593,18 @@ window.hatchApp = function () {
     applyInitialRoute() {
       const params = new URLSearchParams(window.location.search || '');
       const ai = params.get('aiSubTab') || params.get('ai');
+      const memo = params.get('memoSubTab') || params.get('memo');
       const allowedAI = ['overview', 'connect', 'tools', 'workspace', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
+      const allowedMemo = ['today', 'all', 'words', 'review', 'storage'];
       if (allowedAI.includes(ai)) {
         this.tab = 'ai';
         this.selectedDir = null;
         this.aiSubTab = ai;
+      }
+      if (allowedMemo.includes(memo)) {
+        this.tab = 'memo';
+        this.selectedDir = null;
+        this.memoSubTab = memo;
       }
       if (this.aiSubTab === 'mcp' && (params.get('mcpManual') === '1' || params.get('mcpManual') === 'true')) {
         this.mcpManualOpen = true;
@@ -678,9 +759,14 @@ window.hatchApp = function () {
 
     // ── Events ─────────────────────────────────────────────────────────
     setupEvents() {
-      EventsOff('executor:log', 'executor:done', 'executor:status', 'ai:trace');
+      EventsOff('executor:log', 'executor:done', 'executor:status', 'ai:trace', 'memo:reminder');
       EventsOn('ai:trace', (trace) => {
         this.aiTraces = [trace, ...this.aiTraces].slice(0, 50);
+      });
+
+      EventsOn('memo:reminder', (item) => {
+        this.showSuccess(`备忘提醒：${item.title || '待办事项'}`);
+        this.loadMemoModule();
       });
 
       EventsOn('executor:log', (ev) => {
@@ -2999,6 +3085,359 @@ window.hatchApp = function () {
       return '📎';
     },
 
+    // ── Memo module ────────────────────────────────────────────────────────
+    async loadMemoModule() {
+      try {
+        const [dash, memos, vocab, settings] = await Promise.all([
+          GetMemoDashboard(),
+          ListMemos(),
+          ListVocabEntries(),
+          GetMemoSettings(),
+        ]);
+        this.memoDashboard = dash || this.memoDashboard;
+        this.memos = memos || [];
+        this.vocabEntries = vocab || [];
+        this.memoSettings = settings || this.memoSettings;
+        this.loadMemoImagePreviews();
+      } catch (e) {
+        this.showError(`加载备忘录失败: ${e}`);
+      }
+    },
+
+    todayDate() {
+      const d = new Date();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${mm}-${dd}`;
+    },
+
+    unixToLocalInput(unix) {
+      if (!unix) return '';
+      const d = new Date(unix * 1000);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    },
+
+    localInputToUnix(value) {
+      if (!value) return 0;
+      const ts = new Date(value).getTime();
+      return Number.isFinite(ts) ? Math.floor(ts / 1000) : 0;
+    },
+
+    parseTags(raw) {
+      return (raw || '').split(/[,，\s]+/).map(s => s.trim()).filter(Boolean);
+    },
+
+    tagsRaw(tags) {
+      return (tags || []).join(', ');
+    },
+
+    openNewMemo() {
+      this.memoEditingID = '';
+      this.memoFormOpen = true;
+      this.memoForm = {
+        title: '',
+        body: '',
+        date: this.todayDate(),
+        priority: 'normal',
+        tagsRaw: '',
+        reminderLocal: '',
+        reminderMode: 'both',
+        attachments: [],
+      };
+      this.memoAttachmentForm = { path: '', label: '', kind: 'file' };
+    },
+
+    editMemo(item) {
+      this.memoEditingID = item.id;
+      this.memoFormOpen = true;
+      this.memoForm = {
+        title: item.title || '',
+        body: item.body || '',
+        date: item.date || this.todayDate(),
+        priority: item.priority || 'normal',
+        tagsRaw: this.tagsRaw(item.tags),
+        reminderLocal: this.unixToLocalInput(item.reminderAt),
+        reminderMode: item.reminderMode || 'both',
+        attachments: [...(item.attachments || [])],
+      };
+      this.memoAttachmentForm = { path: '', label: '', kind: 'file' };
+    },
+
+    memoPayloadFromForm() {
+      const existing = this.memos.find(m => m.id === this.memoEditingID) || {};
+      return {
+        ...existing,
+        id: this.memoEditingID || existing.id || '',
+        title: this.memoForm.title,
+        body: this.memoForm.body,
+        date: this.memoForm.date || this.todayDate(),
+        priority: this.memoForm.priority || 'normal',
+        tags: this.parseTags(this.memoForm.tagsRaw),
+        reminderAt: this.localInputToUnix(this.memoForm.reminderLocal),
+        reminderMode: this.memoForm.reminderMode || 'both',
+        attachments: this.memoForm.attachments || [],
+        status: existing.status || 'todo',
+      };
+    },
+
+    async saveMemoForm() {
+      if (!this.memoForm.title.trim()) { this.showError('请填写待办标题'); return; }
+      this.memoSaving = true;
+      try {
+        const saved = await SaveMemo(this.memoPayloadFromForm());
+        const idx = this.memos.findIndex(m => m.id === saved.id);
+        if (idx >= 0) this.memos.splice(idx, 1, saved);
+        else this.memos = [saved, ...this.memos];
+        this.memoFormOpen = false;
+        this.memoEditingID = '';
+        await this.loadMemoModule();
+        this.showSuccess('备忘录已保存');
+      } catch (e) {
+        this.showError(`保存备忘录失败: ${e}`);
+      } finally {
+        this.memoSaving = false;
+      }
+    },
+
+    async toggleMemoDone(item) {
+      try {
+        await MarkMemoDone(item.id, item.status !== 'done');
+        await this.loadMemoModule();
+      } catch (e) {
+        this.showError(`更新状态失败: ${e}`);
+      }
+    },
+
+    async deleteMemoItem(item) {
+      if (!confirm(`删除「${item.title}」及其托管附件？此操作不可撤销。`)) return;
+      try {
+        await DeleteMemo(item.id);
+        await this.loadMemoModule();
+        this.showSuccess('备忘录已删除');
+      } catch (e) {
+        this.showError(`删除备忘录失败: ${e}`);
+      }
+    },
+
+    async addMemoAttachment() {
+      const path = (this.memoAttachmentForm.path || '').trim();
+      if (!path) return;
+      try {
+        const att = await ImportMemoAttachment(path, this.memoAttachmentForm.label || '', this.memoAttachmentForm.kind || 'file');
+        this.memoForm.attachments = [...(this.memoForm.attachments || []), att];
+        this.memoAttachmentForm = { path: '', label: '', kind: 'file' };
+        if (att.kind === 'image') this.loadMemoImagePreviews();
+      } catch (e) {
+        this.showError(`添加附件失败: ${e}`);
+      }
+    },
+
+    async removeMemoAttachment(att) {
+      if (this.memoEditingID) {
+        try {
+          const saved = await DeleteMemoAttachment(this.memoEditingID, att.id);
+          this.memoForm.attachments = saved.attachments || [];
+          await this.loadMemoModule();
+          return;
+        } catch (e) {
+          this.showError(`删除附件失败: ${e}`);
+          return;
+        }
+      }
+      this.memoForm.attachments = (this.memoForm.attachments || []).filter(a => a.id !== att.id);
+    },
+
+    async openMemoAttachment(att) {
+      try {
+        await OpenMemoAttachment(att);
+      } catch (e) {
+        this.showError(`打开附件失败: ${e}`);
+      }
+    },
+
+    async loadMemoImagePreviews() {
+      const images = [];
+      for (const m of this.memos || []) {
+        for (const a of (m.attachments || [])) if (a.kind === 'image' && !this.memoPreviewCache[a.id]) images.push(a);
+      }
+      for (const a of images.slice(0, 20)) {
+        try {
+          const p = await GetMemoAttachmentPreview(a);
+          if (p?.dataUrl) this.memoPreviewCache = { ...this.memoPreviewCache, [a.id]: p.dataUrl };
+        } catch (_) {}
+      }
+    },
+
+    attachmentIcon(att) {
+      if (att.kind === 'link') return '🔗';
+      if (att.kind === 'image') return '🖼';
+      return '📄';
+    },
+
+    reminderLabel(item) {
+      if (!item.reminderAt) return '';
+      const when = this.formatTime(item.reminderAt);
+      if (item.status !== 'done' && item.reminderAt < Math.floor(Date.now() / 1000)) return `已过期 · ${when}`;
+      return when;
+    },
+
+    openNewVocab() {
+      this.vocabEditingID = '';
+      this.vocabFormOpen = true;
+      this.vocabForm = { word: '', chinese: '', phonetic: '', partOfSpeech: '', collocationsRaw: '', example: '', audioUrl: '', tagsRaw: '' };
+    },
+
+    editVocab(entry) {
+      this.vocabEditingID = entry.id;
+      this.vocabFormOpen = true;
+      this.vocabForm = {
+        word: entry.word || '',
+        chinese: entry.chinese || '',
+        phonetic: entry.phonetic || '',
+        partOfSpeech: entry.partOfSpeech || '',
+        collocationsRaw: this.collocationsToRaw(entry.collocations || []),
+        example: entry.example || '',
+        audioUrl: entry.audioUrl || '',
+        tagsRaw: this.tagsRaw(entry.tags),
+      };
+    },
+
+    collocationsToRaw(list) {
+      return (list || []).map(c => [c.pattern, c.meaning, c.example].filter(Boolean).join(' | ')).join('\n');
+    },
+
+    parseCollocations(raw) {
+      return (raw || '').split('\n').map(line => {
+        const parts = line.split('|').map(s => s.trim());
+        return { pattern: parts[0] || '', meaning: parts[1] || '', example: parts[2] || '' };
+      }).filter(c => c.pattern || c.meaning || c.example);
+    },
+
+    vocabPayloadFromForm() {
+      const existing = this.vocabEntries.find(v => v.id === this.vocabEditingID) || {};
+      return {
+        ...existing,
+        id: this.vocabEditingID || existing.id || '',
+        word: this.vocabForm.word,
+        chinese: this.vocabForm.chinese,
+        phonetic: this.vocabForm.phonetic,
+        partOfSpeech: this.vocabForm.partOfSpeech,
+        collocations: this.parseCollocations(this.vocabForm.collocationsRaw),
+        example: this.vocabForm.example,
+        audioUrl: this.vocabForm.audioUrl,
+        tags: this.parseTags(this.vocabForm.tagsRaw),
+      };
+    },
+
+    async lookupVocab() {
+      const word = (this.vocabForm.word || '').trim();
+      if (!word) { this.showError('请先填写英文单词'); return; }
+      this.vocabLookupBusy = true;
+      try {
+        const r = await LookupVocabWord(word);
+        this.vocabForm.word = r.word || word;
+        this.vocabForm.phonetic = r.phonetic || this.vocabForm.phonetic;
+        this.vocabForm.partOfSpeech = r.partOfSpeech || this.vocabForm.partOfSpeech;
+        this.vocabForm.audioUrl = r.audioUrl || this.vocabForm.audioUrl;
+        if (!this.vocabForm.collocationsRaw && r.collocations?.length) this.vocabForm.collocationsRaw = this.collocationsToRaw(r.collocations);
+        this.showSuccess('词典信息已填入草稿');
+      } catch (e) {
+        this.showError(`词典查询失败: ${e}`);
+      } finally {
+        this.vocabLookupBusy = false;
+      }
+    },
+
+    async suggestVocab() {
+      if (!this.vocabForm.word.trim()) { this.showError('请先填写英文单词'); return; }
+      this.vocabAIBusy = true;
+      try {
+        const r = await SuggestVocabEntry(this.vocabPayloadFromForm());
+        this.vocabForm = {
+          ...this.vocabForm,
+          word: r.word || this.vocabForm.word,
+          chinese: r.chinese || this.vocabForm.chinese,
+          phonetic: r.phonetic || this.vocabForm.phonetic,
+          partOfSpeech: r.partOfSpeech || this.vocabForm.partOfSpeech,
+          collocationsRaw: this.collocationsToRaw(r.collocations || this.parseCollocations(this.vocabForm.collocationsRaw)),
+          example: r.example || this.vocabForm.example,
+          audioUrl: r.audioUrl || this.vocabForm.audioUrl,
+        };
+        this.showSuccess('AI 已补全单词草稿');
+      } catch (e) {
+        this.showError(`AI 补全失败: ${e}`);
+      } finally {
+        this.vocabAIBusy = false;
+      }
+    },
+
+    async saveVocabForm() {
+      if (!this.vocabForm.word.trim()) { this.showError('请填写英文单词'); return; }
+      this.vocabSaving = true;
+      try {
+        await SaveVocabEntry(this.vocabPayloadFromForm());
+        this.vocabFormOpen = false;
+        this.vocabEditingID = '';
+        await this.loadMemoModule();
+        this.showSuccess('单词已保存');
+      } catch (e) {
+        this.showError(`保存单词失败: ${e}`);
+      } finally {
+        this.vocabSaving = false;
+      }
+    },
+
+    async deleteVocab(entry) {
+      if (!confirm(`删除单词「${entry.word}」？`)) return;
+      try {
+        await DeleteVocabEntry(entry.id);
+        await this.loadMemoModule();
+        this.showSuccess('单词已删除');
+      } catch (e) {
+        this.showError(`删除单词失败: ${e}`);
+      }
+    },
+
+    playVocabAudio(entry) {
+      const url = entry.audioUrl || entry.audioURL;
+      if (!url) { this.showError('这个单词还没有音频链接'); return; }
+      new Audio(url).play().catch(e => this.showError(`播放失败: ${e}`));
+    },
+
+    async reviewVocab(entry, result) {
+      try {
+        await ReviewVocabEntry(entry.id, result);
+        this.reviewReveal = { ...this.reviewReveal, [entry.id]: false };
+        await this.loadMemoModule();
+      } catch (e) {
+        this.showError(`保存复盘结果失败: ${e}`);
+      }
+    },
+
+    async saveMemoSettingsForm() {
+      this.memoSettingsSaving = true;
+      try {
+        await SaveMemoSettings(this.memoSettings.filesDir, this.memoSettings.retainDays | 0, !!this.memoSettings.autoCleanup);
+        await this.loadMemoModule();
+        this.showSuccess('备忘录存储设置已保存');
+      } catch (e) {
+        this.showError(`保存存储设置失败: ${e}`);
+      } finally {
+        this.memoSettingsSaving = false;
+      }
+    },
+
+    async cleanupMemoFilesNow() {
+      try {
+        const n = await CleanupMemoFiles();
+        await this.loadMemoModule();
+        this.showSuccess(`已清理 ${n || 0} 个附件文件`);
+      } catch (e) {
+        this.showError(`清理附件失败: ${e}`);
+      }
+    },
+
     // ── Global search / replace ────────────────────────────────────────────
     setupSearchShortcuts() {
       window.addEventListener('keydown', (e) => {
@@ -3166,6 +3605,8 @@ window.hatchApp = function () {
         this.selectedDir ? this.scanDir(this.selectedDir) : this.scanAll();
       } else if (this.tab === 'vpn') {
         this.refreshVPNStatus();
+      } else if (this.tab === 'memo') {
+        this.loadMemoModule();
       } else if (this.tab === 'ai') {
         this.loadAIUsageStatuses();
         this.loadAITraces();

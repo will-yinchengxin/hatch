@@ -1,7 +1,7 @@
 ---
 name: hatch-docs-update
 version: 1.1.0
-description: "更新 Hatch 项目文档。当新功能、重构、配置字段、Wails API、前端状态或已知坑变化时，同步 CLAUDE.md、.claude docs/reference 和 Hatch skills。"
+description: "更新 Hatch 项目文档。当新功能、重构、配置字段、Wails API、前端状态或已知坑变化时，同步 CLAUDE.md、.claude/reference 和 Hatch skills。"
 ---
 
 # Hatch 文档更新工作流
@@ -11,14 +11,14 @@ description: "更新 Hatch 项目文档。当新功能、重构、配置字段�
 ## 文档结构
 
 ```text
-CLAUDE.md                                  # Claude Code 主参考，保持同步
-.claude/reference/data-model.md            # Config / ScriptMeta / VPN 类型
-.claude/reference/bound-methods.md         # Wails methods + events
-.claude/docs/frontend.md                   # Alpine state, layout, CSS conventions
-.claude/docs/internals.md                  # scanner/executor/scheduler/zshrc/AI/data/VPN
-.claude/docs/gotchas.md                    # 非显而易见的坑
-.claude/skills/hatch-frontend/SKILL.md     # 前端修改前必读 workflow
-.claude/skills/hatch-docs-update/SKILL.md  # 本 workflow
+CLAUDE.md                                  # Claude Code 主参考，精简规则 + 路由
+.claude/reference/data-model.md             # Config / ScriptMeta / VPN 类型
+.claude/reference/bound-methods.md          # Wails methods + events
+.claude/docs/frontend.md                    # Alpine state, layout, CSS conventions
+.claude/docs/internals.md                   # scanner/executor/scheduler/zshrc/AI/data/VPN
+.claude/docs/gotchas.md                     # 非显而易见的坑
+.claude/skills/hatch-frontend/SKILL.md      # 前端修改前必读 workflow
+.claude/skills/hatch-docs-update/SKILL.md   # 本 workflow
 ```
 
 ## 分析变更

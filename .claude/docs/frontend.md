@@ -5,15 +5,17 @@ Use this with `.claude/skills/hatch-frontend/SKILL.md` before editing `frontend/
 ## Alpine State Machine
 
 ```text
-tab = 'scripts' | 'ai' | 'vpn'
+tab = 'scripts' | 'ai' | 'vpn' | 'memo'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'tools' | 'workspace' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
+memoSubTab = 'today' | 'all' | 'words' | 'review' | 'storage'
 
 scripts + !selectedDir  -> directory cards + workspace-settings accordion
 scripts + selectedDir   -> script list
 ai                      -> AI sidebar layout
 vpn                     -> VPN sidebar layout
+memo                    -> Memo sidebar layout
 editTarget != null      -> edit drawer overlay
 ```
 
@@ -34,6 +36,7 @@ editTarget != null      -> edit drawer overlay
 | `mcpForm / mcpSyncBusy / mcpTestBusy / mcpImportBusy / mcpManualOpen` | MCP editor, target sync, connection checks, separated source-install state, and operation-manual modal |
 | `mcpRecommendQuery / mcpRecommendBusy / mcpRecommendation / mcpSelectedRecommendationID` | MCP AI recommendation panel and selected draft candidate |
 | `hooks / hooksStats / hooksSearch / hooksFilter / filteredHooks` | Hook list and filter UI |
+| `workspaceProfiles / workspaceSnapshots / workspaceHealth / workspacePreview` | AI workspace profiles, rollback inventory, diagnostics, and apply preview |
 | `hookEventSupport / hookForm / hookEditOpen / hookEditIsNew / hookSaving` | Hook event catalog + edit form state |
 | `hookSyncBusy / hookTemplates / hookTemplateGalleryOpen / hookSuggestDesc / hookSuggestBusy` | Hook sync busy keys, template gallery, header AI draft bar |
 | `hookAIInstruction / hookAIBusy` | In-editor AI optimize bar for refining an existing hook |
@@ -46,6 +49,8 @@ editTarget != null      -> edit drawer overlay
 | `vpnStatus / vpnCurrentIP / vpnHealthReport / vpnPathValidation` | VPN live status, exit IP, ordinary-user health report, and directory validation |
 | `vpnProfiles / vpnCurrentProfile / vpnEnhanceData / vpnProfileEditing` | VPN profile, enhance, and advanced edit state |
 | `vpnBackups / vpnBackupPreview / vpnSettingsForm / vpnExternalZipPath` | VPN backup/restore preview, settings, and external zip restore state |
+| `memoDashboard / memos / memoSubTab / memoForm / memoSettings` | Memo/todo dashboard, CRUD form, attachment storage settings |
+| `vocabEntries / vocabForm / reviewReveal` | Vocab CRUD, DictionaryAPI/AI draft form, and review reveal state |
 | `success / successTimer / error` | Toasts |
 
 Call `showSuccess()` after write operations. `showError()` is for failures.
@@ -73,19 +78,19 @@ Core tokens:
 
 ## Layout
 
-- Sticky 52px header: logo, tab nav (segmented control — `.tab-nav` is a single rounded container; `.tab.active` is a charcoal fill with a soft shadow; all three tabs carry an icon), tab-aware refresh button (`headerRefresh()` dispatches per `tab`), quick-AI provider button (tooltip shows active provider name + baseUrl), VPN status pill (`vpnPillTitle()` tooltip surfaces system-proxy/TUN/exit-IP), autostart toggle.
+- Sticky 52px header: logo, tab nav (segmented control — `.tab-nav` is a single rounded container; `.tab.active` is a charcoal fill with a soft shadow; top-level tabs carry an icon), tab-aware refresh button (`headerRefresh()` dispatches per `tab`), quick-AI provider button (tooltip shows active provider name + baseUrl), VPN status pill (`vpnPillTitle()` tooltip surfaces system-proxy/TUN/exit-IP), autostart toggle.
 - Content max-width 1080px, centered, `padding: 24px 22px 44px`.
 - `page-hero` bands use eyebrow, h1, subtitle, and stat cards.
 - AI hero stat cards show AI status, active/default model, Skills, MCP, and Hooks; MCP/Hooks reuse existing overview state and responsive grid rules.
 - Responsive breakpoint: 820px. Cards/forms become single column; edit drawer becomes full width.
-- AI and VPN use the same left-sidebar layout: `.ai-layout`, `.ai-sidenav`, `.ai-content`.
+- AI, VPN, and Memo use the same left-sidebar layout: `.ai-layout`, `.ai-sidenav`, `.ai-content`.
 
 ## Feature Surfaces
 
 - Script cards: accent border by type, language/name badges, AI fill, edit, log toggle, tags, service chips, preset buttons, footer controls, dark log panel.
 - Edit drawer: all per-script behavior lives here, including env pairs, notify, schedule, requires, health URL, and pre-scripts.
 - Workspace settings: scripts home accordion with shell/data paths, directories, exports, zshrc parser.
-- AI sidebar order: 概览 → 连接 → 助手（🤖, `aiSubTab==='tools'`）→ Skills → MCP → Hooks → 文档 → 提示词（`aiSubTab==='prompts'`）→ 数据。The "助手" tab (formerly 工具) covers Claude Code + Codex agent status and config. The "提示词" tab (formerly Prompt) covers system prompt overrides.
+- AI sidebar order: 概览 → 连接 → 助手（🤖, `aiSubTab==='tools'`）→ 工作区 → Skills → MCP → Hooks → 文档 → 提示词（`aiSubTab==='prompts'`）→ 数据。工作区画像保存项目根目录与双端模型/工具组合，必须预览后手动应用；页面显示脱敏变更、环境体检和可回滚快照。
 - AI: overview, connect/providers/traces, 助手/agent-status, skills, MCP, hooks, docs, 提示词/system-prompts, data/retention. Skills import can surface same-name content conflicts for Hatch-vs-source selection. MCP starts with a double-click operation manual, includes an AI recommendation panel for choosing a server/install method, separates local/Git/npm acquisition from Claude Code/Codex sync, shows MCP config values in plaintext for review, writes global target config, and shows CLI test results. Docs (`aiSubTab==='docs'`) is a first-class sidebar tab for local document quick links (`docLinks`), at the same level as MCP/Hooks; the overview dashboard has a Docs card showing `docLinks.length` that navigates to it. Model shortcut panels share the `agent-*` config layout classes; both Claude Code and Codex show aligned recommended-combo chips (`.cc-rec-presets` / `.cc-rec-chip`) before saved presets; the Codex Goals toggle sits in the shared action row.
   - Overview is a live dashboard (`.ai-dashboard-grid` / `.ai-dash-card`): active provider, Claude/Codex install+usage, skills counts, MCP enabled/failed counts, hooks counts (total + Claude/Codex enabled), and recent trace errors, each clickable to its subtab. `loadOverview()` aggregates already-bound status methods (including `GetHooksStats`) and is called on the overview sidenav button and from `init()`.
   - Bulk actions (`.bulk-action-bar`) on skills and MCP: `bulkSkillSync` / `bulkSkillUnsyncAll` / `bulkMCPEnable` / `bulkTestMCP` iterate `filteredSkills` / `filteredMCPServers` serially.
@@ -95,6 +100,7 @@ Core tokens:
   - `duplicateProvider(p)` opens the provider editor prefilled (baseUrl/model, blank apiKey, "副本" name).
   - Hooks (`aiSubTab==='hooks'`, `.ai-hooks-section`): registry of `command` hooks. Each `.hook-item` shows event badge + matcher + command preview and two `.skill-sync-toggle` switches (Claude/Codex); a switch gets `.sync-disabled` when `hookEventSupports(h.event, target)` is false. Editing uses a form (`.hook-editor-panel` / `.hook-form-grid`), not a markdown editor. The editor has an inline AI bar (`.se-ai-bar`, `hookAIInstruction` / `hookAIBusy`): `optimizeHookWithAI()` sends the current form via `SuggestHookEdit` to refine the existing hook in place. `📦 模板库` opens `.hook-modal` from `hookTemplates`; the header `✦ AI 起草` calls `suggestHook()` (`SuggestHookFromDescription`) to prefill a new hook. `toggleHookSync` updates the row in place and refreshes `hooksStats`; `saveHook` re-syncs already-enabled targets after `SaveHook`.
 - VPN: overview is a health/diagnostic dashboard for ordinary users; TUN excluded CIDRs are visible directly in a compact hero-card list; backup restore previews zip contents and creates a pre-restore backup; raw config/profile editors are labeled as advanced tools; enhance view explains rules/hosts/DNS overrides.
+- Memo (`tab==='memo'`, `.memo-main`): top-level productivity module with sub-tabs 今日、全部、单词、复盘、存储. It uses `GetMemoDashboard`, `ListMemos`, `ListVocabEntries`, and `GetMemoSettings` through dynamic Wails calls. Local image/file attachments are imported into Hatch's managed memo-files directory before display; URL attachments remain links. Image previews use `GetMemoAttachmentPreview` and a local `memoPreviewCache`. `memo:reminder` is registered in `setupEvents()` after `EventsOff` and refreshes the module. Vocab lookup uses `LookupVocabWord`; `SuggestVocabEntry` is an AI draft only and must not auto-save.
 
 ## CSS And Alpine Pitfalls
 
@@ -106,6 +112,7 @@ Core tokens:
 - Recommended-combo chips: `.cc-rec-presets` wrapper (surface-0 background, shared by Claude Code and Codex via `codex-rec-presets` modifier), `.cc-rec-list` flex row, `.cc-rec-chip` pill button with hover clay/shadow; `.cc-rec-chip-fable` adds purple tint for Fable 5; `codex-rec-chip-max` adds cyan tint for GPT-5.3 Codex.
 - Doc Links section (`doc-links-section`) moved from AI > Tools to AI > Docs; `margin-top: 0` (was `16px`).
 - `setupEvents()` must call `EventsOff` before `EventsOn` to avoid HMR duplicates.
+- When adding Wails events, include them in the same `EventsOff(...)` call; Memo currently listens to `memo:reminder`.
 - Nested Alpine `x-for` preset clicks should use inline handlers:
 
 ```html

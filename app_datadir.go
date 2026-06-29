@@ -19,14 +19,14 @@ import (
 
 // DataDirEntry describes one user-data location managed by Hatch.
 type DataDirEntry struct {
-	Key         string `json:"key"`         // stable id: config / traces / runs / skills / pids / backups
-	Label       string `json:"label"`       // human-readable
-	Path        string `json:"path"`        // absolute path
+	Key         string `json:"key"`   // stable id: config / traces / runs / skills / pids / backups
+	Label       string `json:"label"` // human-readable
+	Path        string `json:"path"`  // absolute path
 	Exists      bool   `json:"exists"`
 	IsDir       bool   `json:"isDir"`
 	TotalBytes  int64  `json:"totalBytes"`
 	FileCount   int    `json:"fileCount"`
-	OldestUnix  int64  `json:"oldestUnix"`  // mtime of oldest file (0 if none)
+	OldestUnix  int64  `json:"oldestUnix"` // mtime of oldest file (0 if none)
 	NewestUnix  int64  `json:"newestUnix"`
 	Cleanable   bool   `json:"cleanable"`   // whether CleanupDataDir(key) does something
 	Description string `json:"description"` // what's stored here
@@ -76,6 +76,13 @@ func (a *App) GetAppDataInventory() []DataDirEntry {
 			Path:        paths.SkillsDir,
 			Cleanable:   false,
 			Description: "Hatch 维护的 SKILL.md 主仓库。同步到 ~/.claude/skills 和 ~/.codex/skills。",
+		},
+		{
+			Key:         "memo-files",
+			Label:       "备忘录附件",
+			Path:        a.memoFilesDir(),
+			Cleanable:   true,
+			Description: "备忘录托管的图片和文件附件。受 Memo.retainDays / autoCleanup 限制。",
 		},
 		{
 			Key:         "pids",
@@ -139,9 +146,11 @@ func statEntry(e *DataDirEntry) {
 }
 
 // CleanupDataDir cleans up generated data by key.
-//   key="traces"  → delete all .jsonl in traces dir
-//   key="runs"    → delete all .log/.json in runs subdirs
-//   key="pids"    → delete stale (process-dead) /tmp/hatch/*.pid files
+//
+//	key="traces"  → delete all .jsonl in traces dir
+//	key="runs"    → delete all .log/.json in runs subdirs
+//	key="pids"    → delete stale (process-dead) /tmp/hatch/*.pid files
+//
 // Returns a short summary.
 func (a *App) CleanupDataDir(key string) (string, error) {
 	switch key {
@@ -187,6 +196,12 @@ func (a *App) CleanupDataDir(key string) (string, error) {
 			}
 		}
 		return fmt.Sprintf("Stale PID 文件已清理 %d 个。", removed), nil
+	case "memo-files":
+		count, err := a.CleanupMemoFiles()
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("备忘录附件已清理 %d 个文件。", count), nil
 	default:
 		return "", fmt.Errorf("不支持的清理目标: %s", key)
 	}
@@ -218,9 +233,9 @@ func pidAlive(pidStr string) bool {
 
 // GetRetentionPolicy returns the current effective retention settings.
 type RetentionView struct {
-	TraceRetainDays  int `json:"traceRetainDays"`
-	RunsRetainDays   int `json:"runsRetainDays"`
-	RunsKeepPerName  int `json:"runsKeepPerName"`
+	TraceRetainDays int `json:"traceRetainDays"`
+	RunsRetainDays  int `json:"runsRetainDays"`
+	RunsKeepPerName int `json:"runsKeepPerName"`
 }
 
 func (a *App) GetRetentionPolicy() RetentionView {
@@ -267,6 +282,7 @@ func (a *App) ApplyRetention() {
 	}
 	executor.PruneHistoryOlderThan(v.RunsRetainDays)
 	executor.PruneAllHistory(v.RunsKeepPerName)
+	a.applyMemoRetention()
 }
 
 // ─── Skill AI optimization ───────────────────────────────────────────────────

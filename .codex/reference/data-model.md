@@ -42,6 +42,7 @@ type Config struct {
     DocLinks         []DocLink
     PromptTemplates  map[string]string
     Retention        DataRetention
+    Memo             MemoSettings
     VPNAppDir        string
     VPNBackupDir     string
     MCPDir           string
@@ -54,8 +55,48 @@ type Config struct {
 }
 
 type DataRetention struct { RunsRetainDays, RunsKeepPerName int }
+type MemoSettings   struct { FilesDir string; RetainDays int; AutoCleanup bool }
 type AIConfig       struct { Enabled bool; BaseURL, APIKey, Model string; TraceRetainDays int }
 ```
+
+## Memo Types
+
+Memo/todo/vocab data is stored outside `config.json` in `~/Library/Application Support/Hatch/memos.json`. Managed attachments default to `~/Library/Application Support/Hatch/memo-files/`.
+
+```go
+type MemoSettings struct {
+    FilesDir    string // default Hatch/memo-files
+    RetainDays  int    // 0 -> default 90
+    AutoCleanup bool   // when true, hourly retention prunes managed files
+}
+
+type MemoItem struct {
+    ID, Title, Body, Date, Status, Priority string
+    Tags                                   []string
+    ReminderAt, ReminderSentAt             int64
+    ReminderMode                           string // banner | sound | both
+    Attachments                            []MemoAttachment
+    CreatedAt, UpdatedAt                   int64
+}
+
+type MemoAttachment struct {
+    ID, Kind, Label string // kind: link | image | file
+    URL, SourcePath, ManagedPath, Mime string
+    Size, CreatedAt, CleanedAt int64
+}
+
+type VocabEntry struct {
+    ID, Word, Chinese, Phonetic, PartOfSpeech string
+    Collocations                              []Collocation
+    Example, AudioURL                         string
+    Tags                                      []string
+    ReviewLevel                               int
+    NextReviewAt, LastReviewedAt              int64
+    CreatedAt, UpdatedAt                      int64
+}
+```
+
+Memo retention deletes only files under the managed attachment directory and marks the attachment `CleanedAt`; it does not delete memo text records.
 
 ## AI Workspace Profiles
 

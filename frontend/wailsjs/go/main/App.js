@@ -46,6 +46,10 @@ export function CleanupDataDir(arg1) {
   return window['go']['main']['App']['CleanupDataDir'](arg1);
 }
 
+export function CleanupMemoFiles() {
+  return window['go']['main']['App']['CleanupMemoFiles']();
+}
+
 export function ClearAITraces() {
   return window['go']['main']['App']['ClearAITraces']();
 }
@@ -78,6 +82,14 @@ export function DeleteMCPServer(arg1) {
   return window['go']['main']['App']['DeleteMCPServer'](arg1);
 }
 
+export function DeleteMemo(arg1) {
+  return window['go']['main']['App']['DeleteMemo'](arg1);
+}
+
+export function DeleteMemoAttachment(arg1, arg2) {
+  return window['go']['main']['App']['DeleteMemoAttachment'](arg1, arg2);
+}
+
 export function DeleteRun(arg1, arg2) {
   return window['go']['main']['App']['DeleteRun'](arg1, arg2);
 }
@@ -96,6 +108,10 @@ export function DeleteSkillEverywhere(arg1) {
 
 export function DeleteVPNBackup(arg1) {
   return window['go']['main']['App']['DeleteVPNBackup'](arg1);
+}
+
+export function DeleteVocabEntry(arg1) {
+  return window['go']['main']['App']['DeleteVocabEntry'](arg1);
 }
 
 export function ExportBackup(arg1) {
@@ -202,6 +218,18 @@ export function GetMCPTemplates() {
   return window['go']['main']['App']['GetMCPTemplates']();
 }
 
+export function GetMemoAttachmentPreview(arg1) {
+  return window['go']['main']['App']['GetMemoAttachmentPreview'](arg1);
+}
+
+export function GetMemoDashboard() {
+  return window['go']['main']['App']['GetMemoDashboard']();
+}
+
+export function GetMemoSettings() {
+  return window['go']['main']['App']['GetMemoSettings']();
+}
+
 export function GetPromptTemplates() {
   return window['go']['main']['App']['GetPromptTemplates']();
 }
@@ -274,6 +302,10 @@ export function ImportMCPFromLocalDir(arg1) {
   return window['go']['main']['App']['ImportMCPFromLocalDir'](arg1);
 }
 
+export function ImportMemoAttachment(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ImportMemoAttachment'](arg1, arg2, arg3);
+}
+
 export function ImportSkillsFrom(arg1) {
   return window['go']['main']['App']['ImportSkillsFrom'](arg1);
 }
@@ -306,6 +338,10 @@ export function ListMCPServers() {
   return window['go']['main']['App']['ListMCPServers']();
 }
 
+export function ListMemos() {
+  return window['go']['main']['App']['ListMemos']();
+}
+
 export function ListRecentRunsSorted(arg1) {
   return window['go']['main']['App']['ListRecentRunsSorted'](arg1);
 }
@@ -322,8 +358,24 @@ export function ListVPNBackups() {
   return window['go']['main']['App']['ListVPNBackups']();
 }
 
+export function ListVocabEntries() {
+  return window['go']['main']['App']['ListVocabEntries']();
+}
+
+export function LookupVocabWord(arg1) {
+  return window['go']['main']['App']['LookupVocabWord'](arg1);
+}
+
+export function MarkMemoDone(arg1, arg2) {
+  return window['go']['main']['App']['MarkMemoDone'](arg1, arg2);
+}
+
 export function OpenFile(arg1) {
   return window['go']['main']['App']['OpenFile'](arg1);
+}
+
+export function OpenMemoAttachment(arg1) {
+  return window['go']['main']['App']['OpenMemoAttachment'](arg1);
 }
 
 export function OpenVPNBackupDir() {
@@ -360,6 +412,10 @@ export function RemoveSchedule(arg1) {
 
 export function ResolveSkillImportConflict(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveSkillImportConflict'](arg1, arg2, arg3);
+}
+
+export function ReviewVocabEntry(arg1, arg2) {
+  return window['go']['main']['App']['ReviewVocabEntry'](arg1, arg2);
 }
 
 export function RollbackAIWorkspaceSnapshot(arg1) {
@@ -426,6 +482,14 @@ export function SaveMCPSettings(arg1) {
   return window['go']['main']['App']['SaveMCPSettings'](arg1);
 }
 
+export function SaveMemo(arg1) {
+  return window['go']['main']['App']['SaveMemo'](arg1);
+}
+
+export function SaveMemoSettings(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveMemoSettings'](arg1, arg2, arg3);
+}
+
 export function SaveNpmMCPServer(arg1, arg2) {
   return window['go']['main']['App']['SaveNpmMCPServer'](arg1, arg2);
 }
@@ -462,12 +526,20 @@ export function SaveVPNSettings(arg1, arg2) {
   return window['go']['main']['App']['SaveVPNSettings'](arg1, arg2);
 }
 
+export function SaveVocabEntry(arg1) {
+  return window['go']['main']['App']['SaveVocabEntry'](arg1);
+}
+
 export function SaveZshrcAnnotation(arg1, arg2) {
   return window['go']['main']['App']['SaveZshrcAnnotation'](arg1, arg2);
 }
 
 export function ScanAll() {
   return window['go']['main']['App']['ScanAll']();
+}
+
+export function ScheduleMemoReminders() {
+  return window['go']['main']['App']['ScheduleMemoReminders']();
 }
 
 export function ServiceAction(arg1, arg2, arg3) {
@@ -528,6 +600,10 @@ export function SuggestSkillContent(arg1, arg2, arg3) {
 
 export function SuggestSkillFromDescription(arg1, arg2) {
   return window['go']['main']['App']['SuggestSkillFromDescription'](arg1, arg2);
+}
+
+export function SuggestVocabEntry(arg1) {
+  return window['go']['main']['App']['SuggestVocabEntry'](arg1);
 }
 
 export function SuggestZshrcAnnotation(arg1) {

@@ -28,6 +28,7 @@
       <button class="tab" :class="tab==='scripts' ? 'active' : ''" @click="tab='scripts'">🗂 工作台</button>
       <button class="tab" :class="tab==='ai'      ? 'active' : ''" @click="tab='ai'; loadAIUsageStatuses(); loadAITraces()">✦ AI</button>
       <button class="tab" :class="tab==='vpn'     ? 'active' : ''" @click="tab='vpn'; loadVPNOverview()">🔒 VPN</button>
+      <button class="tab" :class="tab==='memo'    ? 'active' : ''" @click="tab='memo'; loadMemoModule()">✓ 备忘录</button>
     </nav>
 
     <div class="header-right">
@@ -43,7 +44,7 @@
         class="btn-refresh"
         @click="headerRefresh()"
         :aria-busy="loading || vpnStatusRefreshing"
-        :title="tab==='vpn' ? '刷新代理状态' : (tab==='ai' ? '刷新 AI 状态与日志' : '重新扫描')"
+        :title="tab==='vpn' ? '刷新代理状态' : (tab==='memo' ? '刷新备忘录' : (tab==='ai' ? '刷新 AI 状态与日志' : '重新扫描'))"
       >↻ 刷新</button>
       <!-- v1.3+: quick AI panel (model switch + trace log) -->
       <div class="quick-ai-wrap">
@@ -2948,6 +2949,366 @@
       </div>
     </div>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- 备忘录                                                           -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <main x-show="tab==='memo' && !selectedDir" class="ai-main memo-main">
+    <section class="page-hero ai-hero memo-hero">
+      <div>
+        <p class="eyebrow">每日待办与单词复盘</p>
+        <h1>备忘录</h1>
+        <p class="page-subtitle">记录今日事项、提醒、附件和英文单词，复盘工作中反复出现的信息。</p>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">今日待办</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.today || 0"></span></div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">过期提醒</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.overdue || 0"></span></div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">待提醒</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.reminders || 0"></span></div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">待复盘</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.reviewDue || 0"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ai-layout">
+      <nav class="ai-sidenav">
+        <button class="ai-sidenav-item" :class="memoSubTab==='today' ? 'active' : ''" @click="memoSubTab='today'; loadMemoModule()">
+          <span class="ai-sidenav-icon">☑</span><span>今日</span>
+          <span class="ai-sidenav-count" x-show="memoDashboard.today > 0" x-text="memoDashboard.today"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="memoSubTab==='all' ? 'active' : ''" @click="memoSubTab='all'; loadMemoModule()">
+          <span class="ai-sidenav-icon">📋</span><span>全部</span>
+          <span class="ai-sidenav-count" x-show="memoDashboard.totalMemos > 0" x-text="memoDashboard.totalMemos"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="memoSubTab==='words' ? 'active' : ''" @click="memoSubTab='words'; loadMemoModule()">
+          <span class="ai-sidenav-icon">Aa</span><span>单词</span>
+          <span class="ai-sidenav-count" x-show="memoDashboard.totalVocab > 0" x-text="memoDashboard.totalVocab"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="memoSubTab==='review' ? 'active' : ''" @click="memoSubTab='review'; loadMemoModule()">
+          <span class="ai-sidenav-icon">↻</span><span>复盘</span>
+          <span class="ai-sidenav-count" x-show="memoDashboard.reviewDue > 0" x-text="memoDashboard.reviewDue"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="memoSubTab==='storage' ? 'active' : ''" @click="memoSubTab='storage'; loadMemoModule()">
+          <span class="ai-sidenav-icon">📦</span><span>存储</span>
+        </button>
+      </nav>
+
+      <div class="ai-content">
+        <section class="settings-section memo-editor" x-show="memoFormOpen">
+          <div class="section-header-row">
+            <h3 x-text="memoEditingID ? '编辑待办' : '新增待办'"></h3>
+            <button class="icon-btn" @click="memoFormOpen=false">✕</button>
+          </div>
+          <div class="memo-form-grid">
+            <div class="memo-form-main">
+              <label class="field-label">标题</label>
+              <input class="field-input" x-model="memoForm.title" placeholder="今天要完成什么？" />
+              <label class="field-label">内容</label>
+              <textarea class="field-input" rows="4" x-model="memoForm.body" placeholder="补充细节、上下文、检查点"></textarea>
+              <label class="field-label">标签</label>
+              <input class="field-input" x-model="memoForm.tagsRaw" placeholder="work, review, urgent" />
+            </div>
+            <div class="memo-form-side">
+              <label class="field-label">日期</label>
+              <input class="field-input" type="date" x-model="memoForm.date" />
+              <label class="field-label">优先级</label>
+              <select class="field-input" x-model="memoForm.priority">
+                <option value="low">低</option>
+                <option value="normal">普通</option>
+                <option value="high">高</option>
+              </select>
+              <label class="field-label">提醒时间</label>
+              <input class="field-input" type="datetime-local" x-model="memoForm.reminderLocal" />
+              <label class="field-label">提醒方式</label>
+              <select class="field-input" x-model="memoForm.reminderMode">
+                <option value="both">横幅 + 声音</option>
+                <option value="banner">仅横幅</option>
+                <option value="sound">仅声音</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="memo-attachment-editor">
+            <div class="section-header-row">
+              <h4>附件</h4>
+              <span class="muted text-sm">URL 保存链接；本地图片和文件会复制到托管目录</span>
+            </div>
+            <div class="memo-attachment-list" x-show="memoForm.attachments.length">
+              <template x-for="att in memoForm.attachments" :key="att.id">
+                <div class="memo-attachment-row">
+                  <span class="memo-attachment-icon" x-text="attachmentIcon(att)"></span>
+                  <div class="memo-attachment-info">
+                    <span class="memo-attachment-label" x-text="att.label || att.url || att.managedPath"></span>
+                    <span class="memo-attachment-path muted text-xs" x-text="att.url || att.managedPath || att.sourcePath"></span>
+                  </div>
+                  <button class="icon-btn" @click="openMemoAttachment(att)" title="打开">↗</button>
+                  <button class="icon-btn danger" @click="removeMemoAttachment(att)" title="移除">✕</button>
+                </div>
+              </template>
+            </div>
+            <div class="memo-attachment-add">
+              <select class="field-input memo-kind-input" x-model="memoAttachmentForm.kind">
+                <option value="file">文件</option>
+                <option value="image">图片</option>
+                <option value="link">链接</option>
+              </select>
+              <input class="field-input memo-path-input" x-model="memoAttachmentForm.path" placeholder="/path/to/file 或 https://..." />
+              <input class="field-input memo-label-input" x-model="memoAttachmentForm.label" placeholder="显示名称（可选）" />
+              <button class="btn-sm btn-primary" @click="addMemoAttachment()" :disabled="!memoAttachmentForm.path.trim()">+ 添加</button>
+            </div>
+          </div>
+
+          <div class="prompt-actions-row">
+            <button class="btn-primary" @click="saveMemoForm()" :aria-busy="memoSaving">保存</button>
+            <button class="secondary" @click="memoFormOpen=false">取消</button>
+          </div>
+        </section>
+
+        <div x-show="memoSubTab==='today'">
+          <section class="settings-section">
+            <div class="section-header-row">
+              <h3>今日待办</h3>
+              <button class="btn-sm btn-primary" @click="openNewMemo()">+ 新增</button>
+            </div>
+            <div class="memo-list" x-show="todayMemos.length">
+              <template x-for="item in todayMemos" :key="item.id">
+                <div class="memo-item" :class="item.status === 'done' ? 'is-done' : ''">
+                  <button class="memo-check" @click="toggleMemoDone(item)" x-text="item.status === 'done' ? '✓' : ''"></button>
+                  <div class="memo-item-body">
+                    <div class="memo-item-title" x-text="item.title"></div>
+                    <div class="memo-item-text" x-show="item.body" x-text="item.body"></div>
+                    <div class="memo-tags" x-show="item.tags && item.tags.length">
+                      <template x-for="tag in item.tags" :key="tag"><span class="memo-tag" x-text="tag"></span></template>
+                    </div>
+                    <div class="memo-attachment-strip" x-show="item.attachments && item.attachments.length">
+                      <template x-for="att in item.attachments" :key="att.id">
+                        <button class="memo-attachment-chip" @click="openMemoAttachment(att)">
+                          <span x-text="attachmentIcon(att)"></span>
+                          <span x-text="att.label || att.url || '附件'"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="memo-item-meta">
+                    <span class="memo-priority" :class="'priority-' + (item.priority || 'normal')" x-text="item.priority || 'normal'"></span>
+                    <span class="memo-reminder" x-show="item.reminderAt" x-text="reminderLabel(item)"></span>
+                    <button class="icon-btn" @click="editMemo(item)">✎</button>
+                    <button class="icon-btn danger" @click="deleteMemoItem(item)">✕</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="data-empty" x-show="!todayMemos.length">今天暂无待办。</div>
+          </section>
+        </div>
+
+        <div x-show="memoSubTab==='all'">
+          <section class="settings-section">
+            <div class="section-header-row">
+              <h3>全部备忘</h3>
+              <button class="btn-sm btn-primary" @click="openNewMemo()">+ 新增</button>
+            </div>
+            <div class="memo-toolbar">
+              <input class="field-input" type="search" x-model="memoSearch" placeholder="搜索标题、正文、标签" />
+              <select class="field-input memo-filter-select" x-model="memoFilter">
+                <option value="open">未完成</option>
+                <option value="done">已完成</option>
+                <option value="all">全部</option>
+              </select>
+            </div>
+            <div class="memo-list">
+              <template x-for="item in filteredMemos" :key="item.id">
+                <div class="memo-item" :class="item.status === 'done' ? 'is-done' : ''">
+                  <button class="memo-check" @click="toggleMemoDone(item)" x-text="item.status === 'done' ? '✓' : ''"></button>
+                  <div class="memo-item-body">
+                    <div class="memo-item-title" x-text="item.title"></div>
+                    <div class="memo-item-text" x-show="item.body" x-text="item.body"></div>
+                    <div class="memo-tags">
+                      <span class="memo-tag" x-text="item.date"></span>
+                      <template x-for="tag in item.tags || []" :key="tag"><span class="memo-tag" x-text="tag"></span></template>
+                    </div>
+                    <div class="memo-image-grid" x-show="item.attachments && item.attachments.some(a => a.kind === 'image')">
+                      <template x-for="att in (item.attachments || []).filter(a => a.kind === 'image')" :key="att.id">
+                        <button class="memo-image-thumb" @click="openMemoAttachment(att)" :title="att.label">
+                          <img x-show="memoPreviewCache[att.id]" :src="memoPreviewCache[att.id]" :alt="att.label || 'image'" />
+                          <span x-show="!memoPreviewCache[att.id]">图片</span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="memo-item-meta">
+                    <span class="memo-reminder" x-show="item.reminderAt" x-text="reminderLabel(item)"></span>
+                    <button class="icon-btn" @click="editMemo(item)">✎</button>
+                    <button class="icon-btn danger" @click="deleteMemoItem(item)">✕</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="data-empty" x-show="!filteredMemos.length">没有匹配的备忘录。</div>
+          </section>
+        </div>
+
+        <div x-show="memoSubTab==='words'">
+          <section class="settings-section" x-show="vocabFormOpen">
+            <div class="section-header-row">
+              <h3 x-text="vocabEditingID ? '编辑单词' : '新增单词'"></h3>
+              <button class="icon-btn" @click="vocabFormOpen=false">✕</button>
+            </div>
+            <div class="vocab-form-grid">
+              <div>
+                <label class="field-label">英文</label>
+                <input class="field-input" x-model="vocabForm.word" placeholder="resilient" />
+              </div>
+              <div>
+                <label class="field-label">中文</label>
+                <input class="field-input" x-model="vocabForm.chinese" placeholder="有韧性的" />
+              </div>
+              <div>
+                <label class="field-label">音标</label>
+                <input class="field-input" x-model="vocabForm.phonetic" placeholder="/rɪˈzɪliənt/" />
+              </div>
+              <div>
+                <label class="field-label">词性</label>
+                <input class="field-input" x-model="vocabForm.partOfSpeech" placeholder="adjective" />
+              </div>
+            </div>
+            <label class="field-label">常用语法组合</label>
+            <textarea class="field-input" rows="4" x-model="vocabForm.collocationsRaw" placeholder="be resilient in | 在...方面有韧性 | Teams need to be resilient in outages."></textarea>
+            <label class="field-label">例句</label>
+            <textarea class="field-input" rows="2" x-model="vocabForm.example"></textarea>
+            <div class="vocab-form-grid">
+              <div>
+                <label class="field-label">音频 URL</label>
+                <input class="field-input" x-model="vocabForm.audioUrl" placeholder="https://..." />
+              </div>
+              <div>
+                <label class="field-label">标签</label>
+                <input class="field-input" x-model="vocabForm.tagsRaw" placeholder="work, reading" />
+              </div>
+            </div>
+            <div class="prompt-actions-row">
+              <button class="btn-sm" @click="lookupVocab()" :aria-busy="vocabLookupBusy">🔎 在线词典</button>
+              <button class="btn-sm" @click="suggestVocab()" :aria-busy="vocabAIBusy">✦ AI 补全</button>
+              <button class="btn-primary" @click="saveVocabForm()" :aria-busy="vocabSaving">保存</button>
+              <button class="secondary" @click="vocabFormOpen=false">取消</button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-header-row">
+              <h3>单词库</h3>
+              <button class="btn-sm btn-primary" @click="openNewVocab()">+ 新增</button>
+            </div>
+            <div class="memo-toolbar">
+              <input class="field-input" type="search" x-model="vocabSearch" placeholder="搜索英文、中文、标签" />
+            </div>
+            <div class="vocab-list">
+              <template x-for="entry in filteredVocabEntries" :key="entry.id">
+                <div class="vocab-card">
+                  <div class="vocab-head">
+                    <div>
+                      <strong class="vocab-word" x-text="entry.word"></strong>
+                      <span class="muted" x-text="entry.phonetic"></span>
+                    </div>
+                    <div class="vocab-actions">
+                      <button class="icon-btn" @click="playVocabAudio(entry)" title="发音">▶</button>
+                      <button class="icon-btn" @click="editVocab(entry)" title="编辑">✎</button>
+                      <button class="icon-btn danger" @click="deleteVocab(entry)" title="删除">✕</button>
+                    </div>
+                  </div>
+                  <div class="vocab-meaning" x-text="entry.chinese || '未填写中文释义'"></div>
+                  <div class="vocab-meta">
+                    <span x-show="entry.partOfSpeech" x-text="entry.partOfSpeech"></span>
+                    <span x-text="'记录: ' + formatTime(entry.createdAt)"></span>
+                  </div>
+                  <div class="vocab-collocations" x-show="entry.collocations && entry.collocations.length">
+                    <template x-for="c in entry.collocations" :key="c.pattern + c.example">
+                      <div class="vocab-collocation">
+                        <strong x-text="c.pattern"></strong>
+                        <span x-text="c.meaning"></span>
+                        <span class="muted" x-text="c.example"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="data-empty" x-show="!filteredVocabEntries.length">暂无单词记录。</div>
+          </section>
+        </div>
+
+        <div x-show="memoSubTab==='review'">
+          <section class="settings-section">
+            <div class="section-header-row">
+              <h3>单词复盘</h3>
+              <span class="muted text-sm" x-text="reviewDueEntries.length + ' 个待复盘'"></span>
+            </div>
+            <div class="review-list">
+              <template x-for="entry in reviewDueEntries" :key="entry.id">
+                <div class="review-card">
+                  <div class="vocab-head">
+                    <strong class="vocab-word" x-text="entry.word"></strong>
+                    <button class="icon-btn" @click="playVocabAudio(entry)" title="发音">▶</button>
+                  </div>
+                  <button class="btn-sm" x-show="!reviewReveal[entry.id]" @click="reviewReveal = { ...reviewReveal, [entry.id]: true }">显示答案</button>
+                  <div x-show="reviewReveal[entry.id]" class="review-answer">
+                    <div class="vocab-meaning" x-text="entry.chinese"></div>
+                    <div class="muted" x-text="entry.phonetic"></div>
+                    <div x-text="entry.example"></div>
+                    <div class="prompt-actions-row">
+                      <button class="btn-sm" @click="reviewVocab(entry, 'hard')">困难</button>
+                      <button class="btn-sm btn-primary" @click="reviewVocab(entry, 'known')">熟悉</button>
+                      <button class="btn-sm" @click="reviewVocab(entry, 'mastered')">掌握</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="data-empty" x-show="!reviewDueEntries.length">当前没有待复盘单词。</div>
+          </section>
+        </div>
+
+        <div x-show="memoSubTab==='storage'">
+          <section class="settings-section">
+            <div class="section-header-row">
+              <h3>附件存储</h3>
+              <button class="btn-sm" @click="openDataDir(memoSettings.filesDir)">📂 打开目录</button>
+            </div>
+            <div class="retention-form memo-storage-form">
+              <div>
+                <label class="field-label">托管目录</label>
+                <input class="field-input" x-model="memoSettings.filesDir" />
+              </div>
+              <div>
+                <label class="field-label">附件保留天数</label>
+                <input type="number" min="1" max="3650" class="field-input" x-model.number="memoSettings.retainDays" />
+              </div>
+              <label class="toggle-row memo-storage-toggle">
+                <input type="checkbox" x-model="memoSettings.autoCleanup" />
+                <span>自动清理托管附件</span>
+              </label>
+              <button @click="saveMemoSettingsForm()" :aria-busy="memoSettingsSaving">保存设置</button>
+            </div>
+            <div class="retention-note">清理只删除 Hatch 托管目录里的附件文件，不删除备忘录文字记录。</div>
+            <div class="prompt-actions-row">
+              <button class="secondary" @click="cleanupMemoFilesNow()">🗑 立即清理过期附件</button>
+              <button class="secondary" @click="loadDataInventory(); tab='ai'; aiSubTab='data'">查看全部数据目录</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
 
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <!-- VPN 配置中心                                                       -->

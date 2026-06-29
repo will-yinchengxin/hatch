@@ -29,10 +29,11 @@ description: "Hatch 前端参考：修改 frontend/index.html、frontend/src/mai
 ## 当前页面模型
 
 ```text
-tab = 'scripts' | 'ai' | 'vpn'
+tab = 'scripts' | 'ai' | 'vpn' | 'memo'
 selectedDir = null | { path, exportName, isScriptDir }
-aiSubTab = 'overview' | 'connect' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'tools' | 'prompts' | 'data'
+aiSubTab = 'overview' | 'connect' | 'tools' | 'workspace' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
 vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
+memoSubTab = 'today' | 'all' | 'words' | 'review' | 'storage'
 ```
 
 - `scripts + !selectedDir`: 目录卡片 + workspace settings accordion。
@@ -40,6 +41,7 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - `ai`: AI 侧边栏顺序：概览 → 连接 → **助手**（tools，🤖 Claude Code/Codex 状态与配置）→ Skills → MCP → Hooks → 文档 → **提示词**（prompts，system prompt 覆盖）→ 数据。
 - AI hero 顶部统计卡包含 AI 状态、模型、Skills、MCP、Hooks；保持同一套 `hero-stat-*` 卡片样式和响应式 grid。
 - `vpn`: VPN 侧边栏布局，含体检、备份、自定义规则，以及高级配置/Profile 原文编辑；TUN 排除网段在 hero 卡片内紧凑常驻展示，不使用隐藏式双击交互。
+- `memo`: 备忘录侧边栏布局，含今日、全部、单词、复盘、存储；提醒只在 Hatch 运行时触发，附件导入到托管目录后展示/清理。
 - `editTarget != null`: 右侧编辑抽屉。
 - `?aiSubTab=mcp` 等 query 可直接打开 AI 子页，`?aiSubTab=mcp&mcpManual=1` 可打开 MCP 手册弹窗，便于本地截图验证。
 
@@ -48,11 +50,13 @@ vpnSubTab = 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
 - 脚本运行：`statuses`、`runningSet`、`scriptLogs`、`scriptExitCodes`、`logTarget`。
 - 编辑抽屉：`editTarget`、`editForm`、`editSaving`，所有 per-script 行为都从这里配置。
 - AI：`aiForm`、`aiProviders`、`activeProviderID`、`quickAIOpen`、`traceLog`、`promptTemplates`、AI tool model config state。
+- AI 工作区：`workspaceProfiles`、`workspaceSnapshots`、`workspaceHealth`、`workspacePreview`、`workspaceForm`。应用只能走后端预检与确认，不在前端直接同步资源。
 - Skills：`skills`、`skillsStats`、`skillSearch`、`skillFilter`、`filteredSkills`、`skillAIInstruction`、`skillImportResult`、`skillConflictBusy`。
 - MCP：`mcpSettings`、`mcpServers`、`mcpTemplates`、`mcpForm`、`mcpSyncBusy`、`mcpTestBusy`、`mcpImportBusy`、`mcpManualOpen`、`mcpRecommendQuery`、`mcpRecommendation`、`mcpSelectedRecommendationID`、`filteredMCPServers`。MCP 页面包含 AI 推荐选型、获取/安装、配置同步；推荐候选只填入编辑器，不自动保存；配置值默认明文展示；批量启用/测试迭代 `filteredMCPServers`。
 - Hooks：`hooks`、`hooksStats`、`hooksSearch`、`hooksFilter`、`filteredHooks`、`hookEventSupport`、`hookForm`/`hookEditOpen`、`hookSyncBusy`、`hookTemplates`、`hookSuggestDesc`（头部起草）、`hookAIInstruction`/`hookAIBusy`（编辑器内 AI 优化）。`hookEventSupports(event,target)` 控制同步开关置灰；同步开关复用 `.skill-sync-toggle`，编辑用表单（`.hook-editor-panel`）而非 markdown 编辑器；`SuggestHookFromDescription` 起草新钩子，`SuggestHookEdit` 改进现有钩子。
 - Data：`dataPaths`、`dataInventory`、`retention`。
 - VPN：`vpnStatus`、`vpnCurrentIP`、`vpnHealthReport`、`vpnPathValidation`、`vpnProfiles`、`vpnEnhanceData`、`vpnBackups`、`vpnBackupPreview`、`vpnSettingsForm`。
+- Memo：`memoDashboard`、`memos`、`memoForm`、`memoSettings`、`memoPreviewCache`、`vocabEntries`、`vocabForm`、`reviewReveal`。
 - Workspace：`wsShellOpen`、`wsDirsOpen`、`wsEnvOpen`、`wsZshrcOpen`。
 
 ## CSS 规则
@@ -66,7 +70,7 @@ header, nav, main, footer, section, article, aside { padding: 0; margin: 0; }
 - 覆盖 `--pico-primary-*` 到 Hatch clay 色。
 - 覆盖 `button[aria-busy="true"]`，否则 Pico 会变蓝。
 - 重置非按钮 `[role="button"]` 卡片样式。
-- AI/VPN 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局；AI Docs 是 MCP/Hooks 平级侧栏页，概览应提供文档数量摘要和跳转；AI Tools 快捷配置共用 `agent-*` 布局类，Claude Code/Codex 推荐组合区块需对齐复用 `.cc-rec-*` chip 结构，Goals 开关放在共享动作行内。
+- AI/VPN/Memo 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局；AI Docs 是 MCP/Hooks 平级侧栏页，概览应提供文档数量摘要和跳转；AI Tools 快捷配置共用 `agent-*` 布局类，Claude Code/Codex 推荐组合区块需对齐复用 `.cc-rec-*` chip 结构，Goals 开关放在共享动作行内。
 - 新 v1.1+ 功能类放在 `style.css` 末尾对应分区，保持命名可读。
 
 ## Alpine 注意事项
