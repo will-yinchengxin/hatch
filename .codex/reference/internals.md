@@ -87,7 +87,8 @@ Positional keys change when the file is edited.
 - Streaming protocol emits `ai:stream`; current implementation may still send one chunk.
 - Skill AI returns full `SKILL.md` content without markdown fences.
 - Skill import fingerprints the whole skill directory by relative path + file content. Same-name differences return conflicts for user choice; Hatch UI saves still resync master content to enabled Claude/Codex targets.
-- AI Tools writes Codex shortcuts into `~/.codex/config.toml`: top-level `model`, top-level `model_reasoning_effort`, and `[features] goals = true/false`. The merge helpers only touch those keys and preserve nested profiles.
+- AI Tools writes Codex shortcuts into `~/.codex/config.toml`: top-level `model`, top-level `model_reasoning_effort`, and `[features] goals = true/false`. The merge helpers only touch those keys and preserve nested profiles. Built-in presets target GPT-5.6 Luna/Terra/Sol; `GetCodexPresets` migrates only legacy presets that still exactly match the old built-in ID/name/model/effort tuple, so edited or deleted defaults and custom presets are preserved.
+- Codex usage snapshots are not position-stable: current CLI versions may put the 7-day window in `rate_limits.primary` and omit `secondary`. `parseCodexRateLimitLine` classifies 300-minute windows as 5H and 10080-minute windows as 7D; missing windows remain unavailable instead of reusing stale data.
 
 ## Hooks
 

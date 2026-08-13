@@ -229,7 +229,24 @@ window.hatchApp = function () {
     codexStatus: null,
     codexStatusLoading: false,
 
-    // Claude Code model + effort config
+    // Claude Code model + effort config.
+    // Single source of truth for the model catalog: `kind` splits the dropdown into
+    // aliases (follow the latest model in a family) and pinned version IDs; `efforts`
+    // is the effort levels that model actually accepts (Haiku supports none).
+    claudeModels: [
+      { value: 'opus',              label: 'Opus（最新）',   kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'sonnet',            label: 'Sonnet（最新）', kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'fable',             label: 'Fable（最新）',  kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'haiku',             label: 'Haiku（最新）',  kind: 'alias',  efforts: [] },
+      { value: 'claude-opus-5',     label: 'Opus 5',         kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-sonnet-5',   label: 'Sonnet 5',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-fable-5',    label: 'Fable 5',        kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-opus-4-8',   label: 'Opus 4.8',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-opus-4-7',   label: 'Opus 4.7',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-opus-4-6',   label: 'Opus 4.6',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'max'] },
+      { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6',     kind: 'pinned', efforts: ['low', 'medium', 'high', 'max'] },
+      { value: 'claude-haiku-4-5',  label: 'Haiku 4.5',      kind: 'pinned', efforts: [] },
+    ],
     claudeCodeConfig: { model: '', effortLevel: '' },
     claudeCodeConfigSaving: false,
     claudeCodePresets: [],
@@ -237,6 +254,14 @@ window.hatchApp = function () {
     claudeCodePresetOpen: false,  // inline add/edit form visible
 
     // Codex model + reasoning effort + goal-mode config
+    codexModels: [
+      { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'gpt-5.5', label: 'GPT-5.5', efforts: ['low', 'medium', 'high', 'xhigh'] },
+      { value: 'gpt-5.4', label: 'GPT-5.4', efforts: ['low', 'medium', 'high', 'xhigh'] },
+      { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini', efforts: ['low', 'medium', 'high', 'xhigh'] },
+    ],
     codexModelConfig: { model: '', effortLevel: '', goalsEnabled: false },
     codexModelConfigSaving: false,
     codexPresets: [],
@@ -2213,7 +2238,7 @@ window.hatchApp = function () {
         deepseek: { name: 'DeepSeek',  baseUrl: 'https://api.deepseek.com/v1',               model: 'deepseek-chat' },
         glm:      { name: 'GLM',       baseUrl: 'https://open.bigmodel.cn/api/paas/v4',       model: 'glm-4-plus' },
         openai:   { name: 'OpenAI',    baseUrl: 'https://api.openai.com/v1',                  model: 'gpt-4o-mini' },
-        claude:   { name: 'Claude',    baseUrl: 'https://api.anthropic.com/v1',               model: 'claude-fable-5' },
+        claude:   { name: 'Claude',    baseUrl: 'https://api.anthropic.com/v1',               model: 'claude-opus-5' },
         kimi:     { name: 'Kimi',      baseUrl: 'https://api.moonshot.cn/v1',                 model: 'moonshot-v1-8k' },
         qwen:     { name: 'Qwen',      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
       };
@@ -2494,6 +2519,7 @@ window.hatchApp = function () {
           this.claudeCodeConfig.model || '',
           this.claudeCodeConfig.effortLevel || ''
         );
+        await this.loadClaudeCodeConfig();   // refresh effectiveModel (alias resolution)
         this.showSuccess('Claude Code 配置已保存');
       } catch (e) {
         this.showError(`保存失败: ${e}`);
@@ -2549,8 +2575,28 @@ window.hatchApp = function () {
     },
 
     async applyClaudeCodePreset(preset) {
-      this.claudeCodeConfig = { model: preset.model, effortLevel: preset.effortLevel };
+      this.claudeCodeConfig = {
+        ...this.claudeCodeConfig,
+        model: preset.model,
+        effortLevel: preset.effortLevel,
+      };
       await this.saveClaudeCodeConfig();
+    },
+
+    isKnownClaudeModel(model) {
+      return this.claudeModels.some(item => item.value === model);
+    },
+
+    claudeEffortOptions(model) {
+      const all = ['low', 'medium', 'high', 'xhigh', 'max'];
+      if (!model) return all;   // 系统默认: don't constrain until a model is chosen
+      const item = this.claudeModels.find(candidate => candidate.value === model);
+      return item ? item.efforts : all;
+    },
+
+    normalizeClaudeEffort(config) {
+      if (!config?.effortLevel || this.claudeEffortOptions(config.model).includes(config.effortLevel)) return;
+      config.effortLevel = '';
     },
 
     async loadCodexModelConfig() {
@@ -2631,44 +2677,31 @@ window.hatchApp = function () {
       await this.saveCodexModelConfig();
     },
 
+    isKnownCodexModel(model) {
+      return this.codexModels.some(item => item.value === model);
+    },
+
+    codexEffortOptions(model) {
+      const all = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+      const item = this.codexModels.find(candidate => candidate.value === model);
+      return item ? item.efforts : all;
+    },
+
+    normalizeCodexEffort(config) {
+      if (!config?.effortLevel || this.codexEffortOptions(config.model).includes(config.effortLevel)) return;
+      config.effortLevel = '';
+    },
+
     effortLabel(level) {
-      return { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }[level] || '系统默认';
-    },
-
-    // xhigh: Opus + Sonnet + Fable 支持（extended thinking）
-    effortSupportsXhigh(model) {
-      if (!model) return true; // 不知道模型时不限制
-      return model.includes('opus') || model.includes('sonnet') || model.includes('fable');
-    },
-
-    // max: Opus + Fable 支持
-    effortSupportsMax(model) {
-      if (!model) return true; // 不知道模型时不限制
-      return model.includes('opus') || model.includes('fable');
+      return { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max', ultra: 'ultra' }[level] || '系统默认';
     },
 
     modelLabel(model) {
-      const map = {
-        'claude-fable-5':   'Fable 5',
-        'claude-opus-4-8':  'Opus 4.8',
-        'claude-opus-4-7':  'Opus 4.7',
-        'claude-opus-4-6':  'Opus 4.6',
-        'claude-sonnet-4-6':'Sonnet 4.6',
-        'claude-haiku-4-5': 'Haiku 4.5',
-        'claude-opus-4-5':  'Opus 4.5',
-      };
-      return map[model] || model || '默认';
+      return this.claudeModels.find(item => item.value === model)?.label || model || '默认';
     },
 
     codexModelLabel(model) {
-      const map = {
-        'gpt-5.5': 'GPT-5.5',
-        'gpt-5.4': 'GPT-5.4',
-        'gpt-5.4-mini': 'GPT-5.4 mini',
-        'gpt-5.3-codex': 'GPT-5.3 Codex',
-        'gpt-5.2': 'GPT-5.2',
-      };
-      return map[model] || model || '默认';
+      return this.codexModels.find(item => item.value === model)?.label || model || '默认';
     },
 
     async loadClaudeStatus() {

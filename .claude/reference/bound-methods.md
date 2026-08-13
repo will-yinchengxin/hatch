@@ -31,7 +31,7 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `ExportBackup / ImportBackup` | Config/store/skills zip backup |
 | `RunWithPreScripts` | Explicit chain runner |
 | `GetAppDataInventory / CleanupDataDir / GetRetentionPolicy / SaveRetentionPolicy` | Data dashboard |
-| `GetClaudeSettings / SaveClaudeSettings / GetClaudeCodeConfig / SetClaudeCodeConfig` | Claude config editors |
+| `GetClaudeSettings / SaveClaudeSettings / GetClaudeCodeConfig / SetClaudeCodeConfig` | Claude config editors. `GetClaudeCodeConfig` is pure file IO — it never shells out, and resolves an alias (`opus`) into `effectiveModel` (`claude-opus-5`) locally |
 | `GetCodexConfig / SaveCodexConfig / GetCodexModelConfig / SetCodexModelConfig` | Codex config editors, including model, reasoning effort, and `[features].goals` |
 | `ListAIWorkspaceProfiles / SaveAIWorkspaceProfile / DeleteAIWorkspaceProfile` | Project-scoped AI profile CRUD |
 | `CaptureCurrentAIWorkspaceProfile / PreviewAIWorkspaceProfileApply / ApplyAIWorkspaceProfile` | Capture current managed state; preflight/de-sensitized diff; confirmed apply with snapshot |

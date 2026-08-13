@@ -237,11 +237,12 @@ func parseCodexRateLimitLine(line string) (codexRateLimitSnapshot, bool) {
 		}
 		return window
 	}
-	primary := fromRaw(entry.Payload.RateLimit.Primary)
-	secondary := fromRaw(entry.Payload.RateLimit.Secondary)
-	if !primary.Available && !secondary.Available {
+	rawPrimary := fromRaw(entry.Payload.RateLimit.Primary)
+	rawSecondary := fromRaw(entry.Payload.RateLimit.Secondary)
+	if !rawPrimary.Available && !rawSecondary.Available {
 		return codexRateLimitSnapshot{}, false
 	}
+	primary, secondary := classifyCodexRateLimitWindows(rawPrimary, rawSecondary)
 	return codexRateLimitSnapshot{
 		Timestamp:    entry.Timestamp,
 		PlanType:     entry.Payload.RateLimit.PlanType,
@@ -249,6 +250,29 @@ func parseCodexRateLimitLine(line string) (codexRateLimitSnapshot, bool) {
 		Primary:      primary,
 		Secondary:    secondary,
 	}, true
+}
+
+func classifyCodexRateLimitWindows(primary, secondary codexRateLimitWindow) (codexRateLimitWindow, codexRateLimitWindow) {
+	var fiveHour, sevenDay codexRateLimitWindow
+	for index, window := range []codexRateLimitWindow{primary, secondary} {
+		if !window.Available {
+			continue
+		}
+		switch window.WindowMinutes {
+		case 300:
+			fiveHour = window
+		case 10080:
+			sevenDay = window
+		case 0:
+			// Older snapshots may omit window_minutes; retain their positional meaning.
+			if index == 0 && !fiveHour.Available {
+				fiveHour = window
+			} else if index == 1 && !sevenDay.Available {
+				sevenDay = window
+			}
+		}
+	}
+	return fiveHour, sevenDay
 }
 
 func codexWindowFromSnapshot(label string, window codexRateLimitWindow) CodexUsageWindow {

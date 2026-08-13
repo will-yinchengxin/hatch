@@ -70,7 +70,8 @@ header, nav, main, footer, section, article, aside { padding: 0; margin: 0; }
 - 覆盖 `--pico-primary-*` 到 Hatch clay 色。
 - 覆盖 `button[aria-busy="true"]`，否则 Pico 会变蓝。
 - 重置非按钮 `[role="button"]` 卡片样式。
-- AI/VPN/Memo 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局；AI Docs 是 MCP/Hooks 平级侧栏页，概览应提供文档数量摘要和跳转；AI Tools 快捷配置共用 `agent-*` 布局类，Claude Code/Codex 推荐组合区块需对齐复用 `.cc-rec-*` chip 结构，Goals 开关放在共享动作行内。
+- AI/VPN/Memo 使用 `.ai-layout`、`.ai-sidenav`、`.ai-content` 共享布局；AI Docs 是 MCP/Hooks 平级侧栏页，概览应提供文档数量摘要和跳转；AI Tools 快捷配置共用 `agent-*` 布局类，Claude Code/Codex 推荐组合区块需对齐复用 `.cc-rec-*` chip 结构，Goals 开关放在共享动作行内。Codex 模型及档位兼容性统一维护在 `main.js` 的 `codexModels`，未知/自定义模型加载时必须保留显示。
+- Claude/Codex 模型目录收敛在 `main.js` 的 `claudeModels` / `codexModels` 数组，下拉一律用 `x-for` 渲染。新增或下线模型只改数组（含该模型的 `efforts` 白名单），不要再往 `index.html` 写死 `<option>` 列表。Claude 下拉按 `kind` 分成「别名 · 跟随最新」和「固定版本」两个 `<optgroup>`。
 - 新 v1.1+ 功能类放在 `style.css` 末尾对应分区，保持命名可读。
 
 ## Alpine 注意事项

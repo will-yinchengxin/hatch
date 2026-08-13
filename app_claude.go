@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,15 +39,37 @@ func (a *App) SaveClaudeSettings(content string) error {
 }
 
 // ClaudeCodeConfig holds the two user-facing knobs written to ~/.claude/settings.json,
-// plus EffectiveModel which reflects what Claude Code is actually running (via `claude model`).
+// plus EffectiveModel, which resolves an alias like "opus" to the concrete model it
+// currently points at. Empty Model means Claude Code runs its own default.
 type ClaudeCodeConfig struct {
 	Model          string `json:"model"`          // explicit setting in settings.json, "" means default
 	EffortLevel    string `json:"effortLevel"`    // explicit setting in settings.json
-	EffectiveModel string `json:"effectiveModel"` // actual model in use (from `claude model`)
+	EffectiveModel string `json:"effectiveModel"` // Model with aliases resolved, "" when unset
 }
 
-// GetClaudeCodeConfig reads model and effortLevel from ~/.claude/settings.json,
-// and queries `claude model` to get the actual effective model.
+// claudeModelAliases maps the aliases accepted by `claude --model` to the concrete
+// model each one currently resolves to. Keep in sync with claudeModels in main.js.
+var claudeModelAliases = map[string]string{
+	"opus":   "claude-opus-5",
+	"sonnet": "claude-sonnet-5",
+	"haiku":  "claude-haiku-4-5",
+	"fable":  "claude-fable-5",
+}
+
+// resolveClaudeModel expands an alias to its concrete model ID; anything else
+// (a pinned ID, a custom value, or "") is returned unchanged.
+func resolveClaudeModel(model string) string {
+	if concrete, ok := claudeModelAliases[model]; ok {
+		return concrete
+	}
+	return model
+}
+
+// GetClaudeCodeConfig reads model and effortLevel from ~/.claude/settings.json.
+//
+// It deliberately does not shell out: `claude` has no subcommand that reports the
+// running model, and an unrecognized argument is treated as a prompt — i.e. probing
+// would start a real (slow, billed) session on every call.
 func (a *App) GetClaudeCodeConfig() ClaudeCodeConfig {
 	home, _ := os.UserHomeDir()
 	data, err := os.ReadFile(home + "/.claude/settings.json")
@@ -63,20 +85,7 @@ func (a *App) GetClaudeCodeConfig() ClaudeCodeConfig {
 			}
 		}
 	}
-
-	// Run `claude model` to get the effective model (works even when no model is set in settings).
-	if claudePath := findCLI("claude"); claudePath != "" {
-		if out, err2 := exec.Command(claudePath, "model").Output(); err2 == nil {
-			// Output: "You're currently running on **Claude Sonnet 4.6** (`claude-sonnet-4-6`)."
-			if idx := strings.Index(string(out), "`"); idx >= 0 {
-				rest := string(out)[idx+1:]
-				if end := strings.Index(rest, "`"); end > 0 {
-					cfg.EffectiveModel = rest[:end]
-				}
-			}
-		}
-	}
-
+	cfg.EffectiveModel = resolveClaudeModel(cfg.Model)
 	return cfg
 }
 
@@ -112,6 +121,9 @@ func (a *App) SetClaudeCodeConfig(model, effortLevel string) error {
 	if err := backupIfExists(path); err != nil {
 		return err
 	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
 	return os.WriteFile(path, out, 0644)
 }
 
@@ -124,6 +136,9 @@ func (a *App) GetClaudeCodePresets() []config.ClaudeCodePreset {
 	if !a.cfg.ClaudeCodePresetsSeeded && len(a.cfg.ClaudeCodePresets) == 0 {
 		a.cfg.ClaudeCodePresets = defaultClaudeCodePresets()
 		a.cfg.ClaudeCodePresetsSeeded = true
+		_ = a.cfg.Save()
+	} else if migrated, changed := migrateLegacyClaudeCodePresets(a.cfg.ClaudeCodePresets); changed {
+		a.cfg.ClaudeCodePresets = migrated
 		_ = a.cfg.Save()
 	}
 	out := make([]config.ClaudeCodePreset, len(a.cfg.ClaudeCodePresets))
@@ -164,13 +179,45 @@ func (a *App) DeleteClaudeCodePreset(id string) error {
 	return a.cfg.Save()
 }
 
+// defaultClaudeCodePresets seeds the shortcut list. The first three use aliases so
+// they follow the latest model in each family; the top tier pins Fable explicitly.
+// Haiku carries no effort level because it does not support the effort knob.
 func defaultClaudeCodePresets() []config.ClaudeCodePreset {
 	return []config.ClaudeCodePreset{
-		{ID: "cc-fast", Name: "快速响应", Model: "claude-haiku-4-5", EffortLevel: "low"},
-		{ID: "cc-balanced", Name: "均衡编码", Model: "claude-sonnet-4-6", EffortLevel: "medium"},
-		{ID: "cc-deep", Name: "复杂分析", Model: "claude-sonnet-4-6", EffortLevel: "high"},
-		{ID: "cc-frontier", Name: "深度推理", Model: "claude-opus-4-8", EffortLevel: "xhigh"},
+		{ID: "cc-fast", Name: "极速轻量", Model: "haiku", EffortLevel: ""},
+		{ID: "cc-balanced", Name: "均衡编码", Model: "sonnet", EffortLevel: "medium"},
+		{ID: "cc-deep", Name: "复杂分析", Model: "opus", EffortLevel: "high"},
+		{ID: "cc-frontier", Name: "深度推理", Model: "claude-fable-5", EffortLevel: "xhigh"},
 	}
+}
+
+// migrateLegacyClaudeCodePresets refreshes seeded defaults that the user never
+// touched. A preset is only replaced when it still matches the old default
+// exactly; edited, custom, and deleted presets are left alone.
+func migrateLegacyClaudeCodePresets(presets []config.ClaudeCodePreset) ([]config.ClaudeCodePreset, bool) {
+	legacy := map[string]config.ClaudeCodePreset{
+		"cc-fast":     {ID: "cc-fast", Name: "快速响应", Model: "claude-haiku-4-5", EffortLevel: "low"},
+		"cc-balanced": {ID: "cc-balanced", Name: "均衡编码", Model: "claude-sonnet-4-6", EffortLevel: "medium"},
+		"cc-deep":     {ID: "cc-deep", Name: "复杂分析", Model: "claude-sonnet-4-6", EffortLevel: "high"},
+		"cc-frontier": {ID: "cc-frontier", Name: "深度推理", Model: "claude-opus-4-8", EffortLevel: "xhigh"},
+	}
+	current := map[string]config.ClaudeCodePreset{}
+	for _, preset := range defaultClaudeCodePresets() {
+		current[preset.ID] = preset
+	}
+
+	out := make([]config.ClaudeCodePreset, len(presets))
+	copy(out, presets)
+	changed := false
+	for i, preset := range out {
+		old, ok := legacy[preset.ID]
+		if !ok || preset != old {
+			continue
+		}
+		out[i] = current[preset.ID]
+		changed = true
+	}
+	return out, changed
 }
 
 // ─── Shared TOML helpers (used by app_claude.go and app_codex.go) ─────────────

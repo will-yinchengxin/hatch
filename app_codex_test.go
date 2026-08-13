@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"hatch/internal/config"
 )
 
 func TestLoadLatestCodexRateLimitSnapshot(t *testing.T) {
@@ -43,6 +45,28 @@ func TestParseCodexRateLimitLineIgnoresNonTokenCount(t *testing.T) {
 	_, ok := parseCodexRateLimitLine(`{"timestamp":"2026-05-15T08:40:00.000Z","payload":{"type":"other"}}`)
 	if ok {
 		t.Fatal("expected non-token_count payload to be ignored")
+	}
+}
+
+func TestParseCodexRateLimitLineClassifiesWeeklyOnlyPrimary(t *testing.T) {
+	snapshot, ok := parseCodexRateLimitLine(`{"timestamp":"2026-08-13T09:09:44.778Z","payload":{"type":"token_count","rate_limits":{"plan_type":"plus","primary":{"used_percent":4,"window_minutes":10080,"resets_at":1787215190},"secondary":null}}}`)
+	if !ok {
+		t.Fatal("expected weekly-only rate-limit snapshot")
+	}
+	if snapshot.Primary.Available {
+		t.Fatalf("5h window should be unavailable: %#v", snapshot.Primary)
+	}
+	if !snapshot.Secondary.Available || snapshot.Secondary.WindowMinutes != 10080 || snapshot.Secondary.UsedPercent != 4 {
+		t.Fatalf("weekly window was not classified as 7d: %#v", snapshot.Secondary)
+	}
+}
+
+func TestClassifyCodexRateLimitWindowsUsesDurationNotPosition(t *testing.T) {
+	weekly := codexRateLimitWindow{Available: true, UsedPercent: 11, WindowMinutes: 10080}
+	fiveHour := codexRateLimitWindow{Available: true, UsedPercent: 22, WindowMinutes: 300}
+	gotFiveHour, gotSevenDay := classifyCodexRateLimitWindows(weekly, fiveHour)
+	if gotFiveHour != fiveHour || gotSevenDay != weekly {
+		t.Fatalf("windows classified by position: 5h=%#v 7d=%#v", gotFiveHour, gotSevenDay)
 	}
 }
 
@@ -111,5 +135,58 @@ func TestSaveCodexConfigRejectsInvalidTOML(t *testing.T) {
 	a := &App{}
 	if err := a.SaveCodexConfig("model = ["); err == nil {
 		t.Fatal("expected invalid TOML to be rejected")
+	}
+}
+
+func TestDefaultCodexPresetsUseCurrentModelFamily(t *testing.T) {
+	presets := defaultCodexPresets()
+	want := map[string]string{
+		"default-fast":     "gpt-5.6-luna/low",
+		"default-balanced": "gpt-5.6-terra/medium",
+		"default-deep":     "gpt-5.6-sol/high",
+		"default-frontier": "gpt-5.6-sol/ultra",
+	}
+	for _, preset := range presets {
+		if got := preset.Model + "/" + preset.EffortLevel; got != want[preset.ID] {
+			t.Fatalf("preset %q = %q, want %q", preset.ID, got, want[preset.ID])
+		}
+	}
+}
+
+func TestMigrateLegacyCodexPresetsOnlyUpdatesUntouchedDefaults(t *testing.T) {
+	legacy := []config.CodexPreset{
+		{ID: "default-fast", Name: "快速日常", Model: "gpt-5.4-mini", EffortLevel: "low"},
+		{ID: "default-balanced", Name: "我的均衡", Model: "gpt-5.5", EffortLevel: "medium"},
+		{ID: "custom", Name: "自定义", Model: "private-model", EffortLevel: "high"},
+	}
+
+	got, changed := migrateLegacyCodexPresets(legacy)
+	if !changed {
+		t.Fatal("expected untouched legacy preset to migrate")
+	}
+	if got[0].Model != "gpt-5.6-luna" || got[0].EffortLevel != "low" || got[0].Name != "极速轻量" {
+		t.Fatalf("legacy default was not migrated: %#v", got[0])
+	}
+	if got[1] != legacy[1] {
+		t.Fatalf("edited default should be preserved: %#v", got[1])
+	}
+	if got[2] != legacy[2] {
+		t.Fatalf("custom preset should be preserved: %#v", got[2])
+	}
+	if len(got) != len(legacy) {
+		t.Fatalf("migration must not restore deleted defaults: got %d, want %d", len(got), len(legacy))
+	}
+}
+
+func TestMigrateLegacyCodexPresetsNoopForCurrentValues(t *testing.T) {
+	presets := defaultCodexPresets()
+	got, changed := migrateLegacyCodexPresets(presets)
+	if changed {
+		t.Fatal("current presets should not be reported as migrated")
+	}
+	for i := range presets {
+		if got[i] != presets[i] {
+			t.Fatalf("preset %d changed: %#v", i, got[i])
+		}
 	}
 }

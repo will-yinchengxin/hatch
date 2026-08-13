@@ -2055,26 +2055,32 @@
                 <div class="cc-config-row agent-config-row">
                   <div class="cc-config-field agent-config-field">
                     <label class="cc-config-label agent-config-label">模型</label>
-                    <select class="cc-config-select agent-config-select" x-model="claudeCodeConfig.model">
+                    <select class="cc-config-select agent-config-select" x-model="claudeCodeConfig.model" @change="normalizeClaudeEffort(claudeCodeConfig)">
                       <option value="">系统默认</option>
-                      <option value="claude-fable-5">claude-fable-5 ✦ 新</option>
-                      <option value="claude-opus-4-8">claude-opus-4-8</option>
-                      <option value="claude-opus-4-7">claude-opus-4-7</option>
-                      <option value="claude-opus-4-6">claude-opus-4-6</option>
-                      <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-                      <option value="claude-haiku-4-5">claude-haiku-4-5</option>
-                      <option value="claude-opus-4-5">claude-opus-4-5</option>
+                      <template x-if="claudeCodeConfig.model && !isKnownClaudeModel(claudeCodeConfig.model)">
+                        <option :value="claudeCodeConfig.model" x-text="claudeCodeConfig.model + ' · 当前/自定义'"></option>
+                      </template>
+                      <optgroup label="别名 · 跟随最新">
+                        <template x-for="model in claudeModels.filter(m => m.kind === 'alias')" :key="model.value">
+                          <option :value="model.value" x-text="model.value + ' · ' + model.label"></option>
+                        </template>
+                      </optgroup>
+                      <optgroup label="固定版本">
+                        <template x-for="model in claudeModels.filter(m => m.kind === 'pinned')" :key="model.value">
+                          <option :value="model.value" x-text="model.value"></option>
+                        </template>
+                      </optgroup>
                     </select>
                   </div>
                   <div class="cc-config-field agent-config-field">
                     <label class="cc-config-label agent-config-label">努力程度</label>
                     <select class="cc-config-select agent-config-select" x-model="claudeCodeConfig.effortLevel">
                       <option value="">系统默认</option>
-                      <option value="low">low · 快速响应</option>
-                      <option value="medium">medium · 均衡</option>
-                      <option value="high">high · 深度思考</option>
-                      <option value="xhigh" :disabled="!effortSupportsXhigh(claudeCodeConfig.model)" x-text="effortSupportsXhigh(claudeCodeConfig.model) ? 'xhigh · 超深思考' : 'xhigh · 仅 Opus / Sonnet'"></option>
-                      <option value="max" :disabled="!effortSupportsMax(claudeCodeConfig.model)" x-text="effortSupportsMax(claudeCodeConfig.model) ? 'max · 极限思考' : 'max · 仅 Opus'"></option>
+                      <option value="low" :disabled="!claudeEffortOptions(claudeCodeConfig.model).includes('low')">low · 快速响应</option>
+                      <option value="medium" :disabled="!claudeEffortOptions(claudeCodeConfig.model).includes('medium')">medium · 均衡</option>
+                      <option value="high" :disabled="!claudeEffortOptions(claudeCodeConfig.model).includes('high')">high · 深度思考</option>
+                      <option value="xhigh" :disabled="!claudeEffortOptions(claudeCodeConfig.model).includes('xhigh')">xhigh · 超深思考</option>
+                      <option value="max" :disabled="!claudeEffortOptions(claudeCodeConfig.model).includes('max')">max · 极限思考</option>
                     </select>
                   </div>
                 </div>
@@ -2093,24 +2099,24 @@
                 <div class="cc-rec-presets">
                   <span class="cc-rec-presets-label">推荐组合</span>
                   <div class="cc-rec-list">
-                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='claude-haiku-4-5'; claudeCodeConfig.effortLevel='low'; saveClaudeCodeConfig()" title="Haiku 4.5 + low · 最快响应，适合简单任务">
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='haiku'; claudeCodeConfig.effortLevel=''; saveClaudeCodeConfig()" title="haiku · 最快响应，适合简单任务（Haiku 不支持努力程度）">
                       <span class="cc-rec-name">极速</span>
-                      <span class="badge cc-model-badge">Haiku 4.5</span>
-                      <span class="badge cc-effort-badge cc-effort-low">low</span>
+                      <span class="badge cc-model-badge">Haiku</span>
+                      <span class="badge cc-effort-badge cc-effort-default">默认</span>
                     </button>
-                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='claude-sonnet-4-6'; claudeCodeConfig.effortLevel='medium'; saveClaudeCodeConfig()" title="Sonnet 4.6 + medium · 速度与质量均衡">
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='sonnet'; claudeCodeConfig.effortLevel='medium'; saveClaudeCodeConfig()" title="sonnet + medium · 速度与质量均衡">
                       <span class="cc-rec-name">均衡</span>
-                      <span class="badge cc-model-badge">Sonnet 4.6</span>
+                      <span class="badge cc-model-badge">Sonnet</span>
                       <span class="badge cc-effort-badge cc-effort-medium">medium</span>
                     </button>
-                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='claude-opus-4-8'; claudeCodeConfig.effortLevel='high'; saveClaudeCodeConfig()" title="Opus 4.8 + high · 复杂任务深度思考">
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='opus'; claudeCodeConfig.effortLevel='high'; saveClaudeCodeConfig()" title="opus + high · 复杂任务深度思考">
                       <span class="cc-rec-name">精深</span>
-                      <span class="badge cc-model-badge">Opus 4.8</span>
+                      <span class="badge cc-model-badge">Opus</span>
                       <span class="badge cc-effort-badge cc-effort-high">high</span>
                     </button>
-                    <button class="cc-rec-chip cc-rec-chip-fable" @click="claudeCodeConfig.model='claude-fable-5'; claudeCodeConfig.effortLevel='xhigh'; saveClaudeCodeConfig()" title="Fable 5 + xhigh · 最强能力，挑战性工程任务">
+                    <button class="cc-rec-chip cc-rec-chip-fable" @click="claudeCodeConfig.model='fable'; claudeCodeConfig.effortLevel='xhigh'; saveClaudeCodeConfig()" title="fable + xhigh · 最强能力，挑战性工程任务">
                       <span class="cc-rec-name">极限</span>
-                      <span class="badge cc-model-badge">Fable 5</span>
+                      <span class="badge cc-model-badge">Fable</span>
                       <span class="badge cc-effort-badge cc-effort-xhigh">xhigh</span>
                     </button>
                   </div>
@@ -2141,23 +2147,29 @@
                   <div class="cc-preset-form-title" x-text="claudeCodePresetForm.id ? '编辑预设' : '新建预设'"></div>
                   <div class="cc-preset-form-body">
                     <input class="cc-preset-name-input" type="text" placeholder="预设名称" x-model="claudeCodePresetForm.name" />
-                    <select class="cc-config-select" x-model="claudeCodePresetForm.model">
+                    <select class="cc-config-select" x-model="claudeCodePresetForm.model" @change="normalizeClaudeEffort(claudeCodePresetForm)">
                       <option value="">系统默认</option>
-                      <option value="claude-fable-5">claude-fable-5 ✦ 新</option>
-                      <option value="claude-opus-4-8">claude-opus-4-8</option>
-                      <option value="claude-opus-4-7">claude-opus-4-7</option>
-                      <option value="claude-opus-4-6">claude-opus-4-6</option>
-                      <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-                      <option value="claude-haiku-4-5">claude-haiku-4-5</option>
-                      <option value="claude-opus-4-5">claude-opus-4-5</option>
+                      <template x-if="claudeCodePresetForm.model && !isKnownClaudeModel(claudeCodePresetForm.model)">
+                        <option :value="claudeCodePresetForm.model" x-text="claudeCodePresetForm.model + ' · 当前/自定义'"></option>
+                      </template>
+                      <optgroup label="别名 · 跟随最新">
+                        <template x-for="model in claudeModels.filter(m => m.kind === 'alias')" :key="model.value">
+                          <option :value="model.value" x-text="model.value + ' · ' + model.label"></option>
+                        </template>
+                      </optgroup>
+                      <optgroup label="固定版本">
+                        <template x-for="model in claudeModels.filter(m => m.kind === 'pinned')" :key="model.value">
+                          <option :value="model.value" x-text="model.value"></option>
+                        </template>
+                      </optgroup>
                     </select>
                     <select class="cc-config-select" x-model="claudeCodePresetForm.effortLevel">
                       <option value="">系统默认</option>
-                      <option value="low">low · 快速响应</option>
-                      <option value="medium">medium · 均衡</option>
-                      <option value="high">high · 深度思考</option>
-                      <option value="xhigh" :disabled="!effortSupportsXhigh(claudeCodePresetForm.model)" x-text="effortSupportsXhigh(claudeCodePresetForm.model) ? 'xhigh · 超深思考' : 'xhigh · 仅 Opus / Sonnet'"></option>
-                      <option value="max" :disabled="!effortSupportsMax(claudeCodePresetForm.model)" x-text="effortSupportsMax(claudeCodePresetForm.model) ? 'max · 极限思考' : 'max · 仅 Opus'"></option>
+                      <option value="low" :disabled="!claudeEffortOptions(claudeCodePresetForm.model).includes('low')">low · 快速响应</option>
+                      <option value="medium" :disabled="!claudeEffortOptions(claudeCodePresetForm.model).includes('medium')">medium · 均衡</option>
+                      <option value="high" :disabled="!claudeEffortOptions(claudeCodePresetForm.model).includes('high')">high · 深度思考</option>
+                      <option value="xhigh" :disabled="!claudeEffortOptions(claudeCodePresetForm.model).includes('xhigh')">xhigh · 超深思考</option>
+                      <option value="max" :disabled="!claudeEffortOptions(claudeCodePresetForm.model).includes('max')">max · 极限思考</option>
                     </select>
                   </div>
                   <div class="cc-preset-form-footer">
@@ -2224,19 +2236,21 @@
                   <template x-if="codexStatus.hasUsageData">
                     <div>
                       <div class="codex-usage-row">
-                        <div class="codex-usage-pill" :class="usagePill(codexStatus.primary.usedPercent)" x-show="codexStatus.primary.available">
+                        <div class="codex-usage-pill" :class="codexStatus.primary.available ? usagePill(codexStatus.primary.usedPercent) : 'usage-unavailable'">
                           <span class="cup-window" x-text="codexStatus.primary.label"></span>
-                          <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.primary.usedPercent)+'%'"></strong></span>
-                          <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.primary.leftPercent)+'%'"></strong></span>
-                          <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.primary.usedPercent,100)+'%'"></span></span>
+                          <span class="cup-metric" x-show="codexStatus.primary.available"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.primary.usedPercent)+'%'"></strong></span>
+                          <span class="cup-metric cup-left" x-show="codexStatus.primary.available"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.primary.leftPercent)+'%'"></strong></span>
+                          <span class="cup-bar" x-show="codexStatus.primary.available"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.primary.usedPercent,100)+'%'"></span></span>
                           <span class="cup-reset" x-show="codexStatus.primary.resetIn">↻ <span x-text="codexStatus.primary.resetIn"></span></span>
+                          <span class="cup-unavailable" x-show="!codexStatus.primary.available">暂无数据</span>
                         </div>
-                        <div class="codex-usage-pill" :class="usagePill(codexStatus.secondary.usedPercent)" x-show="codexStatus.secondary.available">
+                        <div class="codex-usage-pill" :class="codexStatus.secondary.available ? usagePill(codexStatus.secondary.usedPercent) : 'usage-unavailable'">
                           <span class="cup-window" x-text="codexStatus.secondary.label"></span>
-                          <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.secondary.usedPercent)+'%'"></strong></span>
-                          <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.secondary.leftPercent)+'%'"></strong></span>
-                          <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.secondary.usedPercent,100)+'%'"></span></span>
+                          <span class="cup-metric" x-show="codexStatus.secondary.available"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.secondary.usedPercent)+'%'"></strong></span>
+                          <span class="cup-metric cup-left" x-show="codexStatus.secondary.available"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.secondary.leftPercent)+'%'"></strong></span>
+                          <span class="cup-bar" x-show="codexStatus.secondary.available"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.secondary.usedPercent,100)+'%'"></span></span>
                           <span class="cup-reset" x-show="codexStatus.secondary.resetIn">↻ <span x-text="codexStatus.secondary.resetIn"></span></span>
+                          <span class="cup-unavailable" x-show="!codexStatus.secondary.available">暂无数据</span>
                         </div>
                       </div>
                       <p class="codex-usage-meta text-sm">
@@ -2262,13 +2276,14 @@
                 <div class="codex-model-config-row agent-config-row">
                   <div class="codex-model-config-field agent-config-field">
                     <label class="codex-model-config-label agent-config-label">模型</label>
-                    <select class="codex-model-config-select agent-config-select" x-model="codexModelConfig.model">
+                    <select class="codex-model-config-select agent-config-select" x-model="codexModelConfig.model" @change="normalizeCodexEffort(codexModelConfig)">
                       <option value="">系统默认</option>
-                      <option value="gpt-5.5">gpt-5.5</option>
-                      <option value="gpt-5.4">gpt-5.4</option>
-                      <option value="gpt-5.4-mini">gpt-5.4-mini</option>
-                      <option value="gpt-5.3-codex">gpt-5.3-codex</option>
-                      <option value="gpt-5.2">gpt-5.2</option>
+                      <template x-if="codexModelConfig.model && !isKnownCodexModel(codexModelConfig.model)">
+                        <option :value="codexModelConfig.model" x-text="codexModelConfig.model + ' · 当前/自定义'"></option>
+                      </template>
+                      <template x-for="model in codexModels" :key="model.value">
+                        <option :value="model.value" x-text="model.value"></option>
+                      </template>
                     </select>
                   </div>
                   <div class="codex-model-config-field agent-config-field">
@@ -2278,7 +2293,9 @@
                       <option value="low">low · 快速响应</option>
                       <option value="medium">medium · 均衡</option>
                       <option value="high">high · 深度推理</option>
-                      <option value="xhigh">xhigh · 超深推理</option>
+                      <option value="xhigh" :disabled="!codexEffortOptions(codexModelConfig.model).includes('xhigh')">xhigh · 超深推理</option>
+                      <option value="max" :disabled="!codexEffortOptions(codexModelConfig.model).includes('max')">max · 极限推理</option>
+                      <option value="ultra" :disabled="!codexEffortOptions(codexModelConfig.model).includes('ultra')">ultra · 自动委派</option>
                     </select>
                   </div>
                 </div>
@@ -2303,25 +2320,25 @@
                 <div class="cc-rec-presets codex-rec-presets">
                   <span class="cc-rec-presets-label">推荐组合</span>
                   <div class="cc-rec-list">
-                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.4-mini'; codexModelConfig.effortLevel='low'; saveCodexModelConfig()" title="GPT-5.4 Mini + low · 快速轻量，适合简单改动">
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.6-luna'; codexModelConfig.effortLevel='low'; saveCodexModelConfig()" title="GPT-5.6 Luna + low · 快速轻量，适合简单改动">
                       <span class="cc-rec-name">极速</span>
-                      <span class="badge codex-model-badge">5.4 Mini</span>
+                      <span class="badge codex-model-badge">5.6 Luna</span>
                       <span class="badge codex-effort-badge codex-effort-low">low</span>
                     </button>
-                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.5'; codexModelConfig.effortLevel='medium'; saveCodexModelConfig()" title="GPT-5.5 + medium · 日常编码与质量平衡">
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.6-terra'; codexModelConfig.effortLevel='medium'; saveCodexModelConfig()" title="GPT-5.6 Terra + medium · 日常编码与质量平衡">
                       <span class="cc-rec-name">均衡</span>
-                      <span class="badge codex-model-badge">GPT-5.5</span>
+                      <span class="badge codex-model-badge">5.6 Terra</span>
                       <span class="badge codex-effort-badge codex-effort-medium">medium</span>
                     </button>
-                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.5'; codexModelConfig.effortLevel='high'; saveCodexModelConfig()" title="GPT-5.5 + high · 复杂改造与审查">
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.6-sol'; codexModelConfig.effortLevel='high'; saveCodexModelConfig()" title="GPT-5.6 Sol + high · 复杂改造与审查">
                       <span class="cc-rec-name">精深</span>
-                      <span class="badge codex-model-badge">GPT-5.5</span>
+                      <span class="badge codex-model-badge">5.6 Sol</span>
                       <span class="badge codex-effort-badge codex-effort-high">high</span>
                     </button>
-                    <button class="cc-rec-chip codex-rec-chip-max" @click="codexModelConfig.model='gpt-5.3-codex'; codexModelConfig.effortLevel='xhigh'; saveCodexModelConfig()" title="GPT-5.3 Codex + xhigh · 长任务与深度推理">
-                      <span class="cc-rec-name">极限</span>
-                      <span class="badge codex-model-badge">5.3 Codex</span>
-                      <span class="badge codex-effort-badge codex-effort-xhigh">xhigh</span>
+                    <button class="cc-rec-chip codex-rec-chip-ultra" @click="codexModelConfig.model='gpt-5.6-sol'; codexModelConfig.effortLevel='ultra'; saveCodexModelConfig()" title="GPT-5.6 Sol + ultra · 自动委派子任务，适合大型任务">
+                      <span class="cc-rec-name">攻坚</span>
+                      <span class="badge codex-model-badge">5.6 Sol</span>
+                      <span class="badge codex-effort-badge codex-effort-ultra">ultra</span>
                     </button>
                   </div>
                 </div>
@@ -2350,20 +2367,23 @@
                   <div class="codex-preset-form-title" x-text="codexPresetForm.id ? '编辑预设' : '新建预设'"></div>
                   <div class="codex-preset-form-body">
                     <input class="codex-preset-name-input" type="text" placeholder="预设名称" x-model="codexPresetForm.name" />
-                    <select class="codex-model-config-select" x-model="codexPresetForm.model">
+                    <select class="codex-model-config-select" x-model="codexPresetForm.model" @change="normalizeCodexEffort(codexPresetForm)">
                       <option value="">系统默认</option>
-                      <option value="gpt-5.5">gpt-5.5</option>
-                      <option value="gpt-5.4">gpt-5.4</option>
-                      <option value="gpt-5.4-mini">gpt-5.4-mini</option>
-                      <option value="gpt-5.3-codex">gpt-5.3-codex</option>
-                      <option value="gpt-5.2">gpt-5.2</option>
+                      <template x-if="codexPresetForm.model && !isKnownCodexModel(codexPresetForm.model)">
+                        <option :value="codexPresetForm.model" x-text="codexPresetForm.model + ' · 当前/自定义'"></option>
+                      </template>
+                      <template x-for="model in codexModels" :key="model.value">
+                        <option :value="model.value" x-text="model.value"></option>
+                      </template>
                     </select>
                     <select class="codex-model-config-select" x-model="codexPresetForm.effortLevel">
                       <option value="">系统默认</option>
                       <option value="low">low · 快速响应</option>
                       <option value="medium">medium · 均衡</option>
                       <option value="high">high · 深度推理</option>
-                      <option value="xhigh">xhigh · 超深推理</option>
+                      <option value="xhigh" :disabled="!codexEffortOptions(codexPresetForm.model).includes('xhigh')">xhigh · 超深推理</option>
+                      <option value="max" :disabled="!codexEffortOptions(codexPresetForm.model).includes('max')">max · 极限推理</option>
+                      <option value="ultra" :disabled="!codexEffortOptions(codexPresetForm.model).includes('ultra')">ultra · 自动委派</option>
                     </select>
                   </div>
                   <div class="codex-preset-form-footer">

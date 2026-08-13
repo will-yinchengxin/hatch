@@ -92,6 +92,9 @@ func (a *App) GetCodexPresets() []config.CodexPreset {
 		a.cfg.CodexPresets = defaultCodexPresets()
 		a.cfg.CodexPresetsSeeded = true
 		_ = a.cfg.Save()
+	} else if migrated, changed := migrateLegacyCodexPresets(a.cfg.CodexPresets); changed {
+		a.cfg.CodexPresets = migrated
+		_ = a.cfg.Save()
 	}
 	out := make([]config.CodexPreset, len(a.cfg.CodexPresets))
 	copy(out, a.cfg.CodexPresets)
@@ -133,9 +136,35 @@ func (a *App) DeleteCodexPreset(id string) error {
 
 func defaultCodexPresets() []config.CodexPreset {
 	return []config.CodexPreset{
-		{ID: "default-fast", Name: "快速日常", Model: "gpt-5.4-mini", EffortLevel: "low"},
-		{ID: "default-balanced", Name: "均衡编码", Model: "gpt-5.5", EffortLevel: "medium"},
-		{ID: "default-deep", Name: "复杂任务", Model: "gpt-5.5", EffortLevel: "high"},
-		{ID: "default-frontier", Name: "最强推理", Model: "gpt-5.5", EffortLevel: "xhigh"},
+		{ID: "default-fast", Name: "极速轻量", Model: "gpt-5.6-luna", EffortLevel: "low"},
+		{ID: "default-balanced", Name: "均衡编码", Model: "gpt-5.6-terra", EffortLevel: "medium"},
+		{ID: "default-deep", Name: "复杂任务", Model: "gpt-5.6-sol", EffortLevel: "high"},
+		{ID: "default-frontier", Name: "多代理攻坚", Model: "gpt-5.6-sol", EffortLevel: "ultra"},
 	}
+}
+
+func migrateLegacyCodexPresets(presets []config.CodexPreset) ([]config.CodexPreset, bool) {
+	legacy := map[string]config.CodexPreset{
+		"default-fast":     {ID: "default-fast", Name: "快速日常", Model: "gpt-5.4-mini", EffortLevel: "low"},
+		"default-balanced": {ID: "default-balanced", Name: "均衡编码", Model: "gpt-5.5", EffortLevel: "medium"},
+		"default-deep":     {ID: "default-deep", Name: "复杂任务", Model: "gpt-5.5", EffortLevel: "high"},
+		"default-frontier": {ID: "default-frontier", Name: "最强推理", Model: "gpt-5.5", EffortLevel: "xhigh"},
+	}
+	current := map[string]config.CodexPreset{}
+	for _, preset := range defaultCodexPresets() {
+		current[preset.ID] = preset
+	}
+
+	out := make([]config.CodexPreset, len(presets))
+	copy(out, presets)
+	changed := false
+	for i, preset := range out {
+		old, ok := legacy[preset.ID]
+		if !ok || preset != old {
+			continue
+		}
+		out[i] = current[preset.ID]
+		changed = true
+	}
+	return out, changed
 }

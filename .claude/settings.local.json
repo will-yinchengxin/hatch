@@ -114,7 +114,11 @@
       "Bash(screencapture -x /tmp/hatch-app.png)",
       "Bash(open \"http://localhost:34115/?aiSubTab=prompts\")",
       "Bash(screencapture -x /tmp/hatch-prompts-browser.png)",
-      "Bash(screencapture -x /tmp/hatch-chrome-prompts.png)"
+      "Bash(screencapture -x /tmp/hatch-chrome-prompts.png)",
+      "Bash(curl -sf http://localhost:34115 -o /dev/null)",
+      "Bash(curl -s http://localhost:34115/)",
+      "Bash(md5 -q .claude/skills/hatch-frontend/SKILL.md .codex/skills/hatch-frontend/SKILL.md .agents/skills/hatch-frontend/SKILL.md)",
+      "Bash(xargs -I{} sh -c 'test {} -eq 1 && echo \"✓ all 3 identical\" || echo \"✗ diverged\"')"
     ]
   }
 }
