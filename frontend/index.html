@@ -748,9 +748,13 @@
                 </div>
                 <div class="ai-dash-body">
                   <template x-if="claudeStatus && claudeStatus.hasUsageData">
-                    <div class="ai-dash-usage">
-                      <span class="ai-dash-usage-pill" :class="usagePill(claudeStatus.fiveHourPct)">5h <strong x-text="Math.round(claudeStatus.fiveHourPct)+'%'"></strong></span>
-                      <span class="ai-dash-usage-pill" :class="usagePill(claudeStatus.sevenDayPct)">7d <strong x-text="Math.round(claudeStatus.sevenDayPct)+'%'"></strong></span>
+                    <div class="ai-dash-usage-wrap">
+                      <div class="ai-dash-usage">
+                        <span class="ai-dash-usage-pill" :class="usagePill(claudeStatus.fiveHourPct)">5h <strong x-text="Math.round(claudeStatus.fiveHourPct)+'%'"></strong></span>
+                        <span class="ai-dash-usage-pill" :class="usagePill(claudeStatus.sevenDayPct)">7d <strong x-text="Math.round(claudeStatus.sevenDayPct)+'%'"></strong></span>
+                      </div>
+                      <div class="ai-dash-usage-age" :class="claudeStatus.usageStale ? 'is-stale' : ''" x-show="claudeStatus.usageAge"
+                           x-text="(claudeStatus.usageStale ? '⚠ 缓存 ' : '🕐 ') + claudeStatus.usageAge"></div>
                     </div>
                   </template>
                   <template x-if="claudeStatus && !claudeStatus.hasUsageData">
@@ -2032,12 +2036,22 @@
                     </div>
                   </template>
                   <template x-if="claudeStatus.hasUsageData">
-                    <p class="codex-usage-meta text-sm" style="margin-top:6px">
-                      <span x-show="claudeStatus.planType">计划：<strong x-text="claudeStatus.planType"></strong></span>
-                    </p>
+                    <div class="claude-usage-meta-block">
+                      <p class="codex-usage-meta text-sm claude-usage-meta-line">
+                        <span x-show="claudeStatus.planType">计划：<strong x-text="claudeStatus.planType"></strong></span>
+                        <span class="claude-usage-age" :class="claudeStatus.usageStale ? 'is-stale' : ''" x-show="claudeStatus.usageAge">
+                          <span x-text="claudeStatus.usageStale ? '⚠' : '🕐'"></span>
+                          数据更新于 <strong x-text="claudeStatus.usageAge"></strong>
+                          <span class="claude-usage-source" x-text="'（statusline 缓存 · ' + claudeStatus.usageUpdatedAt + '）'"></span>
+                        </span>
+                      </p>
+                      <p class="claude-usage-hint text-sm" x-show="claudeStatus.usageStale">
+                        用量只在 claude CLI 交互会话运行 statusline 时写入本地缓存，桌面版 Claude 的消耗不会刷新这里；开一次终端会话即可更新。
+                      </p>
+                    </div>
                   </template>
                   <template x-if="!claudeStatus.hasUsageData">
-                    <p class="muted text-sm" style="margin-top:8px" x-text="claudeStatus.claudeInstalled ? 'ℹ 未找到用量缓存' : '⚠ claude CLI 未安装'"></p>
+                    <p class="claude-usage-hint text-sm" x-text="claudeStatus.claudeInstalled ? 'ℹ 未找到用量缓存 — 用量由 claude CLI 会话的 statusline 写入，桌面版不会生成' : '⚠ claude CLI 未安装'"></p>
                   </template>
                 </div>
               </template>

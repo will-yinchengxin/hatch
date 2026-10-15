@@ -949,6 +949,9 @@ export namespace main {
 	    sevenDayPct: number;
 	    sevenDayReset: string;
 	    planType: string;
+	    usageUpdatedAt: string;
+	    usageAge: string;
+	    usageStale: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ClaudeCodeStatus(source);
@@ -966,6 +969,9 @@ export namespace main {
 	        this.sevenDayPct = source["sevenDayPct"];
 	        this.sevenDayReset = source["sevenDayReset"];
 	        this.planType = source["planType"];
+	        this.usageUpdatedAt = source["usageUpdatedAt"];
+	        this.usageAge = source["usageAge"];
+	        this.usageStale = source["usageStale"];
 	    }
 	}
 	export class CodexModelConfig {

@@ -7304,3 +7304,55 @@ details[open] .export-preview-toggle::before {
   color: var(--text);
   background: var(--surface-0);
 }
+
+/* ─── Claude 用量缓存新鲜度提示 ────────────────────────────────────────── */
+
+.claude-usage-meta-block {
+  margin-top: 6px;
+}
+
+.claude-usage-meta-line {
+  margin: 0;
+  align-items: baseline;
+}
+
+.claude-usage-age {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.claude-usage-age.is-stale {
+  color: var(--yellow);
+}
+
+.claude-usage-age.is-stale strong {
+  color: var(--yellow);
+}
+
+.claude-usage-source {
+  color: var(--text-dim);
+}
+
+.claude-usage-hint {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.ai-dash-usage-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-dash-usage-age {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.ai-dash-usage-age.is-stale {
+  color: var(--yellow);
+}

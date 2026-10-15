@@ -21,6 +21,9 @@ type ClaudeCodeStatus struct {
 	SevenDayPct     float64  `json:"sevenDayPct"`
 	SevenDayReset   string   `json:"sevenDayReset"`
 	PlanType        string   `json:"planType"`
+	UsageUpdatedAt  string   `json:"usageUpdatedAt"`
+	UsageAge        string   `json:"usageAge"`
+	UsageStale      bool     `json:"usageStale"`
 }
 
 type CodexUsageStatus struct {
@@ -84,6 +87,14 @@ func (a *App) GetClaudeCodeStatus() ClaudeCodeStatus {
 			st.FiveHourReset = formatResetCountdown(cache.RateLimits.FiveHour.ResetsAt)
 			st.SevenDayPct = cache.RateLimits.SevenDay.UsedPercentage
 			st.SevenDayReset = formatResetCountdown(cache.RateLimits.SevenDay.ResetsAt)
+			// The cache is written only by the Claude Code statusline hook, so it
+			// goes stale whenever the user works in the desktop app instead of the
+			// CLI. Surface its age so the UI can say how old the numbers are.
+			if info, statErr := os.Stat(cachePath); statErr == nil {
+				st.UsageUpdatedAt = info.ModTime().Format("2006-01-02 15:04")
+				st.UsageAge = formatElapsed(info.ModTime())
+				st.UsageStale = time.Since(info.ModTime()) > claudeUsageCacheMaxAge
+			}
 		}
 	}
 	return st
@@ -291,6 +302,30 @@ func codexWindowFromSnapshot(label string, window codexRateLimitWindow) CodexUsa
 		ResetsAt:      window.ResetsAt,
 		ResetIn:       formatResetCountdown(window.ResetsAt),
 		Available:     true,
+	}
+}
+
+// claudeUsageCacheMaxAge matches CACHE_MAX_AGE in the statusline script; beyond
+// it the cached rate limits are treated as no longer representative.
+const claudeUsageCacheMaxAge = 6 * time.Hour
+
+// formatElapsed renders how long ago t was, in the same compact style as
+// formatResetCountdown.
+func formatElapsed(t time.Time) string {
+	diff := time.Since(t)
+	if diff < time.Minute {
+		return "刚刚"
+	}
+	mins := int(diff.Minutes())
+	hours := int(diff.Hours())
+	days := hours / 24
+	switch {
+	case days >= 1:
+		return fmt.Sprintf("%d天前", days)
+	case hours >= 1:
+		return fmt.Sprintf("%d小时前", hours)
+	default:
+		return fmt.Sprintf("%d分钟前", mins)
 	}
 }
 

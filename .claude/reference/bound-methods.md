@@ -16,7 +16,7 @@ Methods are exposed from `app.go` and sibling `app_*.go` files to the Wails JS f
 | `SaveExports / CheckZshrc / ParseZshrc / SaveZshrcAnnotation` | Shell config |
 | `SuggestZshrcOrganization / ApplyZshrcOrganization` | AI zshrc preview + backup/write |
 | `GetAutoLaunchEnabled / SetAutoLaunchEnabled` | Login autostart |
-| `GetClaudeCodeStatus / GetCodexUsageStatus` | Status cards |
+| `GetClaudeCodeStatus / GetCodexUsageStatus` | Status cards. `GetClaudeCodeStatus` also returns `usageUpdatedAt` / `usageAge` / `usageStale` from the statusline cache mtime (stale after 6h) |
 | `GetSkills / GetSkillContent / SaveSkillContent / DeleteSkill / DeleteSkillEverywhere / GetSkillsStats` | Skill CRUD |
 | `SetSkillSync / ImportSkillsFrom / ResolveSkillImportConflict / CreateSkillTemplate` | Skill sync + import conflict handling |
 | `SuggestSkillContent / SuggestSkillFromDescription` | Skill AI optimize/generation |
