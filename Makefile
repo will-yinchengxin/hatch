@@ -6,6 +6,9 @@
 VERSION   ?= 0.1.0
 PLATFORM  := darwin/arm64
 WAILS     := $(shell go env GOPATH)/bin/wails
+# Backend (Go module + wails.json) lives in src/, frontend in frontend/;
+# build artifacts still land in build/bin (wails.json "build:dir": "../build").
+BACKEND   := src
 APP       := build/bin/Hatch.app
 DMG       := build/bin/Hatch-$(VERSION)-arm64.dmg
 CREATE_DMG := /opt/homebrew/bin/create-dmg
@@ -21,27 +24,27 @@ help:
 
 ## dev      — 启动热更新开发模式（自动打开窗口）
 dev:
-	$(WAILS) dev
+	cd $(BACKEND) && $(WAILS) dev
 
 ## ─── 测试 ────────────────────────────────────────────────────────────────────
 
-## test     — 运行所有单元测试
+## test     — 运行所有后端单元测试（src/）
 test:
-	go test ./internal/... -v
+	cd $(BACKEND) && go test ./... -v
 
 ## test-short — 只显示 PASS/FAIL，不输出详情
 test-short:
-	go test ./internal/...
+	cd $(BACKEND) && go test ./...
 
 ## ─── 构建 ────────────────────────────────────────────────────────────────────
 
 ## build    — 编译 darwin/arm64（增量，不清理旧产物）
 build:
-	$(WAILS) build -platform $(PLATFORM)
+	cd $(BACKEND) && $(WAILS) build -platform $(PLATFORM)
 
 ## build-clean — 完整重新编译（清理旧产物后再构建）
 build-clean:
-	$(WAILS) build -platform $(PLATFORM) -clean
+	cd $(BACKEND) && $(WAILS) build -platform $(PLATFORM) -clean
 
 ## ─── 签名 & 打包 ─────────────────────────────────────────────────────────────
 

@@ -12,7 +12,8 @@ WAILS="${GOPATH:-$HOME/go}/bin/wails"
 DMG_OUT="build/bin/Hatch-${VERSION}-arm64.dmg"
 
 echo "▶ Building Hatch ${VERSION} (darwin/arm64)…"
-"$WAILS" build -platform darwin/arm64 -clean
+# Backend (Go module + wails.json) lives in src/; output goes to ../build/bin
+(cd src && "$WAILS" build -platform darwin/arm64 -clean)
 
 echo "▶ Signing with ad-hoc identity…"
 codesign --force --deep --sign - build/bin/Hatch.app

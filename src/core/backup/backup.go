@@ -1,0 +1,135 @@
+// Package backup exports and restores Hatch's own data (config.json,
+// scripts.json and the skills master store) as a single zip.
+package backup
+
+import (
+	"archive/zip"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"hatch/core/fsutil"
+)
+
+// Result describes a created backup archive.
+type Result struct {
+	Path     string `json:"path"`
+	Size     int64  `json:"size"`
+	NumFiles int    `json:"numFiles"`
+}
+
+// Export writes <targetDir>/hatch-backup-<ts>.zip (default ~/Desktop) holding
+// config.json, scripts.json (if any) and every file under skillsDir.
+func Export(targetDir, skillsDir string) (Result, error) {
+	if strings.TrimSpace(targetDir) == "" {
+		home, _ := os.UserHomeDir()
+		targetDir = filepath.Join(home, "Desktop")
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return Result{}, err
+	}
+	zipPath := filepath.Join(targetDir, "hatch-backup-"+time.Now().Format("20060102-150405")+".zip")
+	f, err := os.Create(zipPath)
+	if err != nil {
+		return Result{}, err
+	}
+	defer f.Close()
+
+	zw := zip.NewWriter(f)
+	numFiles := 0
+	addFile := func(srcPath, rel string) error {
+		data, err := os.ReadFile(srcPath)
+		if err != nil {
+			return nil // skip missing
+		}
+		w, err := zw.Create(rel)
+		if err != nil {
+			return err
+		}
+		if _, err := w.Write(data); err != nil {
+			return err
+		}
+		numFiles++
+		return nil
+	}
+
+	if hatchDir, err := fsutil.AppDataDir(); err == nil {
+		_ = addFile(filepath.Join(hatchDir, "config.json"), "config.json")
+		_ = addFile(filepath.Join(hatchDir, "scripts.json"), "scripts.json")
+	}
+
+	// skills dir (best-effort, recursively)
+	if skillsDir != "" {
+		_ = filepath.WalkDir(skillsDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			rel, _ := filepath.Rel(filepath.Dir(skillsDir), path)
+			return addFile(path, filepath.Join("skills", rel))
+		})
+	}
+
+	if err := zw.Close(); err != nil {
+		return Result{}, err
+	}
+	fi, _ := f.Stat()
+	return Result{Path: zipPath, Size: fi.Size(), NumFiles: numFiles}, nil
+}
+
+// Import restores config.json / scripts.json into the Hatch data dir and
+// skills/* into skillsDir. It returns how many files were written; the caller
+// reloads config.
+func Import(zipPath, skillsDir string) (int, error) {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	hatchDir, err := fsutil.AppDataDir()
+	if err != nil {
+		return 0, fmt.Errorf("无法定位 user config dir")
+	}
+	if err := os.MkdirAll(hatchDir, 0o755); err != nil {
+		return 0, err
+	}
+
+	restored := 0
+	for _, f := range r.File {
+		var dst string
+		switch {
+		case f.Name == "config.json", f.Name == "scripts.json":
+			dst = filepath.Join(hatchDir, f.Name)
+		case strings.HasPrefix(f.Name, "skills/"):
+			dst = filepath.Join(skillsDir, strings.TrimPrefix(f.Name, "skills/"))
+			_ = os.MkdirAll(filepath.Dir(dst), 0o755)
+		default:
+			continue
+		}
+		if err := writeZipEntry(f, dst); err == nil {
+			restored++
+		}
+	}
+	return restored, nil
+}
+
+func writeZipEntry(f *zip.File, dst string) error {
+	if f.FileInfo().IsDir() {
+		return nil
+	}
+	rc, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, rc)
+	return err
+}

@@ -16,119 +16,122 @@ import {
   CheckZshrc,
   SaveScriptMeta,
   DeleteScriptMeta,
-} from '../wailsjs/go/main/App';
+} from '../wailsjs/go/app/App';
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
 
 // New methods added to Go but not yet in wailsjs/App.js (regenerated on next build).
-const SaveAIConfig        = (ai)      => window['go']['main']['App']['SaveAIConfig'](ai);
-const TestAIConfig        = (ai)      => window['go']['main']['App']['TestAIConfig'](ai);
-const SuggestScriptMeta   = (meta)    => window['go']['main']['App']['SuggestScriptMeta'](meta);
-const GetAutoLaunchEnabled = () => window['go']['main']['App']['GetAutoLaunchEnabled']();
-const SetAutoLaunchEnabled = (enabled) => window['go']['main']['App']['SetAutoLaunchEnabled'](enabled);
-const GetClaudeCodeStatus   = ()                            => window['go']['main']['App']['GetClaudeCodeStatus']();
-const GetCodexUsageStatus   = ()                            => window['go']['main']['App']['GetCodexUsageStatus']();
-const ReadScriptFile        = (path)                        => window['go']['main']['App']['ReadScriptFile'](path);
-const WriteScriptFile       = (path, content)               => window['go']['main']['App']['WriteScriptFile'](path, content);
-const CreateScriptFile      = (dirPath, filename, content)  => window['go']['main']['App']['CreateScriptFile'](dirPath, filename, content);
-const SuggestScriptContent  = (path, cur, inst)             => window['go']['main']['App']['SuggestScriptContent'](path, cur, inst);
-const GetAITraces           = ()                            => window['go']['main']['App']['GetAITraces']();
-const ClearAITraces         = ()                            => window['go']['main']['App']['ClearAITraces']();
-const GetAITraceStorageInfo = ()                            => window['go']['main']['App']['GetAITraceStorageInfo']();
-const GetSkills             = ()                            => window['go']['main']['App']['GetSkills']();
-const GetSkillsStats        = ()                            => window['go']['main']['App']['GetSkillsStats']();
-const GetSkillContent       = (name)                        => window['go']['main']['App']['GetSkillContent'](name);
-const SaveSkillContent      = (name, content)               => window['go']['main']['App']['SaveSkillContent'](name, content);
-const DeleteSkill           = (name)                        => window['go']['main']['App']['DeleteSkill'](name);
-const DeleteSkillEverywhere = (name)                        => window['go']['main']['App']['DeleteSkillEverywhere'](name);
-const SetSkillSync          = (name, target, enabled)       => window['go']['main']['App']['SetSkillSync'](name, target, enabled);
-const ImportSkillsFrom      = (source)                      => window['go']['main']['App']['ImportSkillsFrom'](source);
-const ResolveSkillImportConflict = (name, source, useSource) => window['go']['main']['App']['ResolveSkillImportConflict'](name, source, useSource);
-const CreateSkillTemplate   = (name)                        => window['go']['main']['App']['CreateSkillTemplate'](name);
-const GetAppDataPaths       = ()                            => window['go']['main']['App']['GetAppDataPaths']();
-const SaveAppDataPaths      = (traceDir, skillsDir)         => window['go']['main']['App']['SaveAppDataPaths'](traceDir, skillsDir);
-const GetAIProviders        = ()                            => window['go']['main']['App']['GetAIProviders']();
-const SaveAIProviders       = (providers, activeID)         => window['go']['main']['App']['SaveAIProviders'](providers, activeID);
-const GetDocLinks           = ()                            => window['go']['main']['App']['GetDocLinks']();
-const SaveDocLinks          = (links)                       => window['go']['main']['App']['SaveDocLinks'](links);
-const OpenFile              = (path)                        => window['go']['main']['App']['OpenFile'](path);
-const GetVPNAppDir          = ()                            => window['go']['main']['App']['GetVPNAppDir']();
-const GetVPNProfiles        = ()                            => window['go']['main']['App']['GetVPNProfiles']();
-const GetVPNConfigFile      = (name)                        => window['go']['main']['App']['GetVPNConfigFile'](name);
-const SaveVPNConfigFile     = (name, content)               => window['go']['main']['App']['SaveVPNConfigFile'](name, content);
-const GetVPNProfileContent  = (uid)                         => window['go']['main']['App']['GetVPNProfileContent'](uid);
-const SaveVPNProfileContent = (uid, content)                => window['go']['main']['App']['SaveVPNProfileContent'](uid, content);
-const ExportVPNBackup       = ()                            => window['go']['main']['App']['ExportVPNBackup']();
-const ImportVPNBackup       = (zipPath)                     => window['go']['main']['App']['ImportVPNBackup'](zipPath);
-const ListVPNBackups        = ()                            => window['go']['main']['App']['ListVPNBackups']();
-const DeleteVPNBackup       = (zipPath)                     => window['go']['main']['App']['DeleteVPNBackup'](zipPath);
-const OpenVPNDir            = ()                            => window['go']['main']['App']['OpenVPNDir']();
-const OpenVPNBackupDir      = ()                            => window['go']['main']['App']['OpenVPNBackupDir']();
-const GetVPNSettings        = ()                            => window['go']['main']['App']['GetVPNSettings']();
-const SaveVPNSettings       = (appDir, backupDir)           => window['go']['main']['App']['SaveVPNSettings'](appDir, backupDir);
-const GetVPNStatus          = ()                            => window['go']['main']['App']['GetVPNStatus']();
-const GetVPNCurrentIP       = ()                            => window['go']['main']['App']['GetVPNCurrentIP']();
-const GetVPNHealthReport    = ()                            => window['go']['main']['App']['GetVPNHealthReport']();
-const ValidateVPNSettings   = (appDir, backupDir)           => window['go']['main']['App']['ValidateVPNSettings'](appDir, backupDir);
-const PreviewVPNBackup      = (zipPath)                     => window['go']['main']['App']['PreviewVPNBackup'](zipPath);
-const GetClaudeSettings     = ()                            => window['go']['main']['App']['GetClaudeSettings']();
-const SaveClaudeSettings    = (content)                     => window['go']['main']['App']['SaveClaudeSettings'](content);
-const GetCodexConfig        = ()                            => window['go']['main']['App']['GetCodexConfig']();
-const SaveCodexConfig       = (content)                     => window['go']['main']['App']['SaveCodexConfig'](content);
-const GetMCPSettings        = ()                            => window['go']['main']['App']['GetMCPSettings']();
-const SaveMCPSettings       = (mcpDir)                      => window['go']['main']['App']['SaveMCPSettings'](mcpDir);
-const ListMCPServers        = ()                            => window['go']['main']['App']['ListMCPServers']();
-const SaveMCPServer         = (server)                      => window['go']['main']['App']['SaveMCPServer'](server);
-const DeleteMCPServer       = (id)                          => window['go']['main']['App']['DeleteMCPServer'](id);
-const ImportMCPFromLocalDir = (path)                        => window['go']['main']['App']['ImportMCPFromLocalDir'](path);
-const InstallMCPFromGit     = (url, name)                   => window['go']['main']['App']['InstallMCPFromGit'](url, name);
-const SaveNpmMCPServer      = (pkg, name)                   => window['go']['main']['App']['SaveNpmMCPServer'](pkg, name);
-const SetMCPEnabled         = (id, target, enabled)         => window['go']['main']['App']['SetMCPEnabled'](id, target, enabled);
-const TestMCPConnection     = (id, target)                  => window['go']['main']['App']['TestMCPConnection'](id, target);
-const GetMCPTemplates       = ()                            => window['go']['main']['App']['GetMCPTemplates']();
-const UninstallMCPFromDisk  = (id)                          => window['go']['main']['App']['UninstallMCPFromDisk'](id);
-const UpdateMCPFromGit      = (id)                          => window['go']['main']['App']['UpdateMCPFromGit'](id);
-const SuggestMCPRecommendations = (query)                   => window['go']['main']['App']['SuggestMCPRecommendations'](query);
-const ListHooks             = ()                            => window['go']['main']['App']['ListHooks']();
-const SaveHook              = (hook)                        => window['go']['main']['App']['SaveHook'](hook);
-const DeleteHook            = (id)                          => window['go']['main']['App']['DeleteHook'](id);
-const SetHookEnabled        = (id, target, enabled)         => window['go']['main']['App']['SetHookEnabled'](id, target, enabled);
-const GetHookTemplates      = ()                            => window['go']['main']['App']['GetHookTemplates']();
-const GetHooksStats         = ()                            => window['go']['main']['App']['GetHooksStats']();
-const GetHookEventSupport   = ()                            => window['go']['main']['App']['GetHookEventSupport']();
-const SuggestHookFromDescription = (desc)                   => window['go']['main']['App']['SuggestHookFromDescription'](desc);
-const SuggestHookEdit       = (hook, instruction)          => window['go']['main']['App']['SuggestHookEdit'](hook, instruction);
-const ListAIWorkspaceProfiles = ()                         => window['go']['main']['App']['ListAIWorkspaceProfiles']();
-const SaveAIWorkspaceProfile = (profile)                   => window['go']['main']['App']['SaveAIWorkspaceProfile'](profile);
-const DeleteAIWorkspaceProfile = (id)                      => window['go']['main']['App']['DeleteAIWorkspaceProfile'](id);
-const PreviewAIWorkspaceProfileApply = (id)                => window['go']['main']['App']['PreviewAIWorkspaceProfileApply'](id);
-const ApplyAIWorkspaceProfile = (id)                       => window['go']['main']['App']['ApplyAIWorkspaceProfile'](id);
-const ListAIWorkspaceSnapshots = ()                        => window['go']['main']['App']['ListAIWorkspaceSnapshots']();
-const RollbackAIWorkspaceSnapshot = (id)                   => window['go']['main']['App']['RollbackAIWorkspaceSnapshot'](id);
-const GetAIEnvironmentHealth = ()                          => window['go']['main']['App']['GetAIEnvironmentHealth']();
-const GetMemoDashboard     = ()                            => window['go']['main']['App']['GetMemoDashboard']();
-const ListMemos            = ()                            => window['go']['main']['App']['ListMemos']();
-const SaveMemo             = (item)                        => window['go']['main']['App']['SaveMemo'](item);
-const DeleteMemo           = (id)                          => window['go']['main']['App']['DeleteMemo'](id);
-const MarkMemoDone         = (id, done)                    => window['go']['main']['App']['MarkMemoDone'](id, done);
-const ImportMemoAttachment = (path, label, kind)           => window['go']['main']['App']['ImportMemoAttachment'](path, label, kind);
-const DeleteMemoAttachment = (memoID, attachmentID)        => window['go']['main']['App']['DeleteMemoAttachment'](memoID, attachmentID);
-const OpenMemoAttachment   = (att)                         => window['go']['main']['App']['OpenMemoAttachment'](att);
-const GetMemoAttachmentPreview = (att)                     => window['go']['main']['App']['GetMemoAttachmentPreview'](att);
-const ListVocabEntries     = ()                            => window['go']['main']['App']['ListVocabEntries']();
-const SaveVocabEntry       = (entry)                       => window['go']['main']['App']['SaveVocabEntry'](entry);
-const DeleteVocabEntry     = (id)                          => window['go']['main']['App']['DeleteVocabEntry'](id);
-const ReviewVocabEntry     = (id, result)                  => window['go']['main']['App']['ReviewVocabEntry'](id, result);
-const LookupVocabWord      = (word)                        => window['go']['main']['App']['LookupVocabWord'](word);
-const SuggestVocabEntry    = (entry)                       => window['go']['main']['App']['SuggestVocabEntry'](entry);
-const SpeakVocabWord       = (word)                        => window['go']['main']['App']['SpeakVocabWord'](word);
-const GetMemoSettings      = ()                            => window['go']['main']['App']['GetMemoSettings']();
-const SaveMemoSettings     = (dir, days, auto)             => window['go']['main']['App']['SaveMemoSettings'](dir, days, auto);
-const CleanupMemoFiles     = ()                            => window['go']['main']['App']['CleanupMemoFiles']();
+const SaveAIConfig        = (ai)      => window['go']['app']['App']['SaveAIConfig'](ai);
+const TestAIConfig        = (ai)      => window['go']['app']['App']['TestAIConfig'](ai);
+const SuggestScriptMeta   = (meta)    => window['go']['app']['App']['SuggestScriptMeta'](meta);
+const GetAutoLaunchEnabled = () => window['go']['app']['App']['GetAutoLaunchEnabled']();
+const SetAutoLaunchEnabled = (enabled) => window['go']['app']['App']['SetAutoLaunchEnabled'](enabled);
+const GetClaudeCodeStatus   = ()                            => window['go']['app']['App']['GetClaudeCodeStatus']();
+const GetCodexUsageStatus   = ()                            => window['go']['app']['App']['GetCodexUsageStatus']();
+const ReadScriptFile        = (path)                        => window['go']['app']['App']['ReadScriptFile'](path);
+const WriteScriptFile       = (path, content)               => window['go']['app']['App']['WriteScriptFile'](path, content);
+const CreateScriptFile      = (dirPath, filename, content)  => window['go']['app']['App']['CreateScriptFile'](dirPath, filename, content);
+const SuggestScriptContent  = (path, cur, inst)             => window['go']['app']['App']['SuggestScriptContent'](path, cur, inst);
+const GetAITraces           = ()                            => window['go']['app']['App']['GetAITraces']();
+const ClearAITraces         = ()                            => window['go']['app']['App']['ClearAITraces']();
+const GetAITraceStorageInfo = ()                            => window['go']['app']['App']['GetAITraceStorageInfo']();
+const GetSkills             = ()                            => window['go']['app']['App']['GetSkills']();
+const GetSkillsStats        = ()                            => window['go']['app']['App']['GetSkillsStats']();
+const GetSkillContent       = (name)                        => window['go']['app']['App']['GetSkillContent'](name);
+const SaveSkillContent      = (name, content)               => window['go']['app']['App']['SaveSkillContent'](name, content);
+const DeleteSkill           = (name)                        => window['go']['app']['App']['DeleteSkill'](name);
+const DeleteSkillEverywhere = (name)                        => window['go']['app']['App']['DeleteSkillEverywhere'](name);
+const SetSkillSync          = (name, target, enabled)       => window['go']['app']['App']['SetSkillSync'](name, target, enabled);
+const ImportSkillsFrom      = (source)                      => window['go']['app']['App']['ImportSkillsFrom'](source);
+const ResolveSkillImportConflict = (name, source, useSource) => window['go']['app']['App']['ResolveSkillImportConflict'](name, source, useSource);
+const CreateSkillTemplate   = (name)                        => window['go']['app']['App']['CreateSkillTemplate'](name);
+const GetAppDataPaths       = ()                            => window['go']['app']['App']['GetAppDataPaths']();
+const SaveAppDataPaths      = (traceDir, skillsDir)         => window['go']['app']['App']['SaveAppDataPaths'](traceDir, skillsDir);
+const GetAIProviders        = ()                            => window['go']['app']['App']['GetAIProviders']();
+const SaveAIProviders       = (providers, activeID)         => window['go']['app']['App']['SaveAIProviders'](providers, activeID);
+const GetDocLinks           = ()                            => window['go']['app']['App']['GetDocLinks']();
+const SaveDocLinks          = (links)                       => window['go']['app']['App']['SaveDocLinks'](links);
+const OpenFile              = (path)                        => window['go']['app']['App']['OpenFile'](path);
+const GetVPNAppDir          = ()                            => window['go']['app']['App']['GetVPNAppDir']();
+const GetVPNProfiles        = ()                            => window['go']['app']['App']['GetVPNProfiles']();
+const GetVPNConfigFile      = (name)                        => window['go']['app']['App']['GetVPNConfigFile'](name);
+const SaveVPNConfigFile     = (name, content)               => window['go']['app']['App']['SaveVPNConfigFile'](name, content);
+const GetVPNProfileContent  = (uid)                         => window['go']['app']['App']['GetVPNProfileContent'](uid);
+const SaveVPNProfileContent = (uid, content)                => window['go']['app']['App']['SaveVPNProfileContent'](uid, content);
+const ExportVPNBackup       = ()                            => window['go']['app']['App']['ExportVPNBackup']();
+const ImportVPNBackup       = (zipPath)                     => window['go']['app']['App']['ImportVPNBackup'](zipPath);
+const ListVPNBackups        = ()                            => window['go']['app']['App']['ListVPNBackups']();
+const DeleteVPNBackup       = (zipPath)                     => window['go']['app']['App']['DeleteVPNBackup'](zipPath);
+const OpenVPNDir            = ()                            => window['go']['app']['App']['OpenVPNDir']();
+const OpenVPNBackupDir      = ()                            => window['go']['app']['App']['OpenVPNBackupDir']();
+const GetVPNSettings        = ()                            => window['go']['app']['App']['GetVPNSettings']();
+const SaveVPNSettings       = (appDir, backupDir)           => window['go']['app']['App']['SaveVPNSettings'](appDir, backupDir);
+const GetVPNStatus          = ()                            => window['go']['app']['App']['GetVPNStatus']();
+const GetVPNCurrentIP       = ()                            => window['go']['app']['App']['GetVPNCurrentIP']();
+const GetVPNHealthReport    = ()                            => window['go']['app']['App']['GetVPNHealthReport']();
+const ValidateVPNSettings   = (appDir, backupDir)           => window['go']['app']['App']['ValidateVPNSettings'](appDir, backupDir);
+const PreviewVPNBackup      = (zipPath)                     => window['go']['app']['App']['PreviewVPNBackup'](zipPath);
+const GetClaudeSettings     = ()                            => window['go']['app']['App']['GetClaudeSettings']();
+const SaveClaudeSettings    = (content)                     => window['go']['app']['App']['SaveClaudeSettings'](content);
+const GetCodexConfig        = ()                            => window['go']['app']['App']['GetCodexConfig']();
+const SaveCodexConfig       = (content)                     => window['go']['app']['App']['SaveCodexConfig'](content);
+const GetMCPSettings        = ()                            => window['go']['app']['App']['GetMCPSettings']();
+const SaveMCPSettings       = (mcpDir)                      => window['go']['app']['App']['SaveMCPSettings'](mcpDir);
+const ListMCPServers        = ()                            => window['go']['app']['App']['ListMCPServers']();
+const SaveMCPServer         = (server)                      => window['go']['app']['App']['SaveMCPServer'](server);
+const DeleteMCPServer       = (id)                          => window['go']['app']['App']['DeleteMCPServer'](id);
+const ImportMCPFromLocalDir = (path)                        => window['go']['app']['App']['ImportMCPFromLocalDir'](path);
+const InstallMCPFromGit     = (url, name)                   => window['go']['app']['App']['InstallMCPFromGit'](url, name);
+const SaveNpmMCPServer      = (pkg, name)                   => window['go']['app']['App']['SaveNpmMCPServer'](pkg, name);
+const SetMCPEnabled         = (id, target, enabled)         => window['go']['app']['App']['SetMCPEnabled'](id, target, enabled);
+const TestMCPConnection     = (id, target)                  => window['go']['app']['App']['TestMCPConnection'](id, target);
+const GetMCPTemplates       = ()                            => window['go']['app']['App']['GetMCPTemplates']();
+const UninstallMCPFromDisk  = (id)                          => window['go']['app']['App']['UninstallMCPFromDisk'](id);
+const UpdateMCPFromGit      = (id)                          => window['go']['app']['App']['UpdateMCPFromGit'](id);
+const SuggestMCPRecommendations = (query)                   => window['go']['app']['App']['SuggestMCPRecommendations'](query);
+const ListHooks             = ()                            => window['go']['app']['App']['ListHooks']();
+const SaveHook              = (hook)                        => window['go']['app']['App']['SaveHook'](hook);
+const DeleteHook            = (id)                          => window['go']['app']['App']['DeleteHook'](id);
+const SetHookEnabled        = (id, target, enabled)         => window['go']['app']['App']['SetHookEnabled'](id, target, enabled);
+const GetHookTemplates      = ()                            => window['go']['app']['App']['GetHookTemplates']();
+const GetHooksStats         = ()                            => window['go']['app']['App']['GetHooksStats']();
+const GetHookEventSupport   = ()                            => window['go']['app']['App']['GetHookEventSupport']();
+const SuggestHookFromDescription = (desc)                   => window['go']['app']['App']['SuggestHookFromDescription'](desc);
+const SuggestHookEdit       = (hook, instruction)          => window['go']['app']['App']['SuggestHookEdit'](hook, instruction);
+const ListAIWorkspaceProfiles = ()                         => window['go']['app']['App']['ListAIWorkspaceProfiles']();
+const SaveAIWorkspaceProfile = (profile)                   => window['go']['app']['App']['SaveAIWorkspaceProfile'](profile);
+const DeleteAIWorkspaceProfile = (id)                      => window['go']['app']['App']['DeleteAIWorkspaceProfile'](id);
+const PreviewAIWorkspaceProfileApply = (id)                => window['go']['app']['App']['PreviewAIWorkspaceProfileApply'](id);
+const ApplyAIWorkspaceProfile = (id)                       => window['go']['app']['App']['ApplyAIWorkspaceProfile'](id);
+const ListAIWorkspaceSnapshots = ()                        => window['go']['app']['App']['ListAIWorkspaceSnapshots']();
+const RollbackAIWorkspaceSnapshot = (id)                   => window['go']['app']['App']['RollbackAIWorkspaceSnapshot'](id);
+const GetAIEnvironmentHealth = ()                          => window['go']['app']['App']['GetAIEnvironmentHealth']();
+const GetMemoDashboard     = ()                            => window['go']['app']['App']['GetMemoDashboard']();
+const ListMemos            = ()                            => window['go']['app']['App']['ListMemos']();
+const SaveMemo             = (item)                        => window['go']['app']['App']['SaveMemo'](item);
+const DeleteMemo           = (id)                          => window['go']['app']['App']['DeleteMemo'](id);
+const MarkMemoDone         = (id, done)                    => window['go']['app']['App']['MarkMemoDone'](id, done);
+const ImportMemoAttachment = (path, label, kind)           => window['go']['app']['App']['ImportMemoAttachment'](path, label, kind);
+const DeleteMemoAttachment = (memoID, attachmentID)        => window['go']['app']['App']['DeleteMemoAttachment'](memoID, attachmentID);
+const OpenMemoAttachment   = (att)                         => window['go']['app']['App']['OpenMemoAttachment'](att);
+const GetMemoAttachmentPreview = (att)                     => window['go']['app']['App']['GetMemoAttachmentPreview'](att);
+const ListVocabEntries     = ()                            => window['go']['app']['App']['ListVocabEntries']();
+const SaveVocabEntry       = (entry)                       => window['go']['app']['App']['SaveVocabEntry'](entry);
+const DeleteVocabEntry     = (id)                          => window['go']['app']['App']['DeleteVocabEntry'](id);
+const ReviewVocabEntry     = (id, result)                  => window['go']['app']['App']['ReviewVocabEntry'](id, result);
+const LookupVocabWord      = (word)                        => window['go']['app']['App']['LookupVocabWord'](word);
+const SuggestVocabEntry    = (entry)                       => window['go']['app']['App']['SuggestVocabEntry'](entry);
+const SpeakVocabWord       = (word)                        => window['go']['app']['App']['SpeakVocabWord'](word);
+const GetMemoSettings      = ()                            => window['go']['app']['App']['GetMemoSettings']();
+const SaveMemoSettings     = (dir, days, auto)             => window['go']['app']['App']['SaveMemoSettings'](dir, days, auto);
+const CleanupMemoFiles     = ()                            => window['go']['app']['App']['CleanupMemoFiles']();
+const GetModuleSettings    = ()                            => window['go']['app']['App']['GetModuleSettings']();
 
 window.hatchApp = function () {
   return {
     // ── State ──────────────────────────────────────────────────────────
     tab: 'ai',
+    // Top-level module visibility, from config.json "modules" (GetModuleSettings).
+    modules: { workbench: true, ai: true, vpn: true, memo: true },
 
     selectedDir: null,
     allScripts: [],
@@ -649,6 +652,7 @@ window.hatchApp = function () {
     // ── Lifecycle ──────────────────────────────────────────────────────
     async init() {
       this.applyInitialRoute();
+      await this.loadModules({ init: true });
       await this.loadConfig();
       await this.scanAll();
       this.loadDataPaths();
@@ -659,10 +663,63 @@ window.hatchApp = function () {
       if (this.tab === 'ai' && this.aiSubTab === 'workspace') this.loadWorkspace();
       if (this.tab === 'ai' && this.aiSubTab === 'overview') this.loadOverview();
       if (this.tab === 'memo') this.loadMemoModule();
+      if (this.tab === 'vpn') this.loadVPNOverview();
       this.setupEvents();
+      this.setupModuleReload();
       this.setupSearchShortcuts();
       setInterval(() => this.refreshStatuses(), 3000);
-      try { this.vpnStatus = await GetVPNStatus(); } catch (_) {}
+      if (this.modules.vpn) {
+        try { this.vpnStatus = await GetVPNStatus(); } catch (_) {}
+      }
+    },
+
+    // ── Modules (config.json "modules") ───────────────────────────────────
+    // tab ids map to module keys; 'scripts' is the 工作台 (workbench) module.
+    moduleOn(tab) {
+      const key = tab === 'scripts' ? 'workbench' : tab;
+      return this.modules[key] !== false;
+    },
+
+    openTab(tab) {
+      if (!this.moduleOn(tab)) return;
+      this.tab = tab;
+      this.selectedDir = null;
+      if (tab === 'ai') { this.loadAIUsageStatuses(); this.loadAITraces(); }
+      else if (tab === 'vpn') this.loadVPNOverview();
+      else if (tab === 'memo') this.loadMemoModule();
+    },
+
+    // Re-reads module visibility from config.json; if the current tab was
+    // hidden, falls back to the first visible module. During init only the
+    // tab is switched — init() itself loads the landing page.
+    async loadModules({ init = false } = {}) {
+      try {
+        const m = await GetModuleSettings();
+        if (m) {
+          this.modules = {
+            workbench: m.workbench !== false,
+            ai: m.ai !== false,
+            vpn: m.vpn !== false,
+            memo: m.memo !== false,
+          };
+        }
+      } catch (_) {}
+      if (this.moduleOn(this.tab)) return;
+      const next = ['ai', 'scripts', 'vpn', 'memo'].find(t => this.moduleOn(t)) || 'scripts';
+      if (init) {
+        this.tab = next;
+        this.selectedDir = null;
+      } else {
+        this.openTab(next);
+      }
+    },
+
+    // Apply config.json edits when the window regains focus. The handler is
+    // kept on window so HMR re-inits replace it instead of stacking listeners.
+    setupModuleReload() {
+      if (window.__hatchModuleReload) window.removeEventListener('focus', window.__hatchModuleReload);
+      window.__hatchModuleReload = () => this.loadModules();
+      window.addEventListener('focus', window.__hatchModuleReload);
     },
 
     applyInitialRoute() {
@@ -793,7 +850,7 @@ window.hatchApp = function () {
       this.currentScripts = scripts;
 
       try {
-        await window['go']['main']['App']['SaveScriptOrder'](
+        await window['go']['app']['App']['SaveScriptOrder'](
           this.selectedDir.path,
           scripts.map(s => s.path)
         );
@@ -1402,8 +1459,10 @@ window.hatchApp = function () {
 
     async fillScriptWithAI(script) {
       if (!this.aiReady) {
-        this.selectedDir = null;
-        this.tab = 'ai';
+        if (this.moduleOn('ai')) {
+          this.selectedDir = null;
+          this.tab = 'ai';
+        }
         this.showError('请先完成并启用 AI 配置');  
         return;
       }
@@ -2508,14 +2567,14 @@ window.hatchApp = function () {
 
     async loadClaudeCodeConfig() {
       try {
-        this.claudeCodeConfig = await window['go']['main']['App']['GetClaudeCodeConfig']();
+        this.claudeCodeConfig = await window['go']['app']['App']['GetClaudeCodeConfig']();
       } catch (e) { /* silent */ }
     },
 
     async saveClaudeCodeConfig() {
       this.claudeCodeConfigSaving = true;
       try {
-        await window['go']['main']['App']['SetClaudeCodeConfig'](
+        await window['go']['app']['App']['SetClaudeCodeConfig'](
           this.claudeCodeConfig.model || '',
           this.claudeCodeConfig.effortLevel || ''
         );
@@ -2530,7 +2589,7 @@ window.hatchApp = function () {
 
     async loadClaudeCodePresets() {
       try {
-        this.claudeCodePresets = await window['go']['main']['App']['GetClaudeCodePresets']() || [];
+        this.claudeCodePresets = await window['go']['app']['App']['GetClaudeCodePresets']() || [];
       } catch (e) { /* silent */ }
     },
 
@@ -2555,7 +2614,7 @@ window.hatchApp = function () {
         return;
       }
       try {
-        await window['go']['main']['App']['SaveClaudeCodePreset'](this.claudeCodePresetForm);
+        await window['go']['app']['App']['SaveClaudeCodePreset'](this.claudeCodePresetForm);
         this.claudeCodePresetOpen = false;
         await this.loadClaudeCodePresets();
         this.showSuccess('预设已保存');
@@ -2566,7 +2625,7 @@ window.hatchApp = function () {
 
     async deleteClaudeCodePreset(id) {
       try {
-        await window['go']['main']['App']['DeleteClaudeCodePreset'](id);
+        await window['go']['app']['App']['DeleteClaudeCodePreset'](id);
         await this.loadClaudeCodePresets();
         this.showSuccess('预设已删除');
       } catch (e) {
@@ -2601,14 +2660,14 @@ window.hatchApp = function () {
 
     async loadCodexModelConfig() {
       try {
-        this.codexModelConfig = await window['go']['main']['App']['GetCodexModelConfig']();
+        this.codexModelConfig = await window['go']['app']['App']['GetCodexModelConfig']();
       } catch (e) { /* silent */ }
     },
 
     async saveCodexModelConfig() {
       this.codexModelConfigSaving = true;
       try {
-        await window['go']['main']['App']['SetCodexModelConfig'](
+        await window['go']['app']['App']['SetCodexModelConfig'](
           this.codexModelConfig.model || '',
           this.codexModelConfig.effortLevel || '',
           !!this.codexModelConfig.goalsEnabled
@@ -2624,7 +2683,7 @@ window.hatchApp = function () {
 
     async loadCodexPresets() {
       try {
-        this.codexPresets = await window['go']['main']['App']['GetCodexPresets']() || [];
+        this.codexPresets = await window['go']['app']['App']['GetCodexPresets']() || [];
       } catch (e) { /* silent */ }
     },
 
@@ -2649,7 +2708,7 @@ window.hatchApp = function () {
         return;
       }
       try {
-        await window['go']['main']['App']['SaveCodexPreset'](this.codexPresetForm);
+        await window['go']['app']['App']['SaveCodexPreset'](this.codexPresetForm);
         this.codexPresetOpen = false;
         await this.loadCodexPresets();
         this.showSuccess('预设已保存');
@@ -2660,7 +2719,7 @@ window.hatchApp = function () {
 
     async deleteCodexPreset(id) {
       try {
-        await window['go']['main']['App']['DeleteCodexPreset'](id);
+        await window['go']['app']['App']['DeleteCodexPreset'](id);
         await this.loadCodexPresets();
         this.showSuccess('预设已删除');
       } catch (e) {
@@ -2810,7 +2869,7 @@ window.hatchApp = function () {
 
     async scriptAIGenerate() {
       if (!this.aiReady) {
-        this.tab = 'ai';
+        if (this.moduleOn('ai')) this.tab = 'ai';
         this.showError('请先完成并启用 AI 配置');
         return;
       }
@@ -2866,7 +2925,7 @@ window.hatchApp = function () {
 
     async newScriptAIGenerate() {
       if (!this.aiReady) {
-        this.tab = 'ai';
+        if (this.moduleOn('ai')) this.tab = 'ai';
         this.showError('请先完成并启用 AI 配置');
         return;
       }
@@ -3755,6 +3814,7 @@ window.hatchApp = function () {
 
     // ── Header ────────────────────────────────────────────────────────────
     headerRefresh() {
+      this.loadModules();
       if (this.tab === 'scripts') {
         this.selectedDir ? this.scanDir(this.selectedDir) : this.scanAll();
       } else if (this.tab === 'vpn') {
@@ -4064,7 +4124,7 @@ window.hatchApp = function () {
     async loadVPNEnhanceData() {
       this.vpnEnhanceLoading = true;
       try {
-        this.vpnEnhanceData = await window['go']['main']['App']['GetVPNEnhanceData']();
+        this.vpnEnhanceData = await window['go']['app']['App']['GetVPNEnhanceData']();
       } catch (e) {
         this.vpnMsg = '加载增强配置失败: ' + e;
       } finally {
