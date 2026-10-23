@@ -218,6 +218,8 @@ export function PreviewVPNBackup(arg1:string):Promise<vpn.BackupPreview>;
 
 export function ReadScriptFile(arg1:string):Promise<string>;
 
+export function RefreshClaudeUsage():Promise<agent.ClaudeCodeStatus>;
+
 export function RemoveDirectory(arg1:string):Promise<void>;
 
 export function RemoveSchedule(arg1:string):Promise<void>;

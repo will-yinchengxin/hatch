@@ -406,6 +406,10 @@ export function ReadScriptFile(arg1) {
   return window['go']['app']['App']['ReadScriptFile'](arg1);
 }
 
+export function RefreshClaudeUsage() {
+  return window['go']['app']['App']['RefreshClaudeUsage']();
+}
+
 export function RemoveDirectory(arg1) {
   return window['go']['app']['App']['RemoveDirectory'](arg1);
 }

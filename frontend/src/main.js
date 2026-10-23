@@ -338,6 +338,8 @@ window.hatchApp = function () {
     mcpAddModalOpen: false,
     mcpAddTab: 'git',            // 'git' | 'npm' | 'local'
     mcpDeleteModal: { open: false, id: '', name: '', canCleanDisk: false, localPath: '' },
+    confirmDialog: { open: false, title: '', message: '', confirmText: '', danger: true },
+    confirmResolve: null,
     mcpTemplateGalleryOpen: false,
     mcpUpdateBusy: {},           // { id: true }
     mcpRecommendQuery: 'es 的 MCP，适配 Codex 和 Claude Code',
@@ -1020,6 +1022,7 @@ window.hatchApp = function () {
     },
 
     async removeDirectory(path) {
+      if (!(await this.askConfirm(`移除目录「${path}」？\n脚本文件不会被删除，但该目录的导出与 Hatch 中的配置会被移除。`, { title: '确认移除', confirmText: '移除' }))) return;
       try {
         await RemoveDirectory(path);
         await this.loadConfig();
@@ -1056,6 +1059,7 @@ window.hatchApp = function () {
     },
 
     async clearExport(dir) {
+      if (!(await this.askConfirm(`取消「${dir.path}」的路径导出？\n会从 ~/.zshrc 的 Hatch 区块中移除该导出。`, { title: '取消路径导出', confirmText: '取消导出' }))) return;
       try {
         await UpdateDirectoryExport(dir.path, '');
         await this.loadConfig();
@@ -1201,8 +1205,8 @@ window.hatchApp = function () {
     // v1.3+: data dir inventory + retention
     async loadDataInventory() {
       try {
-        const getInv = window?.go?.main?.App?.GetAppDataInventory;
-        const getRet = window?.go?.main?.App?.GetRetentionPolicy;
+        const getInv = window?.go?.app?.App?.GetAppDataInventory;
+        const getRet = window?.go?.app?.App?.GetRetentionPolicy;
         if (typeof getInv === 'function') {
           this.dataInventory = (await getInv()) || [];
         }
@@ -1219,7 +1223,7 @@ window.hatchApp = function () {
     async saveRetention() {
       this.retentionSaving = true;
       try {
-        const fn = window?.go?.main?.App?.SaveRetentionPolicy;
+        const fn = window?.go?.app?.App?.SaveRetentionPolicy;
         if (typeof fn !== 'function') throw new Error('binding 未生成');
         await fn(this.retention.traceRetainDays|0, this.retention.runsRetainDays|0, this.retention.runsKeepPerName|0);
         this.showSuccess('保留策略已保存并立即应用。');
@@ -1229,9 +1233,9 @@ window.hatchApp = function () {
     },
     async cleanupDataDir(d) {
       if (!d.cleanable) return;
-      if (!confirm(`确认清空「${d.label}」(${d.fileCount} 个文件, ${this.formatBytes(d.totalBytes)})？此操作不可撤销。`)) return;
+      if (!(await this.askConfirm(`确认清空「${d.label}」(${d.fileCount} 个文件, ${this.formatBytes(d.totalBytes)})？此操作不可撤销。`, { title: '确认清空', confirmText: '清空' }))) return;
       try {
-        const fn = window?.go?.main?.App?.CleanupDataDir;
+        const fn = window?.go?.app?.App?.CleanupDataDir;
         if (typeof fn !== 'function') throw new Error('binding 未生成');
         const msg = await fn(d.key);
         this.showSuccess(msg || '已清理');
@@ -1240,7 +1244,7 @@ window.hatchApp = function () {
     },
     async openDataDir(path) {
       try {
-        const fn = window?.go?.main?.App?.OpenFile;
+        const fn = window?.go?.app?.App?.OpenFile;
         if (typeof fn === 'function') await fn(path);
       } catch (_) {}
     },
@@ -1259,8 +1263,8 @@ window.hatchApp = function () {
     // v1.2: Prompt templates (uses dynamic bindings).
     async loadPromptTemplates() {
       try {
-        const getOverrides = window?.go?.main?.App?.GetPromptTemplates;
-        const getDefaults = window?.go?.main?.App?.GetDefaultPrompts;
+        const getOverrides = window?.go?.app?.App?.GetPromptTemplates;
+        const getDefaults = window?.go?.app?.App?.GetDefaultPrompts;
         if (typeof getDefaults === 'function') {
           this.promptDefaults = (await getDefaults()) || {};
         }
@@ -1284,7 +1288,7 @@ window.hatchApp = function () {
     async savePromptTemplates() {
       this.promptSaving = true;
       try {
-        const fn = window?.go?.main?.App?.SavePromptTemplates;
+        const fn = window?.go?.app?.App?.SavePromptTemplates;
         if (typeof fn !== 'function') throw new Error('binding 未生成，请运行 wails dev 或 wails build 重新生成');
         const payload = {};
         for (const op of this.promptOps) {
@@ -1300,7 +1304,7 @@ window.hatchApp = function () {
       }
     },
     async resetPromptTemplate() {
-      if (!confirm('确认清空所有自定义 Prompt 模板，恢复内置默认？')) return;
+      if (!(await this.askConfirm('确认清空所有自定义 Prompt 模板，恢复内置默认？', { title: '恢复默认 Prompt', confirmText: '清空并恢复' }))) return;
       const blank = {};
       for (const op of this.promptOps) blank[op.key] = '';
       this.promptTemplates = blank;
@@ -1315,7 +1319,7 @@ window.hatchApp = function () {
       this.historyLogText = '';
       this.historyLoading = true;
       try {
-        const fn = window?.go?.main?.App?.ListRuns;
+        const fn = window?.go?.app?.App?.ListRuns;
         if (typeof fn === 'function') {
           const runs = await fn(script.path);
           this.historyRecords = runs || [];
@@ -1340,7 +1344,7 @@ window.hatchApp = function () {
       this.historyOpenId = r.id;
       this.historyLogText = '加载日志中…';
       try {
-        const fn = window?.go?.main?.App?.GetRunLog;
+        const fn = window?.go?.app?.App?.GetRunLog;
         if (typeof fn === 'function') {
           this.historyLogText = await fn(this.historyTarget.path, r.id);
         }
@@ -1349,8 +1353,9 @@ window.hatchApp = function () {
       }
     },
     async deleteHistory(r) {
+      if (!(await this.askConfirm('删除这条运行记录及其日志？此操作不可撤销。'))) return;
       try {
-        const fn = window?.go?.main?.App?.DeleteRun;
+        const fn = window?.go?.app?.App?.DeleteRun;
         if (typeof fn === 'function') {
           await fn(this.historyTarget.path, r.id);
         }
@@ -1424,6 +1429,7 @@ window.hatchApp = function () {
 
     async resetEdit() {
       if (!this.editTarget) return;
+      if (!(await this.askConfirm(`重置「${this.baseName(this.editTarget.path)}」的手动配置，恢复自动检测？此操作不可撤销。`, { title: '重置脚本配置', confirmText: '重置' }))) return;
       this.editSaving = true;
       try {
         await DeleteScriptMeta(this.editTarget.path);
@@ -1531,7 +1537,7 @@ window.hatchApp = function () {
       }
       this.skillAIBusy = true;
       try {
-        const fn = window?.go?.main?.App?.SuggestSkillContent;
+        const fn = window?.go?.app?.App?.SuggestSkillContent;
         if (typeof fn !== 'function') throw new Error('binding 未生成，请重新 wails build');
         const out = await fn(this.skillEditTarget, this.skillEditContent || '', instruction);
         if (out) {
@@ -1572,6 +1578,7 @@ window.hatchApp = function () {
     },
 
     async deleteSkill(name) {
+      if (!(await this.askConfirm(`仅从 Hatch 删除 Skill「${name}」？\nClaude / Codex 中已同步的副本会保留。`))) return;
       try {
         const skill = this.skills.find(s => s.name === name);
         await DeleteSkill(name);
@@ -1586,6 +1593,7 @@ window.hatchApp = function () {
     },
 
     async deleteSkillEverywhere(name) {
+      if (!(await this.askConfirm(`从 Hatch、Claude、Codex 全部删除 Skill「${name}」？此操作不可撤销。`))) return;
       try {
         await DeleteSkillEverywhere(name);
         if (this.skillEditTarget === name) this.closeSkillEditor();
@@ -1860,6 +1868,22 @@ window.hatchApp = function () {
       } catch (e) {
         this.showError(`保存 MCP 失败: ${e}`);
       }
+    },
+
+    // Wails' macOS WebView does not implement the JS confirm panel, so
+    // window.confirm() silently returns false. Every destructive action awaits
+    // this in-app dialog instead.
+    askConfirm(message, { title = '确认删除', confirmText = '删除', danger = true } = {}) {
+      if (this.confirmResolve) this.confirmResolve(false);
+      this.confirmDialog = { open: true, title, message, confirmText, danger };
+      return new Promise(resolve => { this.confirmResolve = resolve; });
+    },
+
+    settleConfirm(ok) {
+      const resolve = this.confirmResolve;
+      this.confirmResolve = null;
+      this.confirmDialog = { ...this.confirmDialog, open: false };
+      if (resolve) resolve(ok);
     },
 
     openMCPDeleteModal(s) {
@@ -2199,6 +2223,7 @@ window.hatchApp = function () {
     },
 
     async deleteHook(id) {
+      if (!(await this.askConfirm(`删除 Hook「${id}」？已同步到 Claude / Codex 的条目也会一并移除。`))) return;
       try {
         await DeleteHook(id);
         await this.loadHooks();
@@ -2350,6 +2375,7 @@ window.hatchApp = function () {
 
     async deleteProvider(id) {
       const p = this.aiProviders.find(p => p.id === id);
+      if (!(await this.askConfirm(`删除 AI 提供商「${p?.name || id}」？其 API Key 也会一并删除。`))) return;
       const updated = this.aiProviders.filter(p => p.id !== id);
       const newActive = this.activeProviderID === id
         ? (updated[0]?.id || '')
@@ -2427,6 +2453,7 @@ window.hatchApp = function () {
     },
 
     async clearAITracesLog() {
+      if (!(await this.askConfirm('清空全部 AI 调用日志？此操作不可撤销。', { title: '确认清空', confirmText: '清空' }))) return;
       try {
         await ClearAITraces();
         this.aiTraces = [];
@@ -2543,13 +2570,13 @@ window.hatchApp = function () {
     },
 
     async deleteWorkspaceProfile(profile) {
-      if (!confirm(`删除工作区画像「${profile.name}」？不会改动当前 Claude/Codex 配置。`)) return;
+      if (!(await this.askConfirm(`删除工作区画像「${profile.name}」？不会改动当前 Claude/Codex 配置。`))) return;
       try { await DeleteAIWorkspaceProfile(profile.id); await this.loadWorkspace(); this.showSuccess('工作区画像已删除'); }
       catch (e) { this.showError(`删除失败: ${e}`); }
     },
 
     async rollbackWorkspaceSnapshot(snapshot) {
-      if (!confirm(`回滚到「${snapshot.profileName}」应用前的状态？当前 Hatch 管理的 AI 配置会被恢复。`)) return;
+      if (!(await this.askConfirm(`回滚到「${snapshot.profileName}」应用前的状态？当前 Hatch 管理的 AI 配置会被恢复。`, { title: '回滚 AI 工作区', confirmText: '回滚' }))) return;
       try { await RollbackAIWorkspaceSnapshot(snapshot.id); await this.loadWorkspace(); this.showSuccess('已回滚 AI 工作区快照'); }
       catch (e) { this.showError(`回滚失败: ${e}`); }
     },
@@ -2624,6 +2651,8 @@ window.hatchApp = function () {
     },
 
     async deleteClaudeCodePreset(id) {
+      const preset = this.claudeCodePresets.find(p => p.id === id);
+      if (!(await this.askConfirm(`删除 Claude Code 预设「${preset?.name || id}」？`))) return;
       try {
         await window['go']['app']['App']['DeleteClaudeCodePreset'](id);
         await this.loadClaudeCodePresets();
@@ -2718,6 +2747,8 @@ window.hatchApp = function () {
     },
 
     async deleteCodexPreset(id) {
+      const preset = this.codexPresets.find(p => p.id === id);
+      if (!(await this.askConfirm(`删除 Codex 预设「${preset?.name || id}」？`))) return;
       try {
         await window['go']['app']['App']['DeleteCodexPreset'](id);
         await this.loadCodexPresets();
@@ -2769,6 +2800,22 @@ window.hatchApp = function () {
         this.claudeStatus = await GetClaudeCodeStatus();
       } catch (e) {
         this.showError(`获取 Claude Code 状态失败: ${e}`);
+      } finally {
+        this.claudeStatusLoading = false;
+      }
+    },
+
+    // ↻ on the Claude Code card: run a one-line Haiku prompt via the claude CLI so
+    // the 5h/7d usage cache refreshes without opening an interactive session.
+    async refreshClaudeUsage() {
+      if (this.claudeStatusLoading) return;
+      this.claudeStatusLoading = true;
+      try {
+        this.claudeStatus = await window['go']['app']['App']['RefreshClaudeUsage']();
+        this.showSuccess('已通过 Haiku 刷新 Claude 用量');
+      } catch (e) {
+        this.showError(`刷新 Claude 用量失败: ${e}`);
+        try { this.claudeStatus = await GetClaudeCodeStatus(); } catch {}
       } finally {
         this.claudeStatusLoading = false;
       }
@@ -3183,6 +3230,8 @@ window.hatchApp = function () {
     },
 
     async removeDocLink(idx) {
+      const link = this.docLinks[idx];
+      if (!(await this.askConfirm(`移除文档「${link?.label || link?.path || ''}」？只移除链接，不删除文件。`, { title: '确认移除', confirmText: '移除' }))) return;
       this.docLinks = this.docLinks.filter((_, i) => i !== idx);
       await this.saveDocLinks();
     },
@@ -3399,7 +3448,7 @@ window.hatchApp = function () {
     },
 
     async deleteMemoItem(item) {
-      if (!confirm(`删除「${item.title}」及其托管附件？此操作不可撤销。`)) return;
+      if (!(await this.askConfirm(`删除「${item.title}」及其托管附件？此操作不可撤销。`))) return;
       try {
         await DeleteMemo(item.id);
         await this.loadMemoModule();
@@ -3424,6 +3473,7 @@ window.hatchApp = function () {
 
     async removeMemoAttachment(att) {
       if (this.memoEditingID) {
+        if (!(await this.askConfirm(`删除附件「${att.label || att.url || '附件'}」？托管目录中的副本也会被删除。`))) return;
         try {
           const saved = await DeleteMemoAttachment(this.memoEditingID, att.id);
           this.memoForm.attachments = saved.attachments || [];
@@ -4037,7 +4087,7 @@ window.hatchApp = function () {
           this.vpnMsg = '备份预览失败: 这不像 Clash Verge Rev 配置备份';
           return;
         }
-        if (!confirm(`确认恢复这个备份？\n${target}\n\n包含 ${preview.numFiles} 个文件\n关键文件：${keyFiles}\n\n恢复前 Hatch 会自动创建当前配置备份。建议先关闭 Clash Verge Rev。${warnings}`)) return;
+        if (!(await this.askConfirm(`确认恢复这个备份？\n${target}\n\n包含 ${preview.numFiles} 个文件\n关键文件：${keyFiles}\n\n恢复前 Hatch 会自动创建当前配置备份。建议先关闭 Clash Verge Rev。${warnings}`, { title: '恢复 VPN 备份', confirmText: '恢复' }))) return;
       } catch (e) {
         this.vpnMsg = '备份预览失败: ' + e;
         return;
@@ -4065,7 +4115,7 @@ window.hatchApp = function () {
     },
 
     async deleteVPNBackup(zipPath) {
-      if (!confirm(`确认删除备份？\n${this.vpnBackupBasename(zipPath)}\n\n此操作不可撤销。`)) return;
+      if (!(await this.askConfirm(`确认删除备份？\n${this.vpnBackupBasename(zipPath)}\n\n此操作不可撤销。`))) return;
       try {
         await DeleteVPNBackup(zipPath);
         this.vpnBackups = await ListVPNBackups();

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -13,6 +14,18 @@ import (
 // GetClaudeCodeStatus reports claude CLI install/version, VPN tunnel state and
 // cached rate-limit usage.
 func (a *App) GetClaudeCodeStatus() agent.ClaudeCodeStatus { return agent.ClaudeStatus() }
+
+// RefreshClaudeUsage sends a one-line Haiku prompt through the claude CLI to
+// pull fresh 5h/7d rate limits into the statusline cache, then returns the
+// updated status.
+func (a *App) RefreshClaudeUsage() (agent.ClaudeCodeStatus, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	if err := agent.RefreshClaudeUsage(ctx); err != nil {
+		return agent.ClaudeStatus(), err
+	}
+	return agent.ClaudeStatus(), nil
+}
 
 // GetCodexUsageStatus reports codex CLI install/version and the latest local
 // rate-limit snapshot.

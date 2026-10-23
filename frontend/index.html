@@ -155,6 +155,25 @@
     <button class="icon-btn" @click="error=''; clearTimeout(errorTimer)">✕</button>
   </div>
 
+  <!-- ── Confirm dialog (replaces window.confirm, which WKWebView no-ops) ── -->
+  <template x-if="confirmDialog.open">
+    <div class="modal-backdrop confirm-backdrop" @click.self="settleConfirm(false)" @keydown.escape.window="settleConfirm(false)">
+      <div class="modal-panel confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
+        <div class="modal-head">
+          <h3 id="confirmDialogTitle" x-text="confirmDialog.title"></h3>
+          <button class="icon-btn" @click="settleConfirm(false)" title="关闭">✕</button>
+        </div>
+        <div class="confirm-modal-body">
+          <p class="confirm-modal-message" x-text="confirmDialog.message"></p>
+          <div class="confirm-modal-actions">
+            <button class="btn-sm" x-init="$nextTick(() => $el.focus())" @click="settleConfirm(false)">取消</button>
+            <button :class="confirmDialog.danger ? 'btn-danger-fill' : 'btn-sm active'" @click="settleConfirm(true)" x-text="confirmDialog.confirmText"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
   <!-- ══════════════════════════════════════════════════════════════════
        SCRIPTS — Directory list
   ══════════════════════════════════════════════════════════════════ -->
@@ -1985,7 +2004,7 @@
             <section class="settings-section ai-usage-card">
               <div class="section-header-row">
                 <h3>⚡ Claude Code</h3>
-                <button class="btn-sm" @click="loadClaudeStatus()" :aria-busy="claudeStatusLoading">↻</button>
+                <button class="btn-sm" @click="refreshClaudeUsage()" :aria-busy="claudeStatusLoading" :disabled="claudeStatusLoading" title="用 Haiku 发一句 hello 刷新 5h/7d 用量">↻</button>
               </div>
               <template x-if="!claudeStatus && !claudeStatusLoading">
                 <p class="muted text-sm">点击 ↻ 检测</p>
@@ -2048,12 +2067,12 @@
                         </span>
                       </p>
                       <p class="claude-usage-hint text-sm" x-show="claudeStatus.usageStale">
-                        用量只在 claude CLI 交互会话运行 statusline 时写入本地缓存，桌面版 Claude 的消耗不会刷新这里；开一次终端会话即可更新。
+                        用量缓存已过期。点击右上角 ↻，Hatch 会用 Haiku 发一句 hello（约几秒、极少额度）拉取最新 5h/7d 用量。
                       </p>
                     </div>
                   </template>
                   <template x-if="!claudeStatus.hasUsageData">
-                    <p class="claude-usage-hint text-sm" x-text="claudeStatus.claudeInstalled ? 'ℹ 未找到用量缓存 — 用量由 claude CLI 会话的 statusline 写入，桌面版不会生成' : '⚠ claude CLI 未安装'"></p>
+                    <p class="claude-usage-hint text-sm" x-text="claudeStatus.claudeInstalled ? 'ℹ 未找到用量缓存 — 点击右上角 ↻ 用 Haiku 拉取一次' : '⚠ claude CLI 未安装'"></p>
                   </template>
                 </div>
               </template>

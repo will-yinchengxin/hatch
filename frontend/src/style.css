@@ -7356,3 +7356,31 @@ details[open] .export-preview-toggle::before {
 .ai-dash-usage-age.is-stale {
   color: var(--yellow);
 }
+
+/* ── Confirm dialog (askConfirm) ── */
+.confirm-backdrop {
+  z-index: 1100;
+}
+.confirm-modal {
+  max-width: 420px;
+  overflow: hidden;
+}
+.confirm-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+}
+.confirm-modal-message {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-line;
+  word-break: break-word;
+}
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
