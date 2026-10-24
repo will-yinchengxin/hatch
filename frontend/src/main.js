@@ -238,14 +238,21 @@ window.hatchApp = function () {
     // Single source of truth for the model catalog: `kind` splits the dropdown into
     // aliases (follow the latest model in a family) and pinned version IDs; `efforts`
     // is the effort levels that model actually accepts (Haiku supports none).
+    // Claude Code model catalog (Anthropic API, checked 2026-10 against code.claude.com/docs/en/model-config).
     claudeModels: [
-      { value: 'opus',              label: 'Opus（最新）',   kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { value: 'sonnet',            label: 'Sonnet（最新）', kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { value: 'fable',             label: 'Fable（最新）',  kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { value: 'haiku',             label: 'Haiku（最新）',  kind: 'alias',  efforts: [] },
+      { value: 'opus',              label: 'Opus（最新 · 5.5）',          kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'sonnet',            label: 'Sonnet（最新 · 5.5）',        kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'fable',             label: 'Fable（最新 · 5.1）',         kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'haiku',             label: 'Haiku（最新 · 5.5）',         kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'best',              label: '最强可用（有 Fable 用 Fable）', kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'opusplan',          label: '规划用 Opus，执行用 Sonnet',  kind: 'alias',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-fable-5-1',  label: 'Fable 5.1',      kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-opus-5-5',   label: 'Opus 5.5',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-sonnet-5-5', label: 'Sonnet 5.5',     kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-haiku-5-5',  label: 'Haiku 5.5',      kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'claude-fable-5',    label: 'Fable 5',        kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { value: 'claude-opus-5',     label: 'Opus 5',         kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { value: 'claude-sonnet-5',   label: 'Sonnet 5',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { value: 'claude-fable-5',    label: 'Fable 5',        kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { value: 'claude-opus-4-8',   label: 'Opus 4.8',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { value: 'claude-opus-4-7',   label: 'Opus 4.7',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { value: 'claude-opus-4-6',   label: 'Opus 4.6',       kind: 'pinned', efforts: ['low', 'medium', 'high', 'max'] },
@@ -259,13 +266,16 @@ window.hatchApp = function () {
     claudeCodePresetOpen: false,  // inline add/edit form visible
 
     // Codex model + reasoning effort + goal-mode config
+    // Codex model catalog (checked 2026-10 against the Codex models page). kind: current | legacy.
     codexModels: [
-      { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
-      { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
-      { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { value: 'gpt-5.5', label: 'GPT-5.5', efforts: ['low', 'medium', 'high', 'xhigh'] },
-      { value: 'gpt-5.4', label: 'GPT-5.4', efforts: ['low', 'medium', 'high', 'xhigh'] },
-      { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini', efforts: ['low', 'medium', 'high', 'xhigh'] },
+      { value: 'gpt-6.1-sol',   label: 'GPT-6.1 Sol · 复杂编码 / 代理任务', kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      { value: 'gpt-6-astra',   label: 'GPT-6 Astra · 最难的端到端任务',    kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh'] },
+      { value: 'gpt-6-sol',     label: 'GPT-6 Sol',                         kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      { value: 'gpt-6-luna',    label: 'GPT-6 Luna · 轻快、可重复的任务',   kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'gpt-5.6-sol',   label: 'GPT-5.6 Sol',                       kind: 'legacy',  efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra',                     kind: 'legacy',  efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      { value: 'gpt-5.6-luna',  label: 'GPT-5.6 Luna',                      kind: 'legacy',  efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'gpt-5.5',       label: 'GPT-5.5 · 仅 API Key 登录可用',     kind: 'legacy',  efforts: ['low', 'medium', 'high', 'xhigh'] },
     ],
     codexModelConfig: { model: '', effortLevel: '', goalsEnabled: false },
     codexModelConfigSaving: false,
@@ -408,6 +418,7 @@ window.hatchApp = function () {
     vpnRestoreBusy: false,
     vpnMsg: '',
     vpnStatusRefreshing: false,
+    vpnDelayTesting: false,
     // 订阅 (subscriptions overview)
     vpnSubs: null,           // { subscriptions, global, files }
     vpnSubsLoading: false,
@@ -2343,7 +2354,7 @@ window.hatchApp = function () {
         deepseek: { name: 'DeepSeek',  baseUrl: 'https://api.deepseek.com/v1',               model: 'deepseek-chat' },
         glm:      { name: 'GLM',       baseUrl: 'https://open.bigmodel.cn/api/paas/v4',       model: 'glm-4-plus' },
         openai:   { name: 'OpenAI',    baseUrl: 'https://api.openai.com/v1',                  model: 'gpt-4o-mini' },
-        claude:   { name: 'Claude',    baseUrl: 'https://api.anthropic.com/v1',               model: 'claude-opus-5' },
+        claude:   { name: 'Claude',    baseUrl: 'https://api.anthropic.com/v1',               model: 'claude-opus-5-5' },
         kimi:     { name: 'Kimi',      baseUrl: 'https://api.moonshot.cn/v1',                 model: 'moonshot-v1-8k' },
         qwen:     { name: 'Qwen',      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
       };
@@ -2812,7 +2823,8 @@ window.hatchApp = function () {
     },
 
     codexModelLabel(model) {
-      return this.codexModels.find(item => item.value === model)?.label || model || '默认';
+      const label = this.codexModels.find(item => item.value === model)?.label;
+      return label ? label.split(' · ')[0] : (model || '默认');
     },
 
     async loadClaudeStatus() {
@@ -4160,6 +4172,68 @@ window.hatchApp = function () {
     vpnHealthGo(action) {
       if (!action || !action.tab) return;
       this.vpnGo(action.tab === 'advanced' ? 'config' : action.tab);
+    },
+
+    // ── VPN hero dashboard ──────────────────────────────────────────────────
+    vpnConnState() {
+      const s = this.vpnStatus;
+      if (!s) return { text: '读取中…', on: false, cls: '' };
+      if (!s.coreOnline) return { text: '内核未运行', on: false, cls: 'is-off' };
+      if (s.tunEnabled || s.systemProxyEnabled) return { text: '已连接', on: true, cls: 'is-on' };
+      return { text: '未接管流量', on: false, cls: 'is-warn' };
+    },
+
+    vpnModeLabel(mode) {
+      return { rule: '规则分流', global: '全局代理', direct: '全部直连' }[mode] || mode || '';
+    },
+
+    vpnTunBypassText() {
+      const n = ((this.vpnStatus && this.vpnStatus.tunExcludedCidrs) || []).length;
+      return n ? `${n} 个网段绕过 VPN` : '没有绕过的网段';
+    },
+
+    vpnFlag(code) {
+      if (!/^[A-Za-z]{2}$/.test(code || '')) return '🌐';
+      return String.fromCodePoint(...code.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+    },
+
+    vpnIPPlace(ip) {
+      let country = ip.country || '';
+      try {
+        if (/^[A-Za-z]{2}$/.test(country)) country = new Intl.DisplayNames(['zh-CN'], { type: 'region' }).of(country.toUpperCase());
+      } catch (_) { /* keep the code */ }
+      return [country, ip.city].filter(Boolean).join(' · ') || '未知位置';
+    },
+
+    vpnIPOrg(org) {
+      return (org || '').replace(/^AS\d+\s+/, '');
+    },
+
+    vpnDelayText(ms) {
+      if (ms > 0) return ms + ' ms';
+      if (ms < 0) return '超时';
+      return '未测速';
+    },
+
+    vpnDelayClass(ms) {
+      if (!ms) return '';
+      if (ms < 0) return 'is-bad';
+      return ms < 200 ? 'is-good' : ms < 500 ? 'is-mid' : 'is-bad';
+    },
+
+    async testVPNNodeDelay() {
+      const s = this.vpnStatus;
+      if (!s || !s.currentGroup || this.vpnDelayTesting) return;
+      this.vpnDelayTesting = true;
+      try {
+        const ms = await window['go']['app']['App']['TestVPNNodeDelay'](s.currentGroup);
+        s.nodeDelay = ms;
+        if (s.proxyGroups && s.proxyGroups[0]) s.proxyGroups[0].delay = ms;
+      } catch (e) {
+        this.showError('测速失败：' + e);
+      } finally {
+        this.vpnDelayTesting = false;
+      }
     },
 
     // ── VPN navigation ──────────────────────────────────────────────────────

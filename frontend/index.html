@@ -2134,22 +2134,22 @@
                 <div class="cc-rec-presets">
                   <span class="cc-rec-presets-label">推荐组合</span>
                   <div class="cc-rec-list">
-                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='haiku'; claudeCodeConfig.effortLevel=''; saveClaudeCodeConfig()" title="haiku · 最快响应，适合简单任务（Haiku 不支持努力程度）">
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='haiku'; claudeCodeConfig.effortLevel='low'; saveClaudeCodeConfig()" title="haiku（Haiku 5.5）+ low · 最快响应，适合简单任务">
                       <span class="cc-rec-name">极速</span>
                       <span class="badge cc-model-badge">Haiku</span>
-                      <span class="badge cc-effort-badge cc-effort-default">默认</span>
+                      <span class="badge cc-effort-badge cc-effort-low">low</span>
                     </button>
-                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='sonnet'; claudeCodeConfig.effortLevel='medium'; saveClaudeCodeConfig()" title="sonnet + medium · 速度与质量均衡">
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='sonnet'; claudeCodeConfig.effortLevel='medium'; saveClaudeCodeConfig()" title="sonnet（Sonnet 5.5）+ medium · 速度与质量均衡">
                       <span class="cc-rec-name">均衡</span>
                       <span class="badge cc-model-badge">Sonnet</span>
                       <span class="badge cc-effort-badge cc-effort-medium">medium</span>
                     </button>
-                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='opus'; claudeCodeConfig.effortLevel='high'; saveClaudeCodeConfig()" title="opus + high · 复杂任务深度思考">
+                    <button class="cc-rec-chip" @click="claudeCodeConfig.model='opus'; claudeCodeConfig.effortLevel='high'; saveClaudeCodeConfig()" title="opus（Opus 5.5）+ high · 复杂任务深度思考">
                       <span class="cc-rec-name">精深</span>
                       <span class="badge cc-model-badge">Opus</span>
                       <span class="badge cc-effort-badge cc-effort-high">high</span>
                     </button>
-                    <button class="cc-rec-chip cc-rec-chip-fable" @click="claudeCodeConfig.model='fable'; claudeCodeConfig.effortLevel='xhigh'; saveClaudeCodeConfig()" title="fable + xhigh · 最强能力，挑战性工程任务">
+                    <button class="cc-rec-chip cc-rec-chip-fable" @click="claudeCodeConfig.model='fable'; claudeCodeConfig.effortLevel='xhigh'; saveClaudeCodeConfig()" title="fable（Fable 5.1）+ xhigh · 最强能力，挑战性工程任务">
                       <span class="cc-rec-name">极限</span>
                       <span class="badge cc-model-badge">Fable</span>
                       <span class="badge cc-effort-badge cc-effort-xhigh">xhigh</span>
@@ -2316,9 +2316,16 @@
                       <template x-if="codexModelConfig.model && !isKnownCodexModel(codexModelConfig.model)">
                         <option :value="codexModelConfig.model" x-text="codexModelConfig.model + ' · 当前/自定义'"></option>
                       </template>
-                      <template x-for="model in codexModels" :key="model.value">
-                        <option :value="model.value" x-text="model.value"></option>
-                      </template>
+                      <optgroup label="最新">
+                        <template x-for="model in codexModels.filter(m => m.kind === 'current')" :key="model.value">
+                          <option :value="model.value" x-text="model.label"></option>
+                        </template>
+                      </optgroup>
+                      <optgroup label="旧版 · 逐步下线">
+                        <template x-for="model in codexModels.filter(m => m.kind === 'legacy')" :key="model.value">
+                          <option :value="model.value" x-text="model.label"></option>
+                        </template>
+                      </optgroup>
                     </select>
                   </div>
                   <div class="codex-model-config-field agent-config-field">
@@ -2355,25 +2362,25 @@
                 <div class="cc-rec-presets codex-rec-presets">
                   <span class="cc-rec-presets-label">推荐组合</span>
                   <div class="cc-rec-list">
-                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.6-luna'; codexModelConfig.effortLevel='low'; saveCodexModelConfig()" title="GPT-5.6 Luna + low · 快速轻量，适合简单改动">
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-6-luna'; codexModelConfig.effortLevel='low'; saveCodexModelConfig()" title="GPT-6 Luna + low · 快速轻量，适合简单、可重复的改动">
                       <span class="cc-rec-name">极速</span>
-                      <span class="badge codex-model-badge">5.6 Luna</span>
+                      <span class="badge codex-model-badge">6 Luna</span>
                       <span class="badge codex-effort-badge codex-effort-low">low</span>
                     </button>
-                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.6-terra'; codexModelConfig.effortLevel='medium'; saveCodexModelConfig()" title="GPT-5.6 Terra + medium · 日常编码与质量平衡">
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-6-sol'; codexModelConfig.effortLevel='medium'; saveCodexModelConfig()" title="GPT-6 Sol + medium · 日常编码与质量平衡">
                       <span class="cc-rec-name">均衡</span>
-                      <span class="badge codex-model-badge">5.6 Terra</span>
+                      <span class="badge codex-model-badge">6 Sol</span>
                       <span class="badge codex-effort-badge codex-effort-medium">medium</span>
                     </button>
-                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-5.6-sol'; codexModelConfig.effortLevel='high'; saveCodexModelConfig()" title="GPT-5.6 Sol + high · 复杂改造与审查">
+                    <button class="cc-rec-chip" @click="codexModelConfig.model='gpt-6.1-sol'; codexModelConfig.effortLevel='high'; saveCodexModelConfig()" title="GPT-6.1 Sol + high · 复杂编码、代理任务与审查">
                       <span class="cc-rec-name">精深</span>
-                      <span class="badge codex-model-badge">5.6 Sol</span>
+                      <span class="badge codex-model-badge">6.1 Sol</span>
                       <span class="badge codex-effort-badge codex-effort-high">high</span>
                     </button>
-                    <button class="cc-rec-chip codex-rec-chip-ultra" @click="codexModelConfig.model='gpt-5.6-sol'; codexModelConfig.effortLevel='ultra'; saveCodexModelConfig()" title="GPT-5.6 Sol + ultra · 自动委派子任务，适合大型任务">
+                    <button class="cc-rec-chip codex-rec-chip-ultra" @click="codexModelConfig.model='gpt-6-astra'; codexModelConfig.effortLevel='xhigh'; saveCodexModelConfig()" title="GPT-6 Astra + xhigh · 最难的端到端任务">
                       <span class="cc-rec-name">攻坚</span>
-                      <span class="badge codex-model-badge">5.6 Sol</span>
-                      <span class="badge codex-effort-badge codex-effort-ultra">ultra</span>
+                      <span class="badge codex-model-badge">6 Astra</span>
+                      <span class="badge codex-effort-badge codex-effort-xhigh">xhigh</span>
                     </button>
                   </div>
                 </div>
@@ -2407,9 +2414,16 @@
                       <template x-if="codexPresetForm.model && !isKnownCodexModel(codexPresetForm.model)">
                         <option :value="codexPresetForm.model" x-text="codexPresetForm.model + ' · 当前/自定义'"></option>
                       </template>
-                      <template x-for="model in codexModels" :key="model.value">
-                        <option :value="model.value" x-text="model.value"></option>
-                      </template>
+                      <optgroup label="最新">
+                        <template x-for="model in codexModels.filter(m => m.kind === 'current')" :key="model.value">
+                          <option :value="model.value" x-text="model.label"></option>
+                        </template>
+                      </optgroup>
+                      <optgroup label="旧版 · 逐步下线">
+                        <template x-for="model in codexModels.filter(m => m.kind === 'legacy')" :key="model.value">
+                          <option :value="model.value" x-text="model.label"></option>
+                        </template>
+                      </optgroup>
                     </select>
                     <select class="codex-model-config-select" x-model="codexPresetForm.effortLevel">
                       <option value="">系统默认</option>
@@ -3409,108 +3423,113 @@
               @click="refreshVPNStatus()"
               :aria-busy="vpnStatusRefreshing"
               :disabled="vpnStatusRefreshing"
-              title="刷新代理状态、TUN、出口 IP、代理节点">↻</button>
+              title="刷新连接状态、出口 IP、节点与流量">↻</button>
 
       <div class="vpn-hero-left">
         <p class="eyebrow">代理配置管理</p>
         <h1>VPN 配置中心</h1>
         <p class="page-subtitle">Clash Verge Rev 配置查看、编辑、备份与恢复。</p>
       </div>
-      <div class="vpn-hero-right">
-        <!-- 状态卡行 -->
-        <div class="hero-stats vpn-hero-stats">
-
-          <!-- TUN 模式 card -->
-          <div class="hero-stat-card vpn-status-card vpn-tun-card"
-               :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-stat-on' : 'vpn-stat-off'">
-            <div class="hero-stat-label">TUN 模式
-              <span x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length"
-                    class="vpn-tun-hint" x-text="(vpnStatus && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length || 0) + ' 个排除'"></span>
-            </div>
-            <div class="vpn-status-row">
-              <span class="vpn-status-dot" :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-dot-on' : 'vpn-dot-off'"></span>
-              <span class="vpn-status-text"
-                :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-on' : 'vpn-off'"
-                x-text="vpnStatus ? (vpnStatus.tunEnabled ? '已开启' : '已关闭') : '—'"></span>
-            </div>
-            <!-- TUN interface info -->
-            <div class="vpn-tun-iface" x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunInterface"
-                 x-text="vpnStatus && vpnStatus.tunInterface"></div>
-            <!-- Excluded CIDRs -->
-            <div class="vpn-tun-cidrs" x-show="vpnStatus && vpnStatus.tunEnabled">
-              <div class="vpn-tun-cidrs-title">
-                <span>排除网段</span>
-                <button class="vpn-link-btn" @click="vpnRulesSection = 'tun'; vpnGo('rules')">编辑</button>
-              </div>
-              <div class="vpn-tun-cidrs-empty" x-show="!(vpnStatus && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length)">未设置，所有流量都经过 TUN</div>
-              <div class="vpn-tun-cidrs-list">
-                <template x-for="cidr in (vpnStatus && vpnStatus.tunExcludedCidrs || [])">
-                  <span class="vpn-cidr-tag" x-text="cidr"></span>
-                </template>
-              </div>
-            </div>
+      <div class="vpn-dash">
+        <!-- 连接状态 -->
+        <div class="vpn-dash-card" :class="vpnConnState().cls">
+          <div class="vpn-dash-label">连接状态</div>
+          <div class="vpn-dash-main">
+            <span class="vpn-status-dot" :class="vpnConnState().on ? 'vpn-dot-on' : 'vpn-dot-off'"></span>
+            <span class="vpn-dash-big" x-text="vpnConnState().text"></span>
           </div>
-
-          <!-- 出口 IP card -->
-          <div class="hero-stat-card vpn-ip-card">
-            <div class="hero-stat-label">
-              出口 IP
-              <button class="vpn-ip-refresh" @click.stop="refreshVPNCurrentIP()" :aria-busy="vpnIPLoading" title="刷新">↻</button>
-            </div>
-            <div class="hero-stat-body">
-              <template x-if="vpnIPLoading">
-                <span class="hero-stat-value hero-stat-value--sm vpn-muted">检测中…</span>
-              </template>
-              <template x-if="!vpnIPLoading && vpnCurrentIP && !vpnCurrentIP.error">
-                <div class="vpn-ip-body">
-                  <span class="vpn-ip-location">
-                    <span x-text="vpnCurrentIP.country"></span>
-                    <span x-show="vpnCurrentIP.city" x-text="' · ' + vpnCurrentIP.city"></span>
-                  </span>
-                  <span class="vpn-ip-addr" x-text="vpnCurrentIP.ip"></span>
-                </div>
-              </template>
-              <template x-if="!vpnIPLoading && (!vpnCurrentIP || vpnCurrentIP.error)">
-                <span class="hero-stat-value hero-stat-value--sm vpn-muted">—</span>
-              </template>
-            </div>
+          <div class="vpn-dash-chips">
+            <span class="vpn-dash-chip on" x-show="vpnStatus && vpnStatus.mode" x-text="vpnModeLabel(vpnStatus && vpnStatus.mode)"></span>
+            <span class="vpn-dash-chip" :class="vpnStatus && vpnStatus.tunEnabled ? 'on' : ''"
+              x-text="vpnStatus && vpnStatus.tunEnabled ? 'TUN 已开启' : 'TUN 未开启'"></span>
           </div>
-
-          <!-- 代理节点 card -->
-          <div class="hero-stat-card vpn-node-card" x-show="vpnStatus && (vpnStatus.currentNode || (vpnStatus.proxyGroups && vpnStatus.proxyGroups.length))">
-            <div class="hero-stat-label">代理节点</div>
-            <div class="vpn-proxy-groups">
-              <template x-if="vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length">
-                <div>
-                  <template x-for="(pg, idx) in (vpnStatus && vpnStatus.proxyGroups || [])" :key="pg.name">
-                    <div class="vpn-proxy-group-row" x-show="idx < 3">
-                      <span class="vpn-pg-label" x-text="pg.name"></span>
-                      <span class="vpn-pg-node" x-text="pg.node"></span>
-                    </div>
-                  </template>
-                  <div class="vpn-pg-more" x-show="vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length > 3"
-                       x-text="'+ ' + ((vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length) - 3) + ' 个'"></div>
-                </div>
-              </template>
-              <template x-if="!(vpnStatus && vpnStatus.proxyGroups && vpnStatus.proxyGroups.length) && vpnStatus && vpnStatus.currentNode">
-                <div class="vpn-proxy-group-row">
-                  <span class="vpn-pg-label">节点</span>
-                  <span class="vpn-pg-node" x-text="vpnStatus.currentNode"></span>
-                </div>
-              </template>
-            </div>
+          <div class="vpn-dash-meta">
+            <span x-show="vpnStatus && vpnStatus.coreVersion" x-text="'内核 ' + (vpnStatus && vpnStatus.coreVersion)"></span>
+            <span x-show="vpnStatus && vpnStatus.coreOnline" x-text="(vpnStatus && vpnStatus.connections) + ' 个活动连接'"></span>
           </div>
-
+          <div class="vpn-dash-foot" x-show="vpnStatus && vpnStatus.tunEnabled">
+            <span :title="(vpnStatus && vpnStatus.tunExcludedCidrs || []).join('\n')" x-text="vpnTunBypassText()"></span>
+            <button class="vpn-link-btn" @click="vpnRulesSection = 'tun'; vpnGo('rules')">编辑</button>
+          </div>
         </div>
-        <!-- 流量 + 到期行 -->
-        <div class="vpn-hero-traffic" x-show="vpnStatus && vpnStatus.total">
-          <span>↑ <strong x-text="vpnFormatBytes(vpnStatus && vpnStatus.upload)"></strong></span>
-          <span class="vpn-traffic-sep">·</span>
-          <span>↓ <strong x-text="vpnFormatBytes(vpnStatus && vpnStatus.download)"></strong></span>
-          <span class="vpn-traffic-sep">·</span>
-          <span>总量 <strong x-text="vpnFormatBytes(vpnStatus && vpnStatus.total)"></strong></span>
-          <span class="vpn-traffic-sep">·</span>
-          <span>到期 <strong x-text="vpnStatus && vpnStatus.expireAt ? new Date(vpnStatus.expireAt*1000).toLocaleDateString('zh-CN') : '—'"></strong></span>
+
+        <!-- 出口 IP -->
+        <div class="vpn-dash-card">
+          <div class="vpn-dash-label">
+            <span>出口 IP</span>
+            <button class="vpn-dash-icon-btn" @click.stop="refreshVPNCurrentIP()" :aria-busy="vpnIPLoading" :disabled="vpnIPLoading" title="重新检测">↻</button>
+          </div>
+          <template x-if="vpnIPLoading">
+            <div class="vpn-dash-main"><span class="vpn-dash-big vpn-dash-muted">检测中…</span></div>
+          </template>
+          <template x-if="!vpnIPLoading && vpnCurrentIP && !vpnCurrentIP.error">
+            <div class="vpn-dash-body">
+              <div class="vpn-dash-main">
+                <span class="vpn-dash-flag" x-text="vpnFlag(vpnCurrentIP.country)"></span>
+                <span class="vpn-dash-big" x-text="vpnIPPlace(vpnCurrentIP)"></span>
+              </div>
+              <div class="vpn-dash-mono" x-text="vpnCurrentIP.ip"></div>
+              <div class="vpn-dash-meta" x-show="vpnCurrentIP.org"><span x-text="vpnIPOrg(vpnCurrentIP.org)"></span></div>
+            </div>
+          </template>
+          <template x-if="!vpnIPLoading && (!vpnCurrentIP || vpnCurrentIP.error)">
+            <div class="vpn-dash-body">
+              <div class="vpn-dash-main"><span class="vpn-dash-big vpn-dash-muted">检测失败</span></div>
+              <div class="vpn-dash-meta"><span>网络不通或检测服务不可用，可点 ↻ 重试</span></div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 当前节点 -->
+        <div class="vpn-dash-card">
+          <div class="vpn-dash-label">
+            <span>当前节点</span>
+            <button class="vpn-dash-icon-btn" @click.stop="testVPNNodeDelay()" :aria-busy="vpnDelayTesting"
+              :disabled="vpnDelayTesting || !(vpnStatus && vpnStatus.coreOnline && vpnStatus.currentGroup)" title="测速">⚡</button>
+          </div>
+          <div class="vpn-dash-main">
+            <span class="vpn-dash-big" x-text="vpnStatus && vpnStatus.currentNode || '—'"></span>
+          </div>
+          <div class="vpn-dash-chips">
+            <span class="vpn-dash-chip" x-show="vpnStatus && vpnStatus.currentGroup" x-text="vpnStatus && vpnStatus.currentGroup"></span>
+            <span class="vpn-delay" :class="vpnDelayClass(vpnStatus && vpnStatus.nodeDelay)" x-show="vpnStatus && vpnStatus.coreOnline"
+              x-text="vpnDelayText(vpnStatus && vpnStatus.nodeDelay)"></span>
+          </div>
+          <div class="vpn-dash-list">
+            <template x-for="(pg, idx) in (vpnStatus && vpnStatus.proxyGroups || []).slice(1, 4)" :key="pg.name">
+              <div class="vpn-dash-list-row" :title="vpnGroupTypeLabel(pg.type)">
+                <span class="vpn-dash-list-name" x-text="pg.name"></span>
+                <span class="vpn-dash-list-val">
+                  <span x-text="pg.node"></span>
+                  <span class="vpn-dash-list-delay" :class="vpnDelayClass(pg.delay)" x-show="pg.delay" x-text="vpnDelayText(pg.delay)"></span>
+                </span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 订阅流量 -->
+        <div class="vpn-dash-card">
+          <div class="vpn-dash-label">订阅流量</div>
+          <template x-if="vpnStatus && vpnStatus.total">
+            <div class="vpn-dash-body">
+              <div class="vpn-dash-main">
+                <span class="vpn-dash-big" x-text="vpnFormatBytes(Math.max(vpnStatus.total - vpnStatus.upload - vpnStatus.download, 0))"></span>
+                <span class="vpn-dash-unit">剩余</span>
+              </div>
+              <progress class="vpn-usage-bar" :value="vpnStatus.upload + vpnStatus.download" :max="vpnStatus.total"></progress>
+              <div class="vpn-dash-meta">
+                <span x-text="'已用 ' + vpnFormatBytes(vpnStatus.upload + vpnStatus.download) + ' / ' + vpnFormatBytes(vpnStatus.total)"></span>
+              </div>
+              <div class="vpn-dash-meta"><span :class="vpnExpireClass(vpnStatus.expireAt)" x-text="vpnExpireText(vpnStatus.expireAt)"></span></div>
+            </div>
+          </template>
+          <template x-if="!(vpnStatus && vpnStatus.total)">
+            <div class="vpn-dash-main"><span class="vpn-dash-big vpn-dash-muted">未提供</span></div>
+          </template>
+          <div class="vpn-dash-foot" x-show="vpnStatus && vpnStatus.coreOnline">
+            <span x-text="'本次运行 ↑ ' + vpnFormatBytes(vpnStatus && vpnStatus.sessionUpload) + ' · ↓ ' + vpnFormatBytes(vpnStatus && vpnStatus.sessionDownload)"></span>
+          </div>
         </div>
       </div>
     </section>

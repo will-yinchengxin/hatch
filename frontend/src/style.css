@@ -5022,69 +5022,11 @@ details[open] .export-preview-toggle::before {
 .vpn-hero-left {
   flex-shrink: 0;
 }
-.vpn-hero-right {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.vpn-hero-stats {
-  flex-wrap: wrap;
-}
+
 /* .ai-hero .hero-stats sets flex-basis 720px; inside this column flexbox that
    basis would become the cards' height. */
-.vpn-hero .vpn-hero-stats { flex: 0 0 auto; }
-.vpn-hero-traffic {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 2px 0;
-}
-.vpn-hero-traffic strong {
-  color: var(--text);
-}
-.vpn-traffic-sep {
-  color: var(--border-hover);
-}
 
 /* Exit IP card */
-.vpn-ip-card .hero-stat-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.vpn-ip-refresh {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--text-muted);
-  padding: 0 2px;
-  line-height: 1;
-  opacity: 0.7;
-  transition: opacity 0.15s;
-}
-.vpn-ip-refresh:hover { opacity: 1; }
-.vpn-ip-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.vpn-ip-location {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-.vpn-ip-addr {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-.vpn-muted {
-  color: var(--text-muted);
-  font-style: italic;
-}
 
 /* Status grid */
 .vpn-status-grid {
@@ -5108,8 +5050,7 @@ details[open] .export-preview-toggle::before {
   font-size: 14px;
   font-weight: 600;
 }
-.vpn-on  { color: var(--green); }
-.vpn-off { color: var(--text-muted); }
+
 .vpn-node { font-size: 12px; color: var(--cyan); font-family: var(--font-mono); }
 
 .vpn-traffic-row {
@@ -5465,30 +5406,7 @@ details[open] .export-preview-toggle::before {
   justify-content: center;
 }
 
-/* ─── VPN Hero Card Redesign ────────────────────────────────── */
-
-/* Status cards (系统代理 / TUN模式) */
-.vpn-status-card {
-  min-width: 110px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  cursor: default;
-}
-.vpn-stat-on {
-  border-color: rgba(79,123,88,0.5) !important;
-  background: linear-gradient(135deg, var(--surface-2) 60%, rgba(79,123,88,0.06)) !important;
-  box-shadow: 0 0 0 1px rgba(79,123,88,0.15), var(--shadow-sm) !important;
-}
-.vpn-stat-off {
-  opacity: 0.75;
-}
-
-.vpn-status-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 4px;
-  flex: 1;
-}
+/* ─── VPN status dots (hero + header pill) ──────────────────── */
 .vpn-status-dot {
   width: 8px;
   height: 8px;
@@ -5503,108 +5421,126 @@ details[open] .export-preview-toggle::before {
 .vpn-dot-off {
   background: var(--border);
 }
-.vpn-status-text {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
-}
 
-/* TUN card extras */
-.vpn-tun-card {
-  cursor: default;
+/* ─── VPN hero dashboard (连接 / 出口 IP / 节点 / 流量) ─────────────── */
+.vpn-dash {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
-.vpn-tun-hint {
-  font-size: 9px;
-  color: var(--cyan);
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
-  margin-left: 4px;
-  opacity: 0.9;
-}
-.vpn-tun-iface {
-  font-size: 10.5px;
-  font-family: var(--font-mono);
-  color: var(--cyan);
-  margin-top: 3px;
-  opacity: 0.9;
-}
-.vpn-tun-cidrs {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-.vpn-tun-cidrs-title {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0;
-  margin-bottom: 5px;
-}
-.vpn-tun-cidrs-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  max-height: 48px;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-.vpn-cidr-tag {
-  display: inline-block;
-  font-size: 10px;
-  font-family: var(--font-mono);
-  background: rgba(79,107,123,0.14);
-  color: var(--cyan);
-  border: 1px solid rgba(79,107,123,0.25);
-  border-radius: var(--radius-xs);
-  padding: 1px 6px;
-}
-
-/* Proxy groups card */
-.vpn-node-card {
-  flex: 1.4;
-  min-width: 160px;
-}
-.vpn-proxy-groups {
+.vpn-dash-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 4px;
-  flex: 1;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
 }
-.vpn-proxy-group-row {
+.vpn-dash-card.is-on {
+  border-color: rgba(79,123,88,0.45);
+  background: linear-gradient(135deg, var(--surface-2) 55%, rgba(79,123,88,0.07));
+}
+.vpn-dash-card.is-warn { border-color: rgba(167,119,46,0.45); }
+.vpn-dash-card.is-off { border-color: rgba(185,76,63,0.4); }
+.vpn-dash-label {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  min-width: 0;
-}
-.vpn-pg-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: var(--surface-3);
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-family: var(--font-mono);
-}
-.vpn-pg-node {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--cyan);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.vpn-dash-icon-btn {
+  min-height: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-3);
+}
+.vpn-dash-icon-btn:hover:not(:disabled) { color: var(--primary); background: var(--primary-dim); }
+.vpn-dash-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.vpn-dash-main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.vpn-dash-main .vpn-status-dot { align-self: center; width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.vpn-dash-big {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
+}
+.vpn-dash-card.is-on .vpn-dash-big { color: var(--green); }
+.vpn-dash-card.is-warn .vpn-dash-big { color: var(--yellow); }
+.vpn-dash-card.is-off .vpn-dash-big { color: var(--red); }
+.vpn-dash-muted { color: var(--text-dim); font-weight: 600; }
+.vpn-dash-unit { font-size: 12px; color: var(--text-muted); }
+.vpn-dash-flag { font-size: 20px; line-height: 1; align-self: center; }
+.vpn-dash-mono { font-family: var(--font-mono); font-size: 12px; color: var(--cyan); }
+.vpn-dash-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
   min-width: 0;
 }
-.vpn-pg-more {
-  font-size: 10px;
-  color: var(--text-dim);
-  padding-left: 2px;
+.vpn-dash-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.vpn-dash-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.vpn-dash-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.vpn-dash-chip.on { background: rgba(79,123,88,0.13); color: var(--green); }
+.vpn-delay {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+.vpn-delay.is-good { background: rgba(79,123,88,0.14); color: var(--green); }
+.vpn-delay.is-mid { background: rgba(167,119,46,0.14); color: var(--yellow); }
+.vpn-delay.is-bad { background: rgba(185,76,63,0.12); color: var(--red); }
+.vpn-dash-list { display: flex; flex-direction: column; gap: 3px; }
+.vpn-dash-list-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; min-width: 0; }
+.vpn-dash-list-name { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vpn-dash-list-val { color: var(--text); font-weight: 500; white-space: nowrap; }
+.vpn-dash-list-delay { margin-left: 6px; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+.vpn-dash-list-delay.is-good { color: var(--green); }
+.vpn-dash-list-delay.is-mid { color: var(--yellow); }
+.vpn-dash-list-delay.is-bad { color: var(--red); }
+.vpn-dash-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.vpn-dash .vpn-usage-bar { height: 6px; }
+@media (max-width: 1100px) {
+  .vpn-dash { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .vpn-dash { grid-template-columns: 1fr; }
 }
 
 /* ─── VPN: shared bits for 订阅 / 自定义规则 ────────────────────── */
@@ -6003,8 +5939,7 @@ select.vpn-target-direct, select.vpn-target-proxy, select.vpn-target-reject { fo
 .vpn-enh-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* TUN 卡片 / TUN 绕过 */
-.vpn-tun-cidrs-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.vpn-tun-cidrs-empty { font-size: 11px; color: var(--text-dim); }
+
 .vpn-cidr-hint { flex-shrink: 0; min-width: 110px; font-size: 11.5px; }
 
 /* 一句话改规则 */

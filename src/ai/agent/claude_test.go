@@ -9,10 +9,10 @@ import (
 func TestDefaultClaudeCodePresetsUseCurrentModelFamily(t *testing.T) {
 	presets := DefaultClaudeCodePresets()
 	want := map[string]string{
-		"cc-fast":     "haiku/",
+		"cc-fast":     "haiku/low",
 		"cc-balanced": "sonnet/medium",
 		"cc-deep":     "opus/high",
-		"cc-frontier": "claude-fable-5/xhigh",
+		"cc-frontier": "claude-fable-5-1/xhigh",
 	}
 	for _, preset := range presets {
 		if got := preset.Model + "/" + preset.EffortLevel; got != want[preset.ID] {
@@ -32,7 +32,7 @@ func TestMigrateLegacyClaudeCodePresetsOnlyUpdatesUntouchedDefaults(t *testing.T
 	if !changed {
 		t.Fatal("expected untouched legacy preset to migrate")
 	}
-	if got[0].Model != "haiku" || got[0].EffortLevel != "" || got[0].Name != "极速轻量" {
+	if got[0].Model != "haiku" || got[0].EffortLevel != "low" || got[0].Name != "极速轻量" {
 		t.Fatalf("legacy default was not migrated: %#v", got[0])
 	}
 	if got[1] != legacy[1] {
@@ -61,10 +61,11 @@ func TestMigrateLegacyClaudeCodePresetsNoopForCurrentValues(t *testing.T) {
 
 func TestResolveClaudeModelExpandsAliasesOnly(t *testing.T) {
 	cases := map[string]string{
-		"opus":              "claude-opus-5",
-		"sonnet":            "claude-sonnet-5",
-		"haiku":             "claude-haiku-4-5",
-		"fable":             "claude-fable-5",
+		"opus":              "claude-opus-5-5",
+		"sonnet":            "claude-sonnet-5-5",
+		"haiku":             "claude-haiku-5-5",
+		"fable":             "claude-fable-5-1",
+		"best":              "claude-fable-5-1",
 		"claude-opus-4-8":   "claude-opus-4-8",
 		"some-custom-model": "some-custom-model",
 		"":                  "",

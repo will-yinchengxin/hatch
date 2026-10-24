@@ -75,8 +75,10 @@ type PathValidation struct {
 }
 
 type ProxyGroup struct {
-	Name string `json:"name"`
-	Node string `json:"node"`
+	Name  string `json:"name"`
+	Node  string `json:"node"`
+	Delay int    `json:"delay"` // ms of the selected node's last probe; 0 unknown, -1 failed
+	Type  string `json:"type"`  // select | url-test | fallback | load-balance
 }
 
 type Status struct {
@@ -91,6 +93,14 @@ type Status struct {
 	Upload             int64        `json:"upload"`
 	Download           int64        `json:"download"`
 	Total              int64        `json:"total"`
+	// Live core data (empty when the core API is unreachable)
+	CoreOnline      bool   `json:"coreOnline"`
+	CoreVersion     string `json:"coreVersion"`
+	Mode            string `json:"mode"` // rule | global | direct
+	Connections     int    `json:"connections"`
+	SessionUpload   int64  `json:"sessionUpload"` // since the core started
+	SessionDownload int64  `json:"sessionDownload"`
+	NodeDelay       int    `json:"nodeDelay"` // current node, same convention as ProxyGroup.Delay
 }
 
 type CurrentIP struct {
@@ -480,8 +490,12 @@ func (m Manager) ReadStatus() Status {
 	if apiData, err := m.queryAPI("/proxies"); err == nil {
 		var result struct {
 			Proxies map[string]struct {
-				Now  string `json:"now"`
-				Type string `json:"type"`
+				Now     string `json:"now"`
+				Type    string `json:"type"`
+				Alive   *bool  `json:"alive"`
+				History []struct {
+					Delay int `json:"delay"`
+				} `json:"history"`
 			} `json:"proxies"`
 		}
 		if json.Unmarshal(apiData, &result) == nil {
@@ -494,20 +508,53 @@ func (m Manager) ReadStatus() Status {
 				}
 			}
 
+			// delayOf follows group → selected member until a real node, then
+			// reads its last probe.
+			delayOf := func(name string) int {
+				for i := 0; i < 8; i++ {
+					p, ok := result.Proxies[name]
+					if !ok {
+						return 0
+					}
+					if groupNames[name] && p.Now != "" {
+						name = p.Now
+						continue
+					}
+					if p.Alive != nil && !*p.Alive {
+						return -1
+					}
+					if n := len(p.History); n > 0 {
+						if d := p.History[n-1].Delay; d > 0 {
+							return d
+						}
+						return -1
+					}
+					return 0
+				}
+				return 0
+			}
+			groupType := map[string]string{"Selector": "select", "URLTest": "url-test", "Fallback": "fallback", "LoadBalance": "load-balance"}
 			for name, p := range result.Proxies {
-				if p.Type != "Selector" || name == "GLOBAL" {
+				if !groupNames[name] || name == "GLOBAL" {
 					continue
 				}
 				status.ProxyGroups = append(status.ProxyGroups, ProxyGroup{
-					Name: name,
-					Node: p.Now,
+					Name:  name,
+					Node:  p.Now,
+					Delay: delayOf(p.Now),
+					Type:  groupType[p.Type],
 				})
 			}
 			// Sort: real server selections first, then meta (DIRECT/chain), alpha within each tier
 			isRealNode := func(node string) bool {
 				return node != "DIRECT" && node != "REJECT" && !groupNames[node]
 			}
+			// Manual (select) groups come first: the first one is "the" current node.
 			sort.Slice(status.ProxyGroups, func(i, j int) bool {
+				iSel, jSel := status.ProxyGroups[i].Type == "select", status.ProxyGroups[j].Type == "select"
+				if iSel != jSel {
+					return iSel
+				}
 				iReal := isRealNode(status.ProxyGroups[i].Node)
 				jReal := isRealNode(status.ProxyGroups[j].Node)
 				if iReal != jReal {
@@ -518,8 +565,10 @@ func (m Manager) ReadStatus() Status {
 			if len(status.ProxyGroups) > 0 {
 				status.CurrentGroup = status.ProxyGroups[0].Name
 				status.CurrentNode = status.ProxyGroups[0].Node
+				status.NodeDelay = status.ProxyGroups[0].Delay
 			}
 		}
+		m.readCoreLive(&status)
 	} else {
 		// Fallback: read from profiles.yaml selected[] (may be stale)
 		if data, err := os.ReadFile(filepath.Join(dir, "profiles.yaml")); err == nil {
@@ -555,12 +604,16 @@ func (m Manager) ReadStatus() Status {
 	// Live TUN excluded routes from Clash API
 	if apiData, err := m.queryAPI("/configs"); err == nil {
 		var result struct {
-			TUN struct {
+			Mode string `json:"mode"`
+			TUN  struct {
 				RouteExcludeAddress []string `json:"route-exclude-address"`
 			} `json:"tun"`
 		}
-		if json.Unmarshal(apiData, &result) == nil && len(result.TUN.RouteExcludeAddress) > 0 {
-			status.TUNExcludedCIDRs = result.TUN.RouteExcludeAddress
+		if json.Unmarshal(apiData, &result) == nil {
+			status.Mode = strings.ToLower(result.Mode)
+			if len(result.TUN.RouteExcludeAddress) > 0 {
+				status.TUNExcludedCIDRs = result.TUN.RouteExcludeAddress
+			}
 		}
 	}
 	// Fallback: read excluded CIDRs from clash-verge.yaml (all known key variants)
@@ -594,6 +647,52 @@ func (m Manager) ReadStatus() Status {
 	}
 
 	return status
+}
+
+// readCoreLive fills core version, connection count and session traffic.
+func (m Manager) readCoreLive(status *Status) {
+	if data, err := m.queryAPI("/version"); err == nil {
+		var v struct {
+			Version string `json:"version"`
+		}
+		if json.Unmarshal(data, &v) == nil && v.Version != "" {
+			status.CoreOnline = true
+			status.CoreVersion = v.Version
+		}
+	}
+	if data, err := m.queryAPI("/connections"); err == nil {
+		var c struct {
+			UploadTotal   int64             `json:"uploadTotal"`
+			DownloadTotal int64             `json:"downloadTotal"`
+			Connections   []json.RawMessage `json:"connections"`
+		}
+		if json.Unmarshal(data, &c) == nil {
+			status.Connections = len(c.Connections)
+			status.SessionUpload = c.UploadTotal
+			status.SessionDownload = c.DownloadTotal
+		}
+	}
+}
+
+// TestNodeDelay asks the core to probe a proxy or group now and returns the
+// delay in ms (-1 when the probe failed).
+func (m Manager) TestNodeDelay(name string) (int, error) {
+	q := url.Values{"url": {"https://www.gstatic.com/generate_204"}, "timeout": {"2500"}}
+	data, err := m.queryAPI("/proxies/" + url.PathEscape(name) + "/delay?" + q.Encode())
+	if err != nil {
+		return 0, fmt.Errorf("Clash 内核未连接: %w", err)
+	}
+	var r struct {
+		Delay   int    `json:"delay"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(data, &r); err != nil {
+		return 0, err
+	}
+	if r.Delay <= 0 {
+		return -1, nil
+	}
+	return r.Delay, nil
 }
 
 // detectTUNInterface finds the active Clash TUN virtual network interface by scanning

@@ -19,11 +19,15 @@ type ClaudeCodeConfig struct {
 
 // claudeModelAliases maps the aliases accepted by `claude --model` to the concrete
 // model each one currently resolves to. Keep in sync with claudeModels in main.js.
+// (Anthropic API targets as of 2026-10; opusplan plans with Opus, best is
+// Fable when the account has it.)
 var claudeModelAliases = map[string]string{
-	"opus":   "claude-opus-5",
-	"sonnet": "claude-sonnet-5",
-	"haiku":  "claude-haiku-4-5",
-	"fable":  "claude-fable-5",
+	"opus":     "claude-opus-5-5",
+	"sonnet":   "claude-sonnet-5-5",
+	"haiku":    "claude-haiku-5-5",
+	"fable":    "claude-fable-5-1",
+	"best":     "claude-fable-5-1",
+	"opusplan": "claude-opus-5-5",
 }
 
 // ResolveClaudeModel expands an alias to its concrete model ID; anything else

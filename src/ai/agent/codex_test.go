@@ -129,10 +129,10 @@ func TestSetTOMLSectionBoolKeyCreatesFeaturesSection(t *testing.T) {
 func TestDefaultCodexPresetsUseCurrentModelFamily(t *testing.T) {
 	presets := DefaultCodexPresets()
 	want := map[string]string{
-		"default-fast":     "gpt-5.6-luna/low",
-		"default-balanced": "gpt-5.6-terra/medium",
-		"default-deep":     "gpt-5.6-sol/high",
-		"default-frontier": "gpt-5.6-sol/ultra",
+		"default-fast":     "gpt-6-luna/low",
+		"default-balanced": "gpt-6-sol/medium",
+		"default-deep":     "gpt-6.1-sol/high",
+		"default-frontier": "gpt-6-astra/xhigh",
 	}
 	for _, preset := range presets {
 		if got := preset.Model + "/" + preset.EffortLevel; got != want[preset.ID] {
@@ -152,7 +152,7 @@ func TestMigrateLegacyCodexPresetsOnlyUpdatesUntouchedDefaults(t *testing.T) {
 	if !changed {
 		t.Fatal("expected untouched legacy preset to migrate")
 	}
-	if got[0].Model != "gpt-5.6-luna" || got[0].EffortLevel != "low" || got[0].Name != "极速轻量" {
+	if got[0].Model != "gpt-6-luna" || got[0].EffortLevel != "low" || got[0].Name != "极速轻量" {
 		t.Fatalf("legacy default was not migrated: %#v", got[0])
 	}
 	if got[1] != legacy[1] {
@@ -176,5 +176,18 @@ func TestMigrateLegacyCodexPresetsNoopForCurrentValues(t *testing.T) {
 		if got[i] != presets[i] {
 			t.Fatalf("preset %d changed: %#v", i, got[i])
 		}
+	}
+}
+
+func TestMigratePresetsCoversEveryPastGeneration(t *testing.T) {
+	gen56 := []config.CodexPreset{{ID: "default-deep", Name: "复杂任务", Model: "gpt-5.6-sol", EffortLevel: "high"}}
+	got, changed := MigrateLegacyCodexPresets(gen56)
+	if !changed || got[0].Model != "gpt-6.1-sol" {
+		t.Fatalf("5.6 default not migrated: %#v", got)
+	}
+	gen50 := []config.ClaudeCodePreset{{ID: "cc-fast", Name: "极速轻量", Model: "haiku", EffortLevel: ""}}
+	gotC, changed := MigrateLegacyClaudeCodePresets(gen50)
+	if !changed || gotC[0].EffortLevel != "low" {
+		t.Fatalf("Claude 5.0 default not migrated: %#v", gotC)
 	}
 }

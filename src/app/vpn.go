@@ -39,6 +39,9 @@ func (a *App) GetVPNHealthReport() vpn.HealthReport { return a.vpn().CheckHealth
 // GetVPNStatus reads proxy/TUN flags, traffic and live node selections.
 func (a *App) GetVPNStatus() vpn.Status { return a.vpn().ReadStatus() }
 
+// TestVPNNodeDelay probes a node / group through the core and returns its delay in ms.
+func (a *App) TestVPNNodeDelay(name string) (int, error) { return a.vpn().TestNodeDelay(name) }
+
 // GetVPNCurrentIP fetches the exit IP via Clash's HTTP proxy (direct fallback).
 func (a *App) GetVPNCurrentIP() vpn.CurrentIP { return a.vpn().CurrentIP() }
 
