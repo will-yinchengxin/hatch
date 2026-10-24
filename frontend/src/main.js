@@ -266,11 +266,14 @@ window.hatchApp = function () {
     claudeCodePresetOpen: false,  // inline add/edit form visible
 
     // Codex model + reasoning effort + goal-mode config
-    // Codex model catalog (checked 2026-10 against the Codex models page). kind: current | legacy.
+    // Codex model catalog (checked 2026-10 against learn.chatgpt.com/docs/models). kind: current | legacy.
+    // Efforts per the docs: 6.1 Sol low→ultra (max/ultra depend on settings); 6 Luna up to max, no ultra;
+    // 6 Astra presets low/medium/xhigh (xhigh omitted on some paid plans); 6 Sol levels beyond medium are
+    // not documented, so it is capped at xhigh like Astra. 5.6 entries keep their pre-6 lists.
     codexModels: [
       { value: 'gpt-6.1-sol',   label: 'GPT-6.1 Sol · 复杂编码 / 代理任务', kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
       { value: 'gpt-6-astra',   label: 'GPT-6 Astra · 最难的端到端任务',    kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh'] },
-      { value: 'gpt-6-sol',     label: 'GPT-6 Sol',                         kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
+      { value: 'gpt-6-sol',     label: 'GPT-6 Sol',                         kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh'] },
       { value: 'gpt-6-luna',    label: 'GPT-6 Luna · 轻快、可重复的任务',   kind: 'current', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { value: 'gpt-5.6-sol',   label: 'GPT-5.6 Sol',                       kind: 'legacy',  efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
       { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra',                     kind: 'legacy',  efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
