@@ -45,6 +45,7 @@ func TestNormalizeRule(t *testing.T) {
 		{RuleItem{Type: "DOMAIN-SUFFIX", Value: "*.example.com", Target: "DIRECT"}, "DOMAIN-SUFFIX,example.com,DIRECT"},
 		{RuleItem{Type: "IP-CIDR", Value: "10.1.2.3", Target: "DIRECT", NoResolve: true}, "IP-CIDR,10.1.2.3/32,DIRECT,no-resolve"},
 		{RuleItem{Type: "IP-CIDR", Value: "2001:db8::1", Target: "DIRECT"}, "IP-CIDR6,2001:db8::1/128,DIRECT"},
+		{RuleItem{Type: "IP-CIDR", Value: "172.19.0.0/12", Target: "DIRECT"}, "IP-CIDR,172.19.0.0/12,DIRECT"},
 		{RuleItem{Type: "DOMAIN", Value: "172.16.0.9", Target: "DIRECT"}, "IP-CIDR,172.16.0.9/32,DIRECT,no-resolve"},
 		{RuleItem{Type: "GEOIP", Value: "cn", Target: "DIRECT", NoResolve: true}, "GEOIP,CN,DIRECT,no-resolve"},
 		{RuleItem{Type: "DOMAIN-KEYWORD", Value: "Google", Target: "P", NoResolve: true}, "DOMAIN-KEYWORD,google,P"},
@@ -134,31 +135,6 @@ func TestMatchRules(t *testing.T) {
 	}
 }
 
-func TestExpandTemplate(t *testing.T) {
-	d, err := ExpandTemplate("intranet", map[string]string{"domains": "https://corp.example.com/login\nlab.example.com", "ip": "172.16.27.50"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(d.Prepend) != 3 || d.Prepend[2].String() != "IP-CIDR,172.16.27.50/32,DIRECT,no-resolve" {
-		t.Fatalf("rules: %+v", d.Prepend)
-	}
-	if len(d.Hosts) != 2 || d.Hosts[0].Domain != "corp.example.com" || len(d.FakeIPFilter) != 2 || d.FakeIPFilter[1].Value != "+.lab.example.com" {
-		t.Fatalf("hosts/fakeip: %+v %+v", d.Hosts, d.FakeIPFilter)
-	}
-	if len(d.DNSPolicy) != 0 {
-		t.Fatalf("optional dns should be skipped: %+v", d.DNSPolicy)
-	}
-	if _, err := ExpandTemplate("site-proxy", map[string]string{"domains": "a.com"}); err == nil {
-		t.Fatal("missing target should fail")
-	}
-	for _, tpl := range RuleTemplates() {
-		in := map[string]string{"domains": "a.com", "apps": "App", "target": "Proxy", "ip": "10.0.0.1", "dns": "10.0.0.53", "cidr": "10.0.0.0/8"}
-		if _, err := ExpandTemplate(tpl.ID, in); err != nil {
-			t.Fatalf("template %s: %v", tpl.ID, err)
-		}
-	}
-}
-
 // ─── End-to-end save against a fake Clash Verge dir ──────────────────────────
 
 const testRulesFile = `# Profile Enhancement Rules Template for Clash Verge
@@ -238,7 +214,7 @@ rules:
   - MATCH,Proxy
 `
 	must(os.WriteFile(filepath.Join(dir, "clash-verge.yaml"), []byte(runtime), 0o644))
-	return Manager{AppDir: dir, sockets: []string{socket}}, dir
+	return Manager{AppDir: dir, sockets: []string{socket}, skipCoreCheck: true}, dir
 }
 
 func TestReadRules(t *testing.T) {

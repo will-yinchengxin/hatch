@@ -131,6 +131,8 @@ type Manager struct {
 	AppDir    string
 	BackupDir string
 	sockets   []string // tests only: replaces core socket discovery
+	// tests only: skip `verge-mihomo -t` (fixtures have no geodata)
+	skipCoreCheck bool
 }
 
 // DefaultAppDir is the auto-detected Clash Verge Rev data dir.

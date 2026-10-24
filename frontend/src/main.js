@@ -199,7 +199,7 @@ window.hatchApp = function () {
     retentionSaving: false,
 
     // v1.2: prompt templates
-    promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '', SuggestHookFromDescription: '', SuggestHookEdit: '', SuggestMCPRecommendations: '' },
+    promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '', SuggestHookFromDescription: '', SuggestHookEdit: '', SuggestMCPRecommendations: '', SuggestVPNRuleChange: '', SuggestVPNEnhanceEdit: '' },
     promptDefaults: {},
     promptDefaultsOpen: {},
     promptSaving: false,
@@ -211,6 +211,8 @@ window.hatchApp = function () {
       { key: 'SuggestHookFromDescription',  label: 'Hook 起草',        group: 'Hooks' },
       { key: 'SuggestHookEdit',             label: 'Hook 优化',        group: 'Hooks' },
       { key: 'SuggestMCPRecommendations',   label: 'MCP 选型',         group: 'MCP' },
+      { key: 'SuggestVPNRuleChange',        label: '一句话改分流规则', group: 'VPN' },
+      { key: 'SuggestVPNEnhanceEdit',       label: '订阅增强文件修改', group: 'VPN' },
       { key: 'TestAIConfig',                label: '配置连通性测试',   group: '系统' },
     ],
 
@@ -418,12 +420,11 @@ window.hatchApp = function () {
     vpnRulesSaving: false,
     vpnRulesError: '',
     vpnRulesIssues: [],      // [{section, index, message}] from SaveVPNRules
-    vpnRulesSection: 'rules', // rules | hosts | fakeip | dns
+    vpnRulesSection: 'rules', // rules | hosts | fakeip | dns | tun
     vpnRuleTypeHelpOpen: false,
     vpnAppendOpen: false,
-    vpnRuleTemplates: [],
-    vpnTplCategory: 'all',
-    vpnTpl: null,            // { tpl, inputs, busy, error } while the template dialog is open
+    vpnAI: { text: '', busy: false, error: '', preview: null },  // 一句话改规则 (SuggestVPNRuleChange)
+    vpnEnhAI: null,          // { row, sub, info, text, busy, error, preview, applying } — AI edit of one enhancement file
     vpnBulk: { open: false, text: '', target: 'DIRECT', busy: false },
     vpnRuleTest: { input: '', busy: false, result: null, error: '' },
 
@@ -4267,17 +4268,9 @@ window.hatchApp = function () {
       this.vpnRulesLoading = true;
       this.vpnRulesError = '';
       try {
-        const [state, templates] = await Promise.all([
-          window['go']['app']['App']['GetVPNRules'](),
-          this.vpnRuleTemplates.length ? Promise.resolve(this.vpnRuleTemplates) : window['go']['app']['App']['GetVPNRuleTemplates'](),
-        ]);
+        const state = await window['go']['app']['App']['GetVPNRules']();
         this.vpnRules = state;
-        this.vpnRuleTemplates = templates || [];
-        const d = state.draft || {};
-        this.vpnRulesDraft = {
-          prepend: d.prepend || [], append: d.append || [], hosts: d.hosts || [],
-          fakeIpFilter: d.fakeIpFilter || [], dnsPolicy: d.dnsPolicy || [],
-        };
+        this.vpnRulesDraft = this.vpnDraftShape(state.draft);
         this.vpnRulesSnapshot = JSON.stringify(this.vpnRulesDraft);
         this.vpnRulesIssues = [];
         this.vpnAppendOpen = this.vpnRulesDraft.append.length > 0;
@@ -4301,7 +4294,7 @@ window.hatchApp = function () {
         this.vpnRulesIssues = res.issues || [];
         if (this.vpnRulesIssues.length) {
           const first = this.vpnRulesIssues[0].section;
-          this.vpnRulesSection = { prepend: 'rules', append: 'rules', hosts: 'hosts', fakeip: 'fakeip', dns: 'dns' }[first] || 'rules';
+          this.vpnRulesSection = { prepend: 'rules', append: 'rules', hosts: 'hosts', fakeip: 'fakeip', dns: 'dns', tun: 'tun' }[first] || 'rules';
           if (first === 'append') this.vpnAppendOpen = true;
           this.showError(res.message || '有内容需要修改');
           return;
@@ -4329,6 +4322,7 @@ window.hatchApp = function () {
         { id: 'hosts', title: 'Hosts', desc: '域名固定解析到指定 IP', count: (d.hosts || []).length, issues: issues(['hosts']) },
         { id: 'fakeip', title: 'Fake-IP 过滤', desc: '内网 / 通话 / 游戏用真实 IP', count: (d.fakeIpFilter || []).length, issues: issues(['fakeip']) },
         { id: 'dns', title: 'DNS 分流', desc: '指定域名用指定 DNS', count: (d.dnsPolicy || []).length, issues: issues(['dns']) },
+        { id: 'tun', title: 'TUN 绕过', desc: '这些网段完全不走 VPN', count: (d.tunExclude || []).length, issues: issues(['tun']) },
       ];
     },
 
@@ -4409,6 +4403,7 @@ window.hatchApp = function () {
       if (section === 'hosts') d.hosts.push({ domain: '', value: '', note: '' });
       else if (section === 'fakeip') d.fakeIpFilter.push({ value: '', note: '' });
       else if (section === 'dns') d.dnsPolicy.push({ domain: '', server: '', note: '' });
+      else if (section === 'tun') d.tunExclude.push({ value: '' });
       this.$nextTick(() => {
         const inputs = document.querySelectorAll('.vpn-kv-list-' + section + ' .vpn-kv-first');
         if (inputs.length) inputs[inputs.length - 1].focus();
@@ -4476,56 +4471,127 @@ window.hatchApp = function () {
       return sub.filter(v => !have.has(v));
     },
 
-    // ── Templates ──
-    vpnTemplateCategories() {
-      return [
-        { id: 'all', label: '全部' }, { id: 'fix', label: '修复问题' }, { id: 'speed', label: '加速访问' },
-        { id: 'direct', label: '直连' }, { id: 'block', label: '拦截' }, { id: 'custom', label: '自定义' },
-      ];
+    vpnDraftShape(d) {
+      d = d || {};
+      return {
+        prepend: d.prepend || [], append: d.append || [], hosts: d.hosts || [],
+        fakeIpFilter: d.fakeIpFilter || [], dnsPolicy: d.dnsPolicy || [], tunExclude: d.tunExclude || [],
+      };
     },
 
-    vpnFilteredTemplates() {
-      return this.vpnRuleTemplates.filter(t => this.vpnTplCategory === 'all' || t.category === this.vpnTplCategory);
+    vpnSectionLabel(section) {
+      return { rules: '分流', hosts: 'Hosts', fakeip: 'Fake-IP', dns: 'DNS', tun: 'TUN 绕过' }[section] || section;
     },
 
-    openVPNTemplate(t) {
-      const inputs = {};
-      (t.inputs || []).forEach(inp => { inputs[inp.key] = inp.kind === 'target' ? this.vpnDefaultTarget() : (inp.default || ''); });
-      this.vpnTpl = { tpl: t, inputs, busy: false, error: '' };
+    vpnCIDRHint(v) {
+      const m = /\/(\d+)$/.exec((v || '').trim());
+      if (!m) return '';
+      const bits = Number(m[1]);
+      if ((v || '').includes(':')) return bits >= 128 ? '单个 IP' : '';
+      return bits >= 32 ? '单个 IP' : `约 ${Math.pow(2, 32 - bits).toLocaleString()} 个地址`;
     },
 
-    // Pattern lines with placeholders replaced by readable hints, for the dialog preview.
-    vpnTplPreview(t) {
-      const label = { domains: '〈你的域名〉', apps: '〈应用名〉', target: '〈代理组〉', ip: '〈IP〉', cidr: '〈IP 段〉', dns: '〈DNS〉' };
-      const fill = (line) => line.replace(/\{(\w+)\}/g, (_, k) => label[k] || k);
-      const rows = [];
-      (t.rules || []).forEach(l => rows.push({ kind: '规则', text: fill(l) }));
-      (t.hosts || []).forEach(l => rows.push({ kind: 'Hosts', text: fill(l).replace('=', ' → ') }));
-      (t.fakeIp || []).forEach(l => rows.push({ kind: 'Fake-IP', text: fill(l) }));
-      (t.dns || []).forEach(l => rows.push({ kind: 'DNS', text: fill(l).replace('=', ' → ') }));
-      return rows;
+    vpnAddCommonTun() {
+      const have = new Set(this.vpnRulesDraft.tunExclude.map(c => c.value));
+      ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8'].forEach(v => {
+        if (!have.has(v)) this.vpnRulesDraft.tunExclude.push({ value: v });
+      });
     },
 
-    async applyVPNTemplate() {
-      const st = this.vpnTpl;
-      if (!st) return;
+    // ── AI：一句话改规则 ──
+    vpnAIExamples() {
+      return ['让 notion.so 和 figma.com 走代理', '公司 corp.example.com 直连，用 10.0.0.53 解析', '屏蔽 doubleclick.net', '让 192.168.50.0/24 不经过 VPN'];
+    },
+
+    async runVPNRuleAI() {
+      const st = this.vpnAI;
+      if (!st.text.trim() || st.busy) return;
       st.busy = true;
       st.error = '';
+      st.preview = null;
       try {
-        const add = await window['go']['app']['App']['ExpandVPNRuleTemplate'](st.tpl.id, st.inputs);
-        const n = this.vpnMergeDraft(add || {});
-        const firstSection = (add.prepend || []).length ? 'rules' : (add.fakeIpFilter || []).length ? 'fakeip' : (add.hosts || []).length ? 'hosts' : 'dns';
-        this.vpnRulesSection = firstSection;
-        this.vpnTpl = null;
-        this.showSuccess(n ? `「${st.tpl.title}」已加入 ${n} 项，检查无误后点「保存并生效」` : '这些内容已经存在，无需重复添加');
-        this.$nextTick(() => {
-          const el = document.querySelector('.vpn-editor-section');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+        st.preview = await window['go']['app']['App']['SuggestVPNRuleChange'](st.text, this.vpnRulesDraft);
       } catch (e) {
-        st.error = String(e);
+        st.error = 'AI 没能给出有效修改：' + e;
       } finally {
-        if (this.vpnTpl) this.vpnTpl.busy = false;
+        st.busy = false;
+      }
+    },
+
+    async applyVPNRuleAI(saveNow) {
+      const p = this.vpnAI.preview;
+      if (!p) return;
+      this.vpnRulesDraft = this.vpnDraftShape(p.draft);
+      const first = (p.changes[0] || {}).section || 'rules';
+      this.vpnRulesSection = first;
+      this.vpnAI = { text: '', busy: false, error: '', preview: null };
+      if (saveNow) await this.saveVPNRules();
+      else this.showSuccess('已放进下方列表，确认无误后点「保存并生效」');
+    },
+
+    vpnTestTargetLabel(expect, t) {
+      if (expect === 'BYPASS') return '绕过 TUN';
+      if (expect === 'DIRECT') return '直连';
+      if (/^REJECT/.test(expect)) return '拦截';
+      return expect || t.actual;
+    },
+
+    // ── AI 修改增强文件（订阅页） ──
+    async openVPNEnhanceAI(row, sub) {
+      this.vpnEnhAI = { row, sub, info: null, text: '', busy: false, error: '', preview: null, applying: false };
+      try {
+        const info = await window['go']['app']['App']['GetVPNEnhanceInfo'](row.file);
+        if (this.vpnEnhAI && this.vpnEnhAI.row === row) this.vpnEnhAI.info = info;
+      } catch (e) {
+        if (this.vpnEnhAI) this.vpnEnhAI.error = String(e);
+      }
+    },
+
+    closeVPNEnhanceAI() {
+      if (this.vpnEnhAI && (this.vpnEnhAI.busy || this.vpnEnhAI.applying)) return;
+      this.vpnEnhAI = null;
+    },
+
+    vpnEnhAIScope() {
+      const st = this.vpnEnhAI;
+      if (!st) return '';
+      const scope = st.info ? st.info.scope : (st.sub ? (st.sub.isCurrent ? 'current' : 'other') : 'global');
+      if (scope === 'global') return '所有订阅（全局）';
+      if (scope === 'current') return '当前正在使用的订阅，应用后立即生效';
+      return '未在使用的订阅「' + (st.sub ? st.sub.name : '') + '」，切换到它后生效';
+    },
+
+    async runVPNEnhanceAI() {
+      const st = this.vpnEnhAI;
+      if (!st || !st.text.trim() || st.busy) return;
+      st.busy = true;
+      st.error = '';
+      st.preview = null;
+      try {
+        st.preview = await window['go']['app']['App']['SuggestVPNEnhanceEdit'](st.row.file, st.text);
+      } catch (e) {
+        st.error = 'AI 没能给出有效修改：' + e;
+      } finally {
+        st.busy = false;
+      }
+    },
+
+    async applyVPNEnhanceAI() {
+      const st = this.vpnEnhAI;
+      if (!st || !st.preview) return;
+      st.applying = true;
+      st.error = '';
+      try {
+        const res = await window['go']['app']['App']['ApplyVPNEnhanceEdit'](st.row.file, st.preview.content);
+        this.vpnEnhAI = null;
+        this.showSuccess(res.message || '已保存');
+        await this.loadVPNSubscriptions();
+        if (this.vpnRules && !this.vpnRulesDirty()) this.fetchVPNRules();
+        this.refreshVPNStatus();
+      } catch (e) {
+        st.error = '应用失败：' + e;
+      } finally {
+        if (this.vpnEnhAI) this.vpnEnhAI.applying = false;
       }
     },
 
@@ -4564,6 +4630,7 @@ window.hatchApp = function () {
       if (r.hostsValue) notes.push(`Hosts：${r.host} 固定解析到 ${r.hostsValue}`);
       if (r.fakeIpBypass) notes.push(`Fake-IP 过滤命中「${r.fakeIpBypass}」，会解析出真实 IP`);
       if (r.dnsServer) notes.push(`DNS 分流：由 ${r.dnsServer} 解析`);
+      if (r.tunBypass) notes.push(`该 IP 在 TUN 排除网段 ${r.tunBypass} 内：TUN 模式下完全不经过 Clash，以上规则对它不生效`);
       if (r.uncertainCount) notes.push(`在它之前有 ${r.uncertainCount} 条规则要在真实连接时才能判断（如 ${r.uncertain[0]}），实际可能先命中它们`);
       return notes;
     },

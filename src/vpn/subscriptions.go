@@ -38,6 +38,7 @@ type EnhanceSummary struct {
 	File       string `json:"file"`
 	Customized bool   `json:"customized"`
 	Summary    string `json:"summary"`
+	Desc       string `json:"desc"` // what it is and what it does, for ordinary users
 }
 
 type Subscription struct {
@@ -197,7 +198,7 @@ func (m Manager) summarize(dir string, meta profilesMeta, it profileItem) Subscr
 // summarizeEnhance says whether an enhancement file holds anything beyond
 // Clash Verge's empty template.
 func summarizeEnhance(dir string, it profileItem) EnhanceSummary {
-	out := EnhanceSummary{Kind: it.Type, Label: enhanceLabels[it.Type], File: it.File}
+	out := EnhanceSummary{Kind: it.Type, Label: enhanceLabels[it.Type], File: it.File, Desc: enhanceInfo[it.Type].Desc}
 	data, err := os.ReadFile(filepath.Join(dir, "profiles", it.File))
 	if err != nil {
 		out.Summary = "文件不存在"

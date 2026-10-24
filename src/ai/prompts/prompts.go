@@ -109,5 +109,7 @@ func Defaults() map[string]string {
 		OpSuggestHookFromDescription: HookDraft(),
 		OpSuggestHookEdit:            HookEdit(),
 		OpSuggestMCPRecommendations:  MCPRecommendations,
+		OpSuggestVPNRuleChange:       VPNRuleChange,
+		OpSuggestVPNEnhanceEdit:      VPNEnhanceEdit,
 	}
 }

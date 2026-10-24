@@ -3420,17 +3420,6 @@
         <!-- 状态卡行 -->
         <div class="hero-stats vpn-hero-stats">
 
-          <!-- 系统代理 card -->
-          <div class="hero-stat-card vpn-status-card" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-stat-on' : 'vpn-stat-off'">
-            <div class="hero-stat-label">系统代理</div>
-            <div class="vpn-status-row">
-              <span class="vpn-status-dot" :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-dot-on' : 'vpn-dot-off'"></span>
-              <span class="vpn-status-text"
-                :class="vpnStatus && vpnStatus.systemProxyEnabled ? 'vpn-on' : 'vpn-off'"
-                x-text="vpnStatus ? (vpnStatus.systemProxyEnabled ? '已开启' : '已关闭') : '—'"></span>
-            </div>
-          </div>
-
           <!-- TUN 模式 card -->
           <div class="hero-stat-card vpn-status-card vpn-tun-card"
                :class="vpnStatus && vpnStatus.tunEnabled ? 'vpn-stat-on' : 'vpn-stat-off'">
@@ -3448,8 +3437,12 @@
             <div class="vpn-tun-iface" x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunInterface"
                  x-text="vpnStatus && vpnStatus.tunInterface"></div>
             <!-- Excluded CIDRs -->
-            <div class="vpn-tun-cidrs" x-show="vpnStatus && vpnStatus.tunEnabled && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length">
-              <div class="vpn-tun-cidrs-title">排除网段</div>
+            <div class="vpn-tun-cidrs" x-show="vpnStatus && vpnStatus.tunEnabled">
+              <div class="vpn-tun-cidrs-title">
+                <span>排除网段</span>
+                <button class="vpn-link-btn" @click="vpnRulesSection = 'tun'; vpnGo('rules')">编辑</button>
+              </div>
+              <div class="vpn-tun-cidrs-empty" x-show="!(vpnStatus && vpnStatus.tunExcludedCidrs && vpnStatus.tunExcludedCidrs.length)">未设置，所有流量都经过 TUN</div>
               <div class="vpn-tun-cidrs-list">
                 <template x-for="cidr in (vpnStatus && vpnStatus.tunExcludedCidrs || [])">
                   <span class="vpn-cidr-tag" x-text="cidr"></span>
@@ -3799,10 +3792,18 @@
                   <template x-for="e in s.enhancements" :key="e.kind">
                     <div class="vpn-enh-row">
                       <span class="vpn-enh-dot" :class="e.customized ? 'on' : ''"></span>
-                      <span class="vpn-enh-label" x-text="vpnEnhanceLabel(e)"></span>
-                      <span class="muted vpn-enh-summary" x-text="e.summary"></span>
-                      <button class="btn-edit" x-show="s.isCurrent && (e.kind === 'rules' || e.kind === 'merge')" @click="vpnGo('rules')">可视化编辑</button>
-                      <button class="btn-edit" @click="openVPNRawFile(e.file)">原文</button>
+                      <div class="vpn-enh-main">
+                        <div class="vpn-enh-title">
+                          <span class="vpn-enh-label" x-text="vpnEnhanceLabel(e)"></span>
+                          <span class="vpn-enh-status" :class="e.customized ? 'on' : ''" x-text="e.summary"></span>
+                        </div>
+                        <div class="vpn-enh-desc" x-text="e.desc"></div>
+                      </div>
+                      <div class="vpn-enh-actions">
+                        <button class="btn-edit btn-primary" @click="openVPNEnhanceAI(e, s)">✦ AI 修改</button>
+                        <button class="btn-edit" x-show="s.isCurrent && (e.kind === 'rules' || e.kind === 'merge')" @click="vpnGo('rules')">可视化编辑</button>
+                        <button class="btn-edit" @click="openVPNRawFile(e.file)">原文</button>
+                      </div>
                     </div>
                   </template>
                 </div>
@@ -3817,15 +3818,80 @@
             </section>
           </template>
 
+          <!-- AI 修改增强文件 -->
+          <template x-if="vpnEnhAI">
+            <div class="modal-backdrop" @click.self="closeVPNEnhanceAI()" @keydown.escape.window="closeVPNEnhanceAI()">
+              <div class="modal-panel vpn-ai-modal" role="dialog" aria-modal="true">
+                <div class="modal-head">
+                  <h3>✦ AI 修改 · <span x-text="vpnEnhanceLabel(vpnEnhAI.row)"></span></h3>
+                  <button class="icon-btn" @click="closeVPNEnhanceAI()" title="关闭">✕</button>
+                </div>
+                <div class="vpn-ai-modal-body">
+                  <div class="vpn-ai-explain">
+                    <div><strong>这是什么：</strong><span x-text="vpnEnhAI.info ? vpnEnhAI.info.desc : vpnEnhAI.row.desc"></span></div>
+                    <div x-show="vpnEnhAI.info"><strong>怎么生效：</strong><span x-text="vpnEnhAI.info && vpnEnhAI.info.effect"></span></div>
+                    <div><strong>作用范围：</strong><span x-text="vpnEnhAIScope()"></span></div>
+                  </div>
+                  <label class="vpn-field">
+                    <span class="vpn-field-label">你想怎么改？</span>
+                    <textarea class="vpn-input" rows="3" x-model="vpnEnhAI.text" placeholder="用一句话描述想要的效果" @keydown.meta.enter="runVPNEnhanceAI()"></textarea>
+                  </label>
+                  <div class="vpn-chip-row" x-show="vpnEnhAI.info && !vpnEnhAI.preview">
+                    <template x-for="ex in (vpnEnhAI.info && vpnEnhAI.info.examples || [])">
+                      <button class="vpn-chip-tab" @click="vpnEnhAI.text = ex" x-text="ex"></button>
+                    </template>
+                  </div>
+                  <div class="vpn-config-error" x-show="vpnEnhAI.error" x-text="vpnEnhAI.error"></div>
+                  <template x-if="vpnEnhAI.preview">
+                    <div class="vpn-ai-preview">
+                      <div class="vpn-ai-summary">
+                        <span class="vpn-ai-ok">✓ 已验证有效</span>
+                        <span>最终配置将发生这些变化：</span>
+                      </div>
+                      <ul class="vpn-ai-effects">
+                        <template x-for="ef in vpnEnhAI.preview.effects"><li x-text="ef"></li></template>
+                      </ul>
+                      <div class="vpn-rules-warning" x-show="vpnEnhAI.preview.note" x-text="vpnEnhAI.preview.note"></div>
+                      <details class="vpn-ai-diff">
+                        <summary>查看文件改动</summary>
+                        <div class="vpn-diff">
+                          <template x-for="l in vpnEnhAI.preview.diff">
+                            <div class="vpn-diff-line" :class="l.op === '+' ? 'is-add' : l.op === '-' ? 'is-remove' : ''"><span x-text="l.op"></span><code x-text="l.text"></code></div>
+                          </template>
+                        </div>
+                      </details>
+                    </div>
+                  </template>
+                  <div class="vpn-tpl-actions">
+                    <button class="btn-sm" @click="closeVPNEnhanceAI()">取消</button>
+                    <button class="btn-edit" x-show="vpnEnhAI.preview" @click="runVPNEnhanceAI()" :disabled="vpnEnhAI.busy">重新生成</button>
+                    <button class="btn-primary" x-show="!vpnEnhAI.preview" @click="runVPNEnhanceAI()" :aria-busy="vpnEnhAI.busy" :disabled="vpnEnhAI.busy || !vpnEnhAI.text.trim()"
+                      x-text="vpnEnhAI.busy ? '生成并校验中…' : '生成修改'"></button>
+                    <button class="btn-primary" x-show="vpnEnhAI.preview" @click="applyVPNEnhanceAI()" :aria-busy="vpnEnhAI.applying" :disabled="vpnEnhAI.applying || vpnEnhAI.busy"
+                      x-text="vpnEnhAI.preview && vpnEnhAI.preview.live ? '应用并生效' : '应用'"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <section class="settings-section" x-show="vpnSubs && vpnSubs.global.length">
-            <h3>全局增强 <span class="muted vpn-h3-note">· 对所有订阅生效</span></h3>
+            <h3>全局增强 <span class="muted vpn-h3-note">· 对所有订阅生效，切换订阅也保留</span></h3>
             <div class="vpn-enh-list">
               <template x-for="e in (vpnSubs && vpnSubs.global || [])" :key="e.file">
                 <div class="vpn-enh-row">
                   <span class="vpn-enh-dot" :class="e.customized ? 'on' : ''"></span>
-                  <span class="vpn-enh-label" x-text="vpnEnhanceLabel(e)"></span>
-                  <span class="muted vpn-enh-summary" x-text="e.summary"></span>
-                  <button class="btn-edit" @click="openVPNRawFile(e.file)">原文</button>
+                  <div class="vpn-enh-main">
+                    <div class="vpn-enh-title">
+                      <span class="vpn-enh-label" x-text="vpnEnhanceLabel(e)"></span>
+                      <span class="vpn-enh-status" :class="e.customized ? 'on' : ''" x-text="e.summary"></span>
+                    </div>
+                    <div class="vpn-enh-desc" x-text="e.desc + '对所有订阅生效。'"></div>
+                  </div>
+                  <div class="vpn-enh-actions">
+                    <button class="btn-edit btn-primary" @click="openVPNEnhanceAI(e, null)">✦ AI 修改</button>
+                    <button class="btn-edit" @click="openVPNRawFile(e.file)">原文</button>
+                  </div>
                 </div>
               </template>
             </div>
@@ -3916,28 +3982,59 @@
                 <div class="vpn-rules-warning" x-text="w"></div>
               </template>
 
-              <!-- 常用场景 -->
-              <section class="settings-section">
+              <!-- AI：一句话改规则 -->
+              <section class="settings-section vpn-ai-section">
                 <div class="section-header-row">
-                  <h3>常用场景 · 一键添加</h3>
-                  <div class="vpn-chip-tabs">
-                    <template x-for="c in vpnTemplateCategories()" :key="c.id">
-                      <button class="vpn-chip-tab" :class="vpnTplCategory === c.id ? 'active' : ''" @click="vpnTplCategory = c.id" x-text="c.label"></button>
-                    </template>
-                  </div>
+                  <h3>✦ 一句话告诉 AI 你想要的效果</h3>
+                  <span class="muted vpn-hint">AI 生成后会自动校验并实测，确认有效才会给你应用</span>
                 </div>
-                <p class="settings-desc">遇到问题先在这里找对应的场景，点一下就能生成规则；添加后还可以继续修改，点「保存并生效」才会真正写入。</p>
-                <div class="vpn-tpl-grid">
-                  <template x-for="t in vpnFilteredTemplates()" :key="t.id">
-                    <button class="vpn-tpl-card" @click="openVPNTemplate(t)">
-                      <span class="vpn-tpl-icon" x-text="t.icon"></span>
-                      <span class="vpn-tpl-body">
-                        <span class="vpn-tpl-title" x-text="t.title"></span>
-                        <span class="vpn-tpl-problem" x-text="t.problem"></span>
-                      </span>
-                    </button>
+                <div class="vpn-ai-row">
+                  <textarea class="vpn-input" rows="2" x-model="vpnAI.text"
+                    placeholder="例如：让 notion.so 和 figma.com 走代理；公司 corp.example.com 直连并用 10.0.0.53 解析；屏蔽 doubleclick.net"
+                    @keydown.meta.enter="runVPNRuleAI()"></textarea>
+                  <button class="btn-primary vpn-ai-btn" @click="runVPNRuleAI()" :aria-busy="vpnAI.busy" :disabled="vpnAI.busy || !vpnAI.text.trim()"
+                    x-text="vpnAI.busy ? '生成并校验中…' : '生成修改'"></button>
+                </div>
+                <div class="vpn-chip-row vpn-ai-examples" x-show="!vpnAI.preview">
+                  <template x-for="ex in vpnAIExamples()">
+                    <button class="vpn-chip-tab" @click="vpnAI.text = ex" x-text="ex"></button>
                   </template>
                 </div>
+                <div class="vpn-config-error" x-show="vpnAI.error" x-text="vpnAI.error"></div>
+                <template x-if="vpnAI.preview">
+                  <div class="vpn-ai-preview">
+                    <div class="vpn-ai-summary">
+                      <span class="vpn-ai-ok">✓ 已验证有效</span>
+                      <span x-text="vpnAI.preview.summary || '将进行以下修改'"></span>
+                    </div>
+                    <div class="vpn-ai-changes">
+                      <template x-for="c in vpnAI.preview.changes">
+                        <div class="vpn-ai-change" :class="c.op === 'add' ? 'is-add' : 'is-remove'">
+                          <span class="vpn-ai-op" x-text="c.op === 'add' ? '+' : '−'"></span>
+                          <span class="vpn-raw-badge" x-text="vpnSectionLabel(c.section)"></span>
+                          <code x-text="c.text"></code>
+                        </div>
+                      </template>
+                    </div>
+                    <div class="vpn-ai-tests" x-show="vpnAI.preview.tests.length">
+                      <div class="vpn-sub-label">实测结果</div>
+                      <template x-for="t in vpnAI.preview.tests">
+                        <div class="vpn-ai-test" :class="t.pass ? 'pass' : 'fail'">
+                          <span x-text="t.pass ? '✅' : '❌'"></span>
+                          <code x-text="t.input"></code>
+                          <span x-text="'→ ' + vpnTestTargetLabel(t.expect, t)"></span>
+                          <span class="muted" x-show="t.rule" x-text="'（' + t.rule + '）'"></span>
+                        </div>
+                      </template>
+                    </div>
+                    <div class="vpn-ai-actions">
+                      <button class="btn-primary" @click="applyVPNRuleAI(true)" :disabled="vpnRulesSaving" :aria-busy="vpnRulesSaving"
+                        x-text="vpnRules.coreReachable ? '应用并生效' : '应用并保存'"></button>
+                      <button class="btn-edit" @click="applyVPNRuleAI(false)">放进下方列表，我再改改</button>
+                      <button class="btn-edit" @click="vpnAI.preview = null">放弃</button>
+                    </div>
+                  </div>
+                </template>
               </section>
 
               <!-- 测试 -->
@@ -4214,6 +4311,38 @@
                     <button class="btn-edit btn-primary" @click="vpnAddRow('dns')">＋ 添加 DNS 分流</button>
                   </div>
                 </div>
+
+                <!-- TUN 绕过 -->
+                <div x-show="vpnRulesSection === 'tun'">
+                  <div class="vpn-sec-intro">
+                    <p>开启 TUN 模式后，电脑上<strong>所有流量</strong>都会先进入 Clash。这里列出的网段会<strong>完全绕过 TUN</strong>，直接走本机网络，常用于公司内网、局域网、虚拟机网段，或某些不兼容代理的设备。和分流规则的「直连」不同：直连仍经过 Clash，绕过则完全不碰 Clash。这是全局设置，对所有订阅生效。</p>
+                  </div>
+                  <div class="vpn-rules-warning" x-show="!vpnRules.tunEnabled">当前没有开启 TUN 模式，这里的设置会在开启 TUN 后生效。</div>
+                  <div class="vpn-kv-list vpn-kv-list-tun">
+                    <template x-if="!vpnRulesDraft.tunExclude.length">
+                      <div class="vpn-empty">还没有排除网段，所有流量都会经过 TUN。</div>
+                    </template>
+                    <template x-for="(c, i) in vpnRulesDraft.tunExclude">
+                      <div class="vpn-rule-item" :class="vpnIssue('tun', i) ? 'has-issue' : ''">
+                        <div class="vpn-rule-row">
+                          <span class="vpn-rule-idx" x-text="i + 1"></span>
+                          <div class="vpn-rule-fields">
+                            <input type="text" class="vpn-input vpn-kv-first vpn-mono" x-model="c.value" placeholder="网段，如 192.168.50.0/24；单个 IP 会自动补成 /32">
+                            <span class="muted vpn-cidr-hint" x-text="vpnCIDRHint(c.value)"></span>
+                          </div>
+                          <div class="vpn-row-actions">
+                            <button class="icon-btn-xs vpn-row-del" @click="vpnRulesDraft.tunExclude.splice(i, 1)" title="删除">✕</button>
+                          </div>
+                        </div>
+                        <div class="vpn-row-issue" x-show="vpnIssue('tun', i)" x-text="vpnIssue('tun', i)"></div>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="vpn-list-actions">
+                    <button class="btn-edit btn-primary" @click="vpnAddRow('tun')">＋ 添加网段</button>
+                    <button class="btn-edit" @click="vpnAddCommonTun()">＋ 常见私有网段</button>
+                  </div>
+                </div>
               </section>
 
               <!-- 保存条 -->
@@ -4226,56 +4355,6 @@
             </div>
           </template>
 
-          <!-- 场景模板弹窗 -->
-          <template x-if="vpnTpl">
-            <div class="modal-backdrop" @click.self="vpnTpl = null" @keydown.escape.window="vpnTpl = null">
-              <div class="modal-panel vpn-tpl-modal" role="dialog" aria-modal="true">
-                <div class="modal-head">
-                  <h3><span x-text="vpnTpl.tpl.icon"></span> <span x-text="vpnTpl.tpl.title"></span></h3>
-                  <button class="icon-btn" @click="vpnTpl = null" title="关闭">✕</button>
-                </div>
-                <div class="vpn-tpl-modal-body">
-                  <div class="vpn-tpl-problem-box">
-                    <span class="vpn-tpl-problem-label">适用于</span>
-                    <span x-text="vpnTpl.tpl.problem"></span>
-                  </div>
-                  <p class="settings-desc" x-text="vpnTpl.tpl.desc"></p>
-                  <template x-for="inp in (vpnTpl.tpl.inputs || [])" :key="inp.key">
-                    <label class="vpn-field">
-                      <span class="vpn-field-label" x-text="inp.label"></span>
-                      <template x-if="inp.kind === 'list'">
-                        <textarea class="vpn-input vpn-mono" rows="3" x-model="vpnTpl.inputs[inp.key]" :placeholder="inp.placeholder"></textarea>
-                      </template>
-                      <template x-if="inp.kind === 'text'">
-                        <input type="text" class="vpn-input vpn-mono" x-model="vpnTpl.inputs[inp.key]" :placeholder="inp.placeholder">
-                      </template>
-                      <template x-if="inp.kind === 'target'">
-                        <select class="vpn-input" @change="vpnTpl.inputs[inp.key] = $event.target.value">
-                          <template x-for="o in vpnTargetOptions(vpnTpl.inputs[inp.key], true)" :key="o.value">
-                            <option :value="o.value" :selected="o.value === vpnTpl.inputs[inp.key]" x-text="o.label"></option>
-                          </template>
-                        </select>
-                      </template>
-                      <span class="muted vpn-field-hint" x-show="inp.hint" x-text="inp.hint"></span>
-                    </label>
-                  </template>
-                  <details class="vpn-tpl-preview">
-                    <summary x-text="'会添加哪些内容（' + vpnTplPreview(vpnTpl.tpl).length + ' 项）'"></summary>
-                    <div class="vpn-tpl-preview-list">
-                      <template x-for="row in vpnTplPreview(vpnTpl.tpl)">
-                        <div class="vpn-tpl-preview-row"><span class="vpn-raw-badge" x-text="row.kind"></span><code x-text="row.text"></code></div>
-                      </template>
-                    </div>
-                  </details>
-                  <div class="vpn-config-error" x-show="vpnTpl.error" x-text="vpnTpl.error"></div>
-                  <div class="vpn-tpl-actions">
-                    <button class="btn-sm" @click="vpnTpl = null">取消</button>
-                    <button class="btn-primary" @click="applyVPNTemplate()" :aria-busy="vpnTpl.busy" :disabled="vpnTpl.busy">添加到规则</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
         </div>
 
       </div>

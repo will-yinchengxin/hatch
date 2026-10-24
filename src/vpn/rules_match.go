@@ -22,6 +22,7 @@ type RuleMatch struct {
 	HostsValue     string   `json:"hostsValue"`
 	FakeIPBypass   string   `json:"fakeIpBypass"` // matching fake-ip-filter entry
 	DNSServer      string   `json:"dnsServer"`    // matching nameserver-policy servers
+	TunBypass      string   `json:"tunBypass"`    // TUN route-exclude CIDR containing the IP
 	Matched        bool     `json:"matched"`
 	Rule           string   `json:"rule"`
 	Target         string   `json:"target"`
@@ -105,6 +106,15 @@ func matchRules(input string, d RulesDraft, middle []string) RuleMatch {
 		for _, p := range d.DNSPolicy {
 			if matchDomainPattern(p.Domain, res.Host) {
 				res.DNSServer = p.Server
+				break
+			}
+		}
+	}
+
+	if ip != nil {
+		for _, t := range d.TunExclude {
+			if _, n, err := net.ParseCIDR(t.Value); err == nil && n.Contains(ip) {
+				res.TunBypass = t.Value
 				break
 			}
 		}

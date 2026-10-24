@@ -68,6 +68,12 @@ type RulesDraft struct {
 	Hosts        []HostEntry      `json:"hosts"`
 	FakeIPFilter []FakeIPEntry    `json:"fakeIpFilter"`
 	DNSPolicy    []DNSPolicyEntry `json:"dnsPolicy"`
+	TunExclude   []TunEntry       `json:"tunExclude"` // global: Clash Verge config.yaml tun.route-exclude-address
+}
+
+// TunEntry is one CIDR whose traffic bypasses the TUN device entirely.
+type TunEntry struct {
+	Value string `json:"value"`
 }
 
 type RuleTypeInfo struct {
@@ -94,6 +100,7 @@ type RulesState struct {
 	MissingFakeIP         []string       `json:"missingFakeIp"`
 	DeleteCount           int            `json:"deleteCount"`
 	CoreReachable         bool           `json:"coreReachable"`
+	TunEnabled            bool           `json:"tunEnabled"`
 	Warnings              []string       `json:"warnings"`
 }
 
@@ -240,8 +247,10 @@ func normalizeCIDR(v string) (string, bool, error) {
 	if err != nil {
 		return "", false, fmt.Errorf("「%s」不是有效的 IP 或网段，例：192.168.1.0/24", v)
 	}
+	// Keep the address as written (e.g. 172.19.0.0/12): the core accepts it,
+	// and rewriting it to the network address would silently change user data.
 	ones, _ := n.Mask.Size()
-	return fmt.Sprintf("%s/%d", n.IP.String(), ones), ip.To4() == nil, nil
+	return fmt.Sprintf("%s/%d", ip.String(), ones), ip.To4() == nil, nil
 }
 
 func checkDomainLike(v string) error {
@@ -484,6 +493,23 @@ func NormalizeDraft(d RulesDraft) (RulesDraft, []RuleIssue) {
 		}
 		out.DNSPolicy = append(out.DNSPolicy, n)
 	}
+	out.TunExclude = []TunEntry{}
+	seenTun := map[string]int{}
+	for i, t := range d.TunExclude {
+		cidr, _, err := normalizeCIDR(t.Value)
+		if err == nil {
+			if j, dup := seenTun[cidr]; dup {
+				err = fmt.Errorf("「%s」与第 %d 条重复", cidr, j+1)
+			}
+			seenTun[cidr] = i
+		} else {
+			cidr = strings.TrimSpace(t.Value)
+		}
+		if err != nil {
+			add("tun", i, err)
+		}
+		out.TunExclude = append(out.TunExclude, TunEntry{Value: cidr})
+	}
 	return out, issues
 }
 
@@ -588,6 +614,7 @@ type enhanceCtx struct {
 	rulesPath   string // "" when the subscription has no rules enhancement
 	mergePath   string
 	runtimePath string
+	clashPath   string // Clash Verge base config (config.yaml): TUN settings live here
 }
 
 func (m Manager) currentEnhance() (enhanceCtx, error) {
@@ -604,6 +631,7 @@ func (m Manager) currentEnhance() (enhanceCtx, error) {
 		profile:     cur,
 		subPath:     filepath.Join(dir, "profiles", cur.File),
 		runtimePath: filepath.Join(dir, "clash-verge.yaml"),
+		clashPath:   filepath.Join(dir, "config.yaml"),
 	}
 	resolve := func(uid string) string {
 		if it, ok := meta.find(uid); ok && it.File != "" && safeProfilePath(it.File) {
@@ -618,10 +646,10 @@ func (m Manager) currentEnhance() (enhanceCtx, error) {
 
 // enhanceFiles is what the two enhancement files currently say.
 type enhanceFiles struct {
-	rulesDoc, mergeDoc *yaml.Node
-	draft              RulesDraft
-	fakeIPSet          bool // merge file sets dns.fake-ip-filter (replacing the subscription list)
-	deleteCount        int
+	rulesDoc, mergeDoc, clashDoc *yaml.Node
+	draft                        RulesDraft
+	fakeIPSet                    bool // merge file sets dns.fake-ip-filter (replacing the subscription list)
+	deleteCount                  int
 }
 
 func noteOf(n *yaml.Node) string {
@@ -650,7 +678,7 @@ func scalarList(n *yaml.Node) []string {
 func readEnhanceFiles(ctx enhanceCtx) (enhanceFiles, error) {
 	ef := enhanceFiles{draft: RulesDraft{
 		Prepend: []RuleItem{}, Append: []RuleItem{}, Hosts: []HostEntry{},
-		FakeIPFilter: []FakeIPEntry{}, DNSPolicy: []DNSPolicyEntry{},
+		FakeIPFilter: []FakeIPEntry{}, DNSPolicy: []DNSPolicyEntry{}, TunExclude: []TunEntry{},
 	}}
 	var err error
 	if ef.rulesDoc, err = loadYAMLDoc(ctx.rulesPath); err != nil {
@@ -658,6 +686,12 @@ func readEnhanceFiles(ctx enhanceCtx) (enhanceFiles, error) {
 	}
 	if ef.mergeDoc, err = loadYAMLDoc(ctx.mergePath); err != nil {
 		return ef, err
+	}
+	if ef.clashDoc, err = loadYAMLDoc(ctx.clashPath); err != nil {
+		return ef, err
+	}
+	for _, v := range scalarList(mapGet(mapGet(ef.clashDoc.Content[0], "tun"), "route-exclude-address")) {
+		ef.draft.TunExclude = append(ef.draft.TunExclude, TunEntry{Value: v})
 	}
 
 	rules := ef.rulesDoc.Content[0]
@@ -853,7 +887,7 @@ func (m Manager) ReadRules() (RulesState, error) {
 		return RulesState{}, err
 	}
 	sub := readSubscription(ctx.subPath)
-	_, runtime, runtimeGroups := readRuntime(ctx.runtimePath)
+	runtimeDoc, runtime, runtimeGroups := readRuntime(ctx.runtimePath)
 
 	st := RulesState{
 		Draft:              ef.draft,
@@ -892,6 +926,10 @@ func (m Manager) ReadRules() (RulesState, error) {
 		}
 	}
 
+	if runtimeDoc != nil {
+		tun := mapGet(runtimeDoc.Content[0], "tun")
+		st.TunEnabled = mapGet(tun, "enable") != nil && mapGet(tun, "enable").Value == "true"
+	}
 	st.Groups = runtimeGroups
 	if len(st.Groups) == 0 {
 		st.Groups = sub.groups
@@ -954,13 +992,25 @@ func (m Manager) SaveRules(d RulesDraft) (RulesSaveResult, error) {
 	if mergeChanged && ctx.mergePath == "" {
 		return res, errors.New("当前订阅没有关联覆写文件：请先在 Clash Verge 中对该订阅「编辑覆写」一次")
 	}
-	if !rulesChanged && !mergeChanged {
+	tunChanged := !sameStrings(tunValues(old.draft.TunExclude), tunValues(nd.TunExclude))
+	if !rulesChanged && !mergeChanged && !tunChanged {
 		res.Saved = true
 		res.Message = "没有需要保存的修改"
 		return res, nil
 	}
 
-	var rulesBytes, mergeBytes []byte
+	var rulesBytes, mergeBytes, clashBytes []byte
+	if tunChanged {
+		tun := mapOf(old.clashDoc.Content[0], "tun")
+		if len(nd.TunExclude) == 0 {
+			mapDel(tun, "route-exclude-address")
+		} else {
+			mapSet(tun, "route-exclude-address", seqNode(tunValues(nd.TunExclude), nil))
+		}
+		if clashBytes, err = encodeYAMLDoc(old.clashDoc); err != nil {
+			return res, err
+		}
+	}
 	if rulesChanged {
 		applyRulesDoc(old.rulesDoc, nd)
 		if rulesBytes, err = encodeYAMLDoc(old.rulesDoc); err != nil {
@@ -978,27 +1028,8 @@ func (m Manager) SaveRules(d RulesDraft) (RulesSaveResult, error) {
 	runtimeDoc, _, _ := readRuntime(ctx.runtimePath)
 	var runtimeBytes []byte
 	if runtimeDoc != nil {
-		root := runtimeDoc.Content[0]
-		patchRuntime(root, old, nd, writeFake, sub)
-		if runtimeBytes, err = encodeYAMLDoc(runtimeDoc); err != nil {
-			return res, err
-		}
-		// The payload keeps the core on the socket we are talking to (in service
-		// mode the generated file carries a stale external-controller-unix).
-		socket := m.unixSocketPath()
-		if n := mapGet(root, "external-controller-unix"); n != nil {
-			n.Value = socket
-		}
-		payload, err := encodeYAMLDoc(runtimeDoc)
-		if err != nil {
-			return res, err
-		}
-		switch err := reloadCore(socket, payload); {
-		case err == nil:
-			res.Applied = true
-		case errors.Is(err, errCoreUnreachable):
-			runtimeBytes = nil
-		default:
+		patchRuntime(runtimeDoc.Content[0], old, nd, writeFake, sub)
+		if res.Applied, runtimeBytes, err = m.applyRuntime(runtimeDoc); err != nil {
 			return res, err
 		}
 	}
@@ -1013,6 +1044,11 @@ func (m Manager) SaveRules(d RulesDraft) (RulesSaveResult, error) {
 			return res, fmt.Errorf("写入覆写文件失败: %w", err)
 		}
 	}
+	if clashBytes != nil {
+		if err := fsutil.WriteWithBackup(ctx.clashPath, clashBytes, 0o644); err != nil {
+			return res, fmt.Errorf("写入 config.yaml 失败: %w", err)
+		}
+	}
 	if res.Applied && runtimeBytes != nil {
 		// Keep Verge's generated file in step with what the core is now running.
 		_ = os.WriteFile(ctx.runtimePath, runtimeBytes, 0o644)
@@ -1023,10 +1059,57 @@ func (m Manager) SaveRules(d RulesDraft) (RulesSaveResult, error) {
 	} else {
 		res.Message = "已保存。Clash Verge 内核未运行，下次启动 Clash Verge 时生效"
 	}
+	if tunChanged {
+		res.Warnings = append(res.Warnings, "TUN 排除网段写入了 Clash Verge 的 config.yaml；若 Clash Verge 运行中又在其设置里改动 TUN，会以它为准")
+	}
 	if m.vergeDNSOverride() && mergeChanged {
 		res.Warnings = append(res.Warnings, "Clash Verge 开启了「DNS 覆写」，DNS 设置可能被它覆盖")
 	}
 	return res, nil
+}
+
+func tunValues(list []TunEntry) []string {
+	out := make([]string, 0, len(list))
+	for _, t := range list {
+		out = append(out, t.Value)
+	}
+	return out
+}
+
+// applyRuntime hands a patched runtime config to the running core (PUT
+// /configs payload, socket pinned to the live one). When the core is not
+// running the config is checked with `verge-mihomo -t` instead. It returns
+// whether the core now runs it and the bytes to store as clash-verge.yaml.
+func (m Manager) applyRuntime(runtimeDoc *yaml.Node) (bool, []byte, error) {
+	runtimeBytes, err := encodeYAMLDoc(runtimeDoc)
+	if err != nil {
+		return false, nil, err
+	}
+	root := runtimeDoc.Content[0]
+	socket := m.unixSocketPath()
+	ctl := mapGet(root, "external-controller-unix")
+	orig := ""
+	if ctl != nil {
+		orig, ctl.Value = ctl.Value, socket
+	}
+	payload, err := encodeYAMLDoc(runtimeDoc)
+	if ctl != nil {
+		ctl.Value = orig
+	}
+	if err != nil {
+		return false, nil, err
+	}
+	switch err := reloadCore(socket, payload); {
+	case err == nil:
+		return true, runtimeBytes, nil
+	case errors.Is(err, errCoreUnreachable):
+		if err := m.testConfig(runtimeBytes); err != nil {
+			return false, nil, err
+		}
+		return false, nil, nil
+	default:
+		return false, nil, err
+	}
 }
 
 func sameNotes(a, b []RuleItem) bool {
@@ -1265,6 +1348,13 @@ func applyMergeDoc(doc *yaml.Node, d RulesDraft, writeFake bool) {
 // after the enhancement files change: swap the custom rule blocks, re-merge
 // hosts / nameserver-policy keys and replace (or restore) fake-ip-filter.
 func patchRuntime(root *yaml.Node, old enhanceFiles, nd RulesDraft, writeFake bool, sub subscriptionInfo) {
+	if tun := mapGet(root, "tun"); tun != nil && tun.Kind == yaml.MappingNode {
+		if len(nd.TunExclude) == 0 {
+			mapDel(tun, "route-exclude-address")
+		} else {
+			mapSet(tun, "route-exclude-address", seqNode(tunValues(nd.TunExclude), nil))
+		}
+	}
 	runtimeRules := scalarList(mapGet(root, "rules"))
 	middle := stripCustom(runtimeRules, ruleStrings(old.draft.Prepend), ruleStrings(old.draft.Append))
 	merged := append(append(append([]string{}, ruleStrings(nd.Prepend)...), middle...), ruleStrings(nd.Append)...)

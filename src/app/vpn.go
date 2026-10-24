@@ -1,8 +1,10 @@
 package app
 
 import (
+	"encoding/json"
 	"strings"
 
+	"hatch/ai/prompts"
 	"hatch/core/macos"
 	"hatch/vpn"
 )
@@ -71,13 +73,6 @@ func (a *App) SaveVPNRules(draft vpn.RulesDraft) (vpn.RulesSaveResult, error) {
 	return a.vpn().SaveRules(draft)
 }
 
-func (a *App) GetVPNRuleTemplates() []vpn.RuleTemplate { return vpn.RuleTemplates() }
-
-// ExpandVPNRuleTemplate fills a scenario template; the result is only added to the editor draft.
-func (a *App) ExpandVPNRuleTemplate(id string, inputs map[string]string) (vpn.RulesDraft, error) {
-	return vpn.ExpandTemplate(id, inputs)
-}
-
 // ParseVPNRuleLines turns pasted lines / bare domains into rules pointing at target.
 func (a *App) ParseVPNRuleLines(text, target string) []vpn.RuleItem {
 	return vpn.ParseRuleLines(text, target)
@@ -86,6 +81,91 @@ func (a *App) ParseVPNRuleLines(text, target string) []vpn.RuleItem {
 // TestVPNRule reports which rule (of the unsaved draft) a URL / domain / IP would hit.
 func (a *App) TestVPNRule(input string, draft vpn.RulesDraft) (vpn.RuleMatch, error) {
 	return a.vpn().TestRule(input, draft)
+}
+
+// vpnAIAttempts bounds the generate → verify → feedback loop of VPN AI edits.
+const vpnAIAttempts = 3
+
+// SuggestVPNRuleChange turns a natural-language request into a verified change
+// set for the custom-rules draft. Only an effective, valid, tested change is
+// returned; failures are fed back to the model for another attempt.
+func (a *App) SuggestVPNRuleChange(instruction string, draft vpn.RulesDraft) (vpn.RuleAIPreview, error) {
+	ai, err := a.readyAI()
+	if err != nil {
+		return vpn.RuleAIPreview{}, err
+	}
+	st, err := a.vpn().ReadRules()
+	if err != nil {
+		return vpn.RuleAIPreview{}, err
+	}
+	feedback := ""
+	for i := 0; ; i++ {
+		input, _ := json.Marshal(map[string]any{
+			"instruction": instruction, "groups": st.Groups, "current": draft, "feedback": feedback,
+		})
+		raw, err := a.callAIOp(prompts.OpSuggestVPNRuleChange, ai, prompts.VPNRuleChange, string(input))
+		if err != nil {
+			return vpn.RuleAIPreview{}, err
+		}
+		s, err := vpn.ParseRuleSuggestion(raw)
+		if err == nil {
+			var p vpn.RuleAIPreview
+			if p, err = a.vpn().VerifyRuleSuggestion(draft, s); err == nil {
+				return p, nil
+			}
+		}
+		if i+1 >= vpnAIAttempts {
+			return vpn.RuleAIPreview{}, err
+		}
+		feedback = err.Error()
+	}
+}
+
+// GetVPNEnhanceInfo explains what an enhancement file is and what it does.
+func (a *App) GetVPNEnhanceInfo(file string) (vpn.EnhanceInfo, error) {
+	return a.vpn().EnhanceInfo(file)
+}
+
+// SuggestVPNEnhanceEdit asks AI to rewrite one enhancement file and returns a
+// preview whose effect on the final config was replayed and core-validated.
+func (a *App) SuggestVPNEnhanceEdit(file, instruction string) (vpn.EnhanceEditPreview, error) {
+	ai, err := a.readyAI()
+	if err != nil {
+		return vpn.EnhanceEditPreview{}, err
+	}
+	ctx, err := a.vpn().EnhanceAIContext(file)
+	if err != nil {
+		return vpn.EnhanceEditPreview{}, err
+	}
+	feedback := ""
+	for i := 0; ; i++ {
+		input, _ := json.Marshal(map[string]any{
+			"kind": ctx.Info.Kind, "instruction": instruction, "content": ctx.Content,
+			"groups": ctx.Groups, "proxies": ctx.Proxies, "feedback": feedback,
+		})
+		raw, err := a.callAIOp(prompts.OpSuggestVPNEnhanceEdit, ai, prompts.VPNEnhanceEdit, string(input))
+		if err != nil {
+			return vpn.EnhanceEditPreview{}, err
+		}
+		p, err := a.vpn().PreviewEnhanceEdit(file, raw)
+		if err == nil {
+			return p, nil
+		}
+		if i+1 >= vpnAIAttempts {
+			return vpn.EnhanceEditPreview{}, err
+		}
+		feedback = err.Error()
+	}
+}
+
+// PreviewVPNEnhanceEdit validates given content and reports its real effect, without saving.
+func (a *App) PreviewVPNEnhanceEdit(file, content string) (vpn.EnhanceEditPreview, error) {
+	return a.vpn().PreviewEnhanceEdit(file, content)
+}
+
+// ApplyVPNEnhanceEdit re-validates content and saves it (hot-reloading when exact).
+func (a *App) ApplyVPNEnhanceEdit(file, content string) (vpn.RulesSaveResult, error) {
+	return a.vpn().ApplyEnhanceEdit(file, content)
 }
 
 func (a *App) GetVPNSubscriptions() (vpn.SubscriptionsView, error) { return a.vpn().Subscriptions() }
