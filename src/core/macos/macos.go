@@ -11,16 +11,19 @@ import (
 )
 
 // FindCLI locates a user-installed command. Finder/Dock launches do not inherit
-// the interactive shell PATH, so it falls back to `zsh -l -c command -v`.
+// the interactive shell PATH, so it falls back to a login zsh that also sources
+// ~/.zshrc: PATH entries like ~/.local/bin usually live there, and `zsh -l`
+// alone can resolve a stale copy (e.g. an old npm install in /usr/local/bin).
 func FindCLI(name string) string {
 	if path, err := exec.LookPath(name); err == nil && path != "" {
 		return path
 	}
-	out, err := exec.Command("/bin/zsh", "-l", "-c", "command -v "+name).Output()
+	out, err := exec.Command("/bin/zsh", "-l", "-c", `source ~/.zshrc >/dev/null 2>&1; command -v "$0"`, name).Output()
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(out))
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }
 
 // CLIVersion runs `<path> --version` and returns the trimmed output.
