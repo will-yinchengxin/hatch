@@ -61,7 +61,39 @@ func (a *App) SaveVPNProfileContent(filename, content string) error {
 	return a.vpn().WriteProfile(filename, content)
 }
 
-func (a *App) GetVPNEnhanceData() (vpn.EnhanceData, error) { return a.vpn().ReadEnhanceData() }
+// ── 自定义规则 / 订阅 ──
+
+// GetVPNRules loads the current subscription's custom rules, hosts and DNS overrides.
+func (a *App) GetVPNRules() (vpn.RulesState, error) { return a.vpn().ReadRules() }
+
+// SaveVPNRules validates the draft, hot-reloads the core and writes the enhancement files.
+func (a *App) SaveVPNRules(draft vpn.RulesDraft) (vpn.RulesSaveResult, error) {
+	return a.vpn().SaveRules(draft)
+}
+
+func (a *App) GetVPNRuleTemplates() []vpn.RuleTemplate { return vpn.RuleTemplates() }
+
+// ExpandVPNRuleTemplate fills a scenario template; the result is only added to the editor draft.
+func (a *App) ExpandVPNRuleTemplate(id string, inputs map[string]string) (vpn.RulesDraft, error) {
+	return vpn.ExpandTemplate(id, inputs)
+}
+
+// ParseVPNRuleLines turns pasted lines / bare domains into rules pointing at target.
+func (a *App) ParseVPNRuleLines(text, target string) []vpn.RuleItem {
+	return vpn.ParseRuleLines(text, target)
+}
+
+// TestVPNRule reports which rule (of the unsaved draft) a URL / domain / IP would hit.
+func (a *App) TestVPNRule(input string, draft vpn.RulesDraft) (vpn.RuleMatch, error) {
+	return a.vpn().TestRule(input, draft)
+}
+
+func (a *App) GetVPNSubscriptions() (vpn.SubscriptionsView, error) { return a.vpn().Subscriptions() }
+
+func (a *App) GetVPNSubscriptionURL(uid string) (string, error) { return a.vpn().SubscriptionURL(uid) }
+
+// OpenVPNApp brings Clash Verge Rev to the front.
+func (a *App) OpenVPNApp() error { return vpn.OpenApp() }
 
 func (a *App) ExportVPNBackup() (vpn.BackupResult, error) { return a.vpn().ExportBackup() }
 

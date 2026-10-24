@@ -77,7 +77,8 @@ release: build-clean sign dmg
 
 ## install  — 将 Hatch.app 复制到 /Applications（需要管理员权限）
 install: $(APP)
-	cp -r $(APP) /Applications/Hatch.app
+	rm -rf /Applications/Hatch.app
+	cp -R $(APP) /Applications/Hatch.app
 	xattr -cr /Applications/Hatch.app
 	@echo "✓ 已安装到 /Applications/Hatch.app"
 

@@ -79,14 +79,6 @@ type ProxyGroup struct {
 	Node string `json:"node"`
 }
 
-type EnhanceData struct {
-	PrependRules    []string          `json:"prependRules"`
-	Hosts           map[string]string `json:"hosts"`
-	DNSFakeIPFilter []string          `json:"dnsFakeIPFilter"`
-	HasData         bool              `json:"hasData"`
-	SourceFiles     []string          `json:"sourceFiles"`
-}
-
 type Status struct {
 	SystemProxyEnabled bool         `json:"systemProxyEnabled"`
 	TUNEnabled         bool         `json:"tunEnabled"`
@@ -138,6 +130,7 @@ type HealthReport struct {
 type Manager struct {
 	AppDir    string
 	BackupDir string
+	sockets   []string // tests only: replaces core socket discovery
 }
 
 // DefaultAppDir is the auto-detected Clash Verge Rev data dir.
@@ -632,21 +625,35 @@ func detectTUNInterface() (iface, ip string) {
 	return "", ""
 }
 
-// clashUnixSocketPath reads external-controller-unix from clash-verge.yaml,
-// falling back to the default Clash Verge Rev socket path.
+// unixSocketPath returns the first reachable core socket. In service mode
+// Clash Verge Rev runs the core as root with its socket under
+// /var/run/clash-verge-service/users/<uid>/, and the external-controller-unix
+// in clash-verge.yaml is then stale, so every candidate is probed.
 func (m Manager) unixSocketPath() string {
-	dir, _ := m.DataDir()
-	if dir != "" {
+	if len(m.sockets) > 0 {
+		return m.sockets[0]
+	}
+	var candidates []string
+	if dir, _ := m.DataDir(); dir != "" {
 		if data, err := os.ReadFile(filepath.Join(dir, "clash-verge.yaml")); err == nil {
 			var cfg struct {
 				ExternalControllerUnix string `yaml:"external-controller-unix"`
 			}
 			if yaml.Unmarshal(data, &cfg) == nil && cfg.ExternalControllerUnix != "" {
-				return cfg.ExternalControllerUnix
+				candidates = append(candidates, cfg.ExternalControllerUnix)
 			}
 		}
 	}
-	return "/tmp/verge/verge-mihomo.sock"
+	candidates = append(candidates,
+		fmt.Sprintf("/var/run/clash-verge-service/users/%d/verge-mihomo.sock", os.Getuid()),
+		"/tmp/verge/verge-mihomo.sock")
+	for _, p := range candidates {
+		if conn, err := net.DialTimeout("unix", p, 300*time.Millisecond); err == nil {
+			conn.Close()
+			return p
+		}
+	}
+	return candidates[0]
 }
 
 // queryClashUnixAPI makes a GET request to the Clash core API via Unix socket.
@@ -1149,77 +1156,4 @@ func (m Manager) DeleteBackup(zipPath string) error {
 		return fmt.Errorf("非法的备份文件名: %s", base)
 	}
 	return os.Remove(clean)
-}
-
-// GetVPNEnhanceData reads all "merge"-type profiles and extracts prepend rules,
-// hosts overrides, and DNS fake-ip-filter entries added by the user.
-func (m Manager) ReadEnhanceData() (EnhanceData, error) {
-	dir, err := m.DataDir()
-	if err != nil {
-		return EnhanceData{}, err
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, "profiles.yaml"))
-	if err != nil {
-		return EnhanceData{}, fmt.Errorf("读取 profiles.yaml 失败: %w", err)
-	}
-
-	var raw struct {
-		Items []struct {
-			UID  string `yaml:"uid"`
-			Type string `yaml:"type"`
-			Name string `yaml:"name"`
-			File string `yaml:"file"`
-		} `yaml:"items"`
-	}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return EnhanceData{}, fmt.Errorf("解析 profiles.yaml 失败: %w", err)
-	}
-
-	result := EnhanceData{
-		Hosts:           make(map[string]string),
-		PrependRules:    []string{},
-		DNSFakeIPFilter: []string{},
-		SourceFiles:     []string{},
-	}
-
-	for _, item := range raw.Items {
-		// Both "merge" and "rules" profile types can carry prepend/append/hosts/dns overrides.
-		if item.Type != "merge" && item.Type != "rules" {
-			continue
-		}
-		content, err := m.ReadProfile(item.File)
-		if err != nil {
-			continue
-		}
-
-		var mc struct {
-			Prepend []string          `yaml:"prepend"`
-			Append  []string          `yaml:"append"`
-			Hosts   map[string]string `yaml:"hosts"`
-			DNS     struct {
-				FakeIPFilter []string `yaml:"fake-ip-filter"`
-			} `yaml:"dns"`
-		}
-		if yaml.Unmarshal([]byte(content), &mc) != nil {
-			continue
-		}
-
-		if len(mc.Prepend) > 0 || len(mc.Append) > 0 || len(mc.Hosts) > 0 || len(mc.DNS.FakeIPFilter) > 0 {
-			label := item.Name
-			if label == "" {
-				label = item.File
-			}
-			result.SourceFiles = append(result.SourceFiles, label)
-			result.HasData = true
-		}
-		result.PrependRules = append(result.PrependRules, mc.Prepend...)
-		result.PrependRules = append(result.PrependRules, mc.Append...)
-		for k, v := range mc.Hosts {
-			result.Hosts[k] = v
-		}
-		result.DNSFakeIPFilter = append(result.DNSFakeIPFilter, mc.DNS.FakeIPFilter...)
-	}
-
-	return result, nil
 }

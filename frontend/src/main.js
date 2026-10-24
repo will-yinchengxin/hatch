@@ -381,7 +381,7 @@ window.hatchApp = function () {
     aiSubTab: 'overview',    // 'overview' | 'connect' | 'tools' | 'workspace' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
 
     // VPN module
-    vpnSubTab: 'overview',   // 'overview' | 'config' | 'profiles' | 'backup' | 'enhance'
+    vpnSubTab: 'overview',   // 'overview' | 'subs' | 'rules' | 'backup' | 'config'
     vpnProfiles: [],
     vpnCurrentProfile: null,
     vpnAppDir: '',
@@ -398,10 +398,6 @@ window.hatchApp = function () {
     vpnConfigContent: '',
     vpnConfigSaving: false,
     vpnConfigError: '',
-    vpnProfileEditing: null,
-    vpnProfileContent: '',
-    vpnProfileSaving: false,
-    vpnProfileError: '',
     vpnBackups: [],
     vpnBackupDir: '',
     vpnBackupPreview: null,
@@ -410,8 +406,26 @@ window.hatchApp = function () {
     vpnRestoreBusy: false,
     vpnMsg: '',
     vpnStatusRefreshing: false,
-    vpnEnhanceData: null,
-    vpnEnhanceLoading: false,
+    // 订阅 (subscriptions overview)
+    vpnSubs: null,           // { subscriptions, global, files }
+    vpnSubsLoading: false,
+    vpnSubsError: '',
+    // 自定义规则 (visual editor over the current subscription's rules/merge files)
+    vpnRules: null,          // RulesState from GetVPNRules
+    vpnRulesDraft: null,     // editable copy of vpnRules.draft
+    vpnRulesSnapshot: '',    // JSON of the last loaded draft, for dirty tracking
+    vpnRulesLoading: false,
+    vpnRulesSaving: false,
+    vpnRulesError: '',
+    vpnRulesIssues: [],      // [{section, index, message}] from SaveVPNRules
+    vpnRulesSection: 'rules', // rules | hosts | fakeip | dns
+    vpnRuleTypeHelpOpen: false,
+    vpnAppendOpen: false,
+    vpnRuleTemplates: [],
+    vpnTplCategory: 'all',
+    vpnTpl: null,            // { tpl, inputs, busy, error } while the template dialog is open
+    vpnBulk: { open: false, text: '', target: 'DIRECT', busy: false },
+    vpnRuleTest: { input: '', busy: false, result: null, error: '' },
 
     // Memo module
     memoSubTab: 'today',      // 'today' | 'all' | 'words' | 'review' | 'storage'
@@ -665,7 +679,7 @@ window.hatchApp = function () {
       if (this.tab === 'ai' && this.aiSubTab === 'workspace') this.loadWorkspace();
       if (this.tab === 'ai' && this.aiSubTab === 'overview') this.loadOverview();
       if (this.tab === 'memo') this.loadMemoModule();
-      if (this.tab === 'vpn') this.loadVPNOverview();
+      if (this.tab === 'vpn') { this.loadVPNOverview(); if (this.vpnSubTab !== 'overview') this.vpnGo(this.vpnSubTab); }
       this.setupEvents();
       this.setupModuleReload();
       this.setupSearchShortcuts();
@@ -728,6 +742,7 @@ window.hatchApp = function () {
       const params = new URLSearchParams(window.location.search || '');
       const ai = params.get('aiSubTab') || params.get('ai');
       const memo = params.get('memoSubTab') || params.get('memo');
+      const vpn = params.get('vpnSubTab') || params.get('vpn');
       const allowedAI = ['overview', 'connect', 'tools', 'workspace', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
       const allowedMemo = ['today', 'all', 'words', 'review', 'storage'];
       if (allowedAI.includes(ai)) {
@@ -735,13 +750,18 @@ window.hatchApp = function () {
         this.selectedDir = null;
         this.aiSubTab = ai;
       }
+      if (['overview', 'subs', 'rules', 'backup', 'config'].includes(vpn)) {
+        this.tab = 'vpn';
+        this.selectedDir = null;
+        this.vpnSubTab = vpn;
+      }
       if (allowedMemo.includes(memo)) {
         this.tab = 'memo';
         this.selectedDir = null;
         this.memoSubTab = memo;
       }
-      if (this.aiSubTab === 'mcp' && (params.get('mcpManual') === '1' || params.get('mcpManual') === 'true')) {
-        this.mcpManualOpen = true;
+      if (this.aiSubTab === 'mcp' && params.get('mcpAdd') === '1') {
+        this.openMCPAdd(params.get('mcpAddTab') || 'paste');
       }
     },
 
@@ -3869,6 +3889,8 @@ window.hatchApp = function () {
         this.selectedDir ? this.scanDir(this.selectedDir) : this.scanAll();
       } else if (this.tab === 'vpn') {
         this.refreshVPNStatus();
+        if (this.vpnSubTab === 'subs') this.loadVPNSubscriptions();
+        else if (this.vpnSubTab === 'rules') this.loadVPNRules();
       } else if (this.tab === 'memo') {
         this.loadMemoModule();
       } else if (this.tab === 'ai') {
@@ -4003,8 +4025,13 @@ window.hatchApp = function () {
       this.vpnConfigContent = '';
       this.vpnConfigError = '';
       try {
-        const r = await GetVPNConfigFile(this.vpnConfigFile);
-        this.vpnConfigContent = r.content || '';
+        const f = this.vpnConfigFile;
+        if (f.startsWith('profile:')) {
+          this.vpnConfigContent = await GetVPNProfileContent(f.slice(8)) || '';
+        } else {
+          const r = await GetVPNConfigFile(f);
+          this.vpnConfigContent = r.content || '';
+        }
       } catch (e) {
         this.vpnConfigError = String(e);
       }
@@ -4014,46 +4041,16 @@ window.hatchApp = function () {
       this.vpnConfigSaving = true;
       this.vpnConfigError = '';
       try {
-        await SaveVPNConfigFile(this.vpnConfigFile, this.vpnConfigContent);
-        this.vpnMsg = '已保存 ' + this.vpnConfigFile;
+        const f = this.vpnConfigFile;
+        if (f.startsWith('profile:')) await SaveVPNProfileContent(f.slice(8), this.vpnConfigContent);
+        else await SaveVPNConfigFile(f, this.vpnConfigContent);
+        this.vpnMsg = '已保存 ' + f.replace(/^profile:/, '');
         setTimeout(() => { this.vpnMsg = ''; }, 3000);
       } catch (e) {
         this.vpnConfigError = String(e);
       } finally {
         this.vpnConfigSaving = false;
       }
-    },
-
-    async openVPNProfile(profile) {
-      this.vpnProfileEditing = profile;
-      this.vpnProfileContent = '';
-      this.vpnProfileError = '';
-      try {
-        this.vpnProfileContent = await GetVPNProfileContent(profile.file);
-      } catch (e) {
-        this.vpnProfileError = String(e);
-      }
-    },
-
-    async saveVPNProfile() {
-      if (!this.vpnProfileEditing) return;
-      this.vpnProfileSaving = true;
-      this.vpnProfileError = '';
-      try {
-        await SaveVPNProfileContent(this.vpnProfileEditing.file, this.vpnProfileContent);
-        this.vpnMsg = '已保存 ' + this.vpnProfileEditing.file;
-        setTimeout(() => { this.vpnMsg = ''; }, 3000);
-      } catch (e) {
-        this.vpnProfileError = String(e);
-      } finally {
-        this.vpnProfileSaving = false;
-      }
-    },
-
-    closeVPNProfile() {
-      this.vpnProfileEditing = null;
-      this.vpnProfileContent = '';
-      this.vpnProfileError = '';
     },
 
     async exportVPNBackup() {
@@ -4161,48 +4158,414 @@ window.hatchApp = function () {
 
     vpnHealthGo(action) {
       if (!action || !action.tab) return;
-      if (action.tab === 'advanced') {
-        this.vpnSubTab = 'config';
-        this.loadVPNConfig();
+      this.vpnGo(action.tab === 'advanced' ? 'config' : action.tab);
+    },
+
+    // ── VPN navigation ──────────────────────────────────────────────────────
+    vpnGo(tab) {
+      this.vpnSubTab = tab;
+      if (tab === 'overview') this.loadVPNOverview();
+      else if (tab === 'subs') this.loadVPNSubscriptions();
+      else if (tab === 'rules') this.loadVPNRules();
+      else if (tab === 'backup') this.loadVPNOverview();
+      else if (tab === 'config') { if (!this.vpnSubs) this.loadVPNSubscriptions(); this.loadVPNConfig(); }
+    },
+
+    // ── 订阅 ────────────────────────────────────────────────────────────────
+    async loadVPNSubscriptions() {
+      this.vpnSubsLoading = true;
+      this.vpnSubsError = '';
+      try {
+        this.vpnSubs = await window['go']['app']['App']['GetVPNSubscriptions']();
+      } catch (e) {
+        this.vpnSubsError = String(e);
+      } finally {
+        this.vpnSubsLoading = false;
+      }
+    },
+
+    async copyVPNSubURL(s) {
+      try {
+        const url = await window['go']['app']['App']['GetVPNSubscriptionURL'](s.uid);
+        await this.copyToClipboard(url, '订阅链接');
+      } catch (e) {
+        this.vpnMsg = '复制失败: ' + e;
+      }
+    },
+
+    async openVPNApp() {
+      try { await window['go']['app']['App']['OpenVPNApp'](); } catch (e) { this.vpnMsg = '打开 Clash Verge 失败: ' + e; }
+    },
+
+    async openVPNRawFile(file) {
+      if (!this.vpnSubs) await this.loadVPNSubscriptions();
+      this.vpnConfigFile = 'profile:' + file;
+      this.vpnSubTab = 'config';
+      this.loadVPNConfig();
+    },
+
+    vpnConfigRemoteFile() {
+      const f = this.vpnConfigFile;
+      if (!f.startsWith('profile:') || !this.vpnSubs) return null;
+      return (this.vpnSubs.files || []).find(x => x.file === f.slice(8) && x.remote) || null;
+    },
+
+    vpnExpireText(expire) {
+      if (!expire) return '长期有效';
+      const days = Math.floor((expire * 1000 - Date.now()) / 86400000);
+      const date = new Date(expire * 1000).toLocaleDateString('zh-CN');
+      if (days < 0) return `已于 ${date} 到期`;
+      return `${date} 到期 · 剩 ${days} 天`;
+    },
+
+    vpnExpireClass(expire) {
+      if (!expire) return '';
+      const days = (expire * 1000 - Date.now()) / 86400000;
+      return days < 0 ? 'vpn-text-error' : days < 15 ? 'vpn-text-warn' : '';
+    },
+
+    vpnRelTime(ts) {
+      if (!ts) return '—';
+      const diff = Date.now() / 1000 - ts;
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+      if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+      if (diff < 86400 * 30) return Math.floor(diff / 86400) + ' 天前';
+      return this.vpnFormatTs(ts);
+    },
+
+    vpnIntervalText(min) {
+      if (!min) return '';
+      if (min === 1440) return '天';
+      if (min % 1440 === 0) return ` ${min / 1440} 天`;
+      if (min % 60 === 0) return ` ${min / 60} 小时`;
+      return ` ${min} 分钟`;
+    },
+
+    vpnGroupTypeLabel(type) {
+      return { select: '手动选择', 'url-test': '自动测速', fallback: '故障转移', 'load-balance': '负载均衡', relay: '链式代理' }[type] || type || '分组';
+    },
+
+    vpnEnhanceLabel(e) {
+      return { rules: '分流规则', merge: 'Hosts / DNS 覆写', script: '脚本', proxies: '额外节点', groups: '额外策略组' }[e.kind] || e.label;
+    },
+
+    // ── 自定义规则 ──────────────────────────────────────────────────────────
+    vpnRulesDirty() {
+      return !!this.vpnRulesDraft && JSON.stringify(this.vpnRulesDraft) !== this.vpnRulesSnapshot;
+    },
+
+    async loadVPNRules(force = false) {
+      if (this.vpnRulesDirty()) {
+        if (!force) return;
+        if (!(await this.askConfirm('放弃尚未保存的规则修改，重新读取？', { title: '重新读取', confirmText: '放弃修改' }))) return;
+      }
+      await this.fetchVPNRules();
+    },
+
+    async fetchVPNRules() {
+      this.vpnRulesLoading = true;
+      this.vpnRulesError = '';
+      try {
+        const [state, templates] = await Promise.all([
+          window['go']['app']['App']['GetVPNRules'](),
+          this.vpnRuleTemplates.length ? Promise.resolve(this.vpnRuleTemplates) : window['go']['app']['App']['GetVPNRuleTemplates'](),
+        ]);
+        this.vpnRules = state;
+        this.vpnRuleTemplates = templates || [];
+        const d = state.draft || {};
+        this.vpnRulesDraft = {
+          prepend: d.prepend || [], append: d.append || [], hosts: d.hosts || [],
+          fakeIpFilter: d.fakeIpFilter || [], dnsPolicy: d.dnsPolicy || [],
+        };
+        this.vpnRulesSnapshot = JSON.stringify(this.vpnRulesDraft);
+        this.vpnRulesIssues = [];
+        this.vpnAppendOpen = this.vpnRulesDraft.append.length > 0;
+        this.vpnBulk.target = 'DIRECT';
+      } catch (e) {
+        this.vpnRulesError = String(e);
+      } finally {
+        this.vpnRulesLoading = false;
+      }
+    },
+
+    async discardVPNRules() {
+      if (!(await this.askConfirm('放弃所有未保存的修改？', { title: '放弃修改', confirmText: '放弃' }))) return;
+      await this.fetchVPNRules();
+    },
+
+    async saveVPNRules() {
+      this.vpnRulesSaving = true;
+      try {
+        const res = await window['go']['app']['App']['SaveVPNRules'](this.vpnRulesDraft);
+        this.vpnRulesIssues = res.issues || [];
+        if (this.vpnRulesIssues.length) {
+          const first = this.vpnRulesIssues[0].section;
+          this.vpnRulesSection = { prepend: 'rules', append: 'rules', hosts: 'hosts', fakeip: 'fakeip', dns: 'dns' }[first] || 'rules';
+          if (first === 'append') this.vpnAppendOpen = true;
+          this.showError(res.message || '有内容需要修改');
+          return;
+        }
+        await this.fetchVPNRules();
+        const warn = (res.warnings || []).length ? '（' + res.warnings.join('；') + '）' : '';
+        this.showSuccess((res.message || '已保存') + warn);
+      } catch (e) {
+        this.showError('保存失败：' + e);
+      } finally {
+        this.vpnRulesSaving = false;
+      }
+    },
+
+    vpnIssue(section, index) {
+      const hit = this.vpnRulesIssues.find(x => x.section === section && x.index === index);
+      return hit ? hit.message : '';
+    },
+
+    vpnRuleSections() {
+      const d = this.vpnRulesDraft || {};
+      const issues = (secs) => this.vpnRulesIssues.some(x => secs.includes(x.section));
+      return [
+        { id: 'rules', title: '分流规则', desc: '网站走代理、直连还是拦截', count: (d.prepend || []).length + (d.append || []).length, issues: issues(['prepend', 'append']) },
+        { id: 'hosts', title: 'Hosts', desc: '域名固定解析到指定 IP', count: (d.hosts || []).length, issues: issues(['hosts']) },
+        { id: 'fakeip', title: 'Fake-IP 过滤', desc: '内网 / 通话 / 游戏用真实 IP', count: (d.fakeIpFilter || []).length, issues: issues(['fakeip']) },
+        { id: 'dns', title: 'DNS 分流', desc: '指定域名用指定 DNS', count: (d.dnsPolicy || []).length, issues: issues(['dns']) },
+      ];
+    },
+
+    vpnRuleTypeInfo(type) {
+      return ((this.vpnRules && this.vpnRules.ruleTypes) || []).find(t => t.type === type) || null;
+    },
+
+    vpnRuleTypeOptions(current) {
+      const types = (this.vpnRules && this.vpnRules.ruleTypes) || [];
+      const basic = types.filter(t => !t.advanced || t.type === current);
+      return { basic, advanced: types.filter(t => t.advanced && t.type !== current) };
+    },
+
+    vpnRuleToString(r) {
+      if (r.raw && r.raw.trim()) return r.raw.trim();
+      const info = this.vpnRuleTypeInfo(r.type);
+      let s = `${r.type},${(r.value || '').trim()},${(r.target || '').trim()}`;
+      if (info && info.noResolve && r.noResolve) s += ',no-resolve';
+      return s;
+    },
+
+    vpnSetRuleType(r, type) {
+      if (type === '__raw') {
+        r.raw = this.vpnRuleToString(r);
         return;
       }
-      this.vpnSubTab = action.tab;
-      if (action.tab === 'backup') this.loadVPNOverview();
-      if (action.tab === 'overview') this.refreshVPNStatus();
+      const info = this.vpnRuleTypeInfo(type);
+      r.type = type;
+      if (info && info.noResolve && /^IP-|GEOIP/.test(type)) r.noResolve = true;
     },
 
-    async loadVPNEnhanceData() {
-      this.vpnEnhanceLoading = true;
+    // Raw → form editing when the rule has the simple TYPE,value,target[,no-resolve] shape.
+    vpnRuleToSimple(r) {
+      const parts = (r.raw || '').split(',').map(x => x.trim());
+      const type = (parts[0] || '').toUpperCase();
+      const info = this.vpnRuleTypeInfo(type);
+      const nr = parts.length === 4 && parts[3].toLowerCase() === 'no-resolve' && info && info.noResolve;
+      if (!info || !(parts.length === 3 || nr)) {
+        this.showError('这条规则包含高级语法，只能原样编辑');
+        return;
+      }
+      Object.assign(r, { type, value: parts[1], target: parts[2], noResolve: !!nr, raw: '' });
+    },
+
+    vpnTargetOptions(current, proxyOnly = false) {
+      const groups = (this.vpnRules && this.vpnRules.groups) || [];
+      const opts = proxyOnly ? [] : [
+        { value: 'DIRECT', label: '直连（不走代理）' },
+        { value: 'REJECT', label: '拦截（禁止访问）' },
+      ];
+      groups.forEach(g => opts.push({ value: g, label: '代理 · ' + g }));
+      if (current && !opts.some(o => o.value === current)) opts.push({ value: current, label: current });
+      return opts;
+    },
+
+    vpnTargetClass(target) {
+      if (!target) return '';
+      if (target === 'DIRECT') return 'vpn-target-direct';
+      if (/^REJECT/.test(target)) return 'vpn-target-reject';
+      return 'vpn-target-proxy';
+    },
+
+    vpnDefaultTarget() {
+      const groups = (this.vpnRules && this.vpnRules.groups) || [];
+      return groups[0] || 'DIRECT';
+    },
+
+    vpnAddRule(list) {
+      list.push({ type: 'DOMAIN-SUFFIX', value: '', target: this.vpnDefaultTarget(), noResolve: false, raw: '', note: '' });
+      this.$nextTick(() => {
+        const rows = document.querySelectorAll('.vpn-rule-list-' + (list === this.vpnRulesDraft.append ? 'append' : 'prepend') + ' .vpn-rule-value');
+        if (rows.length) rows[rows.length - 1].focus();
+      });
+    },
+
+    vpnAddRow(section) {
+      const d = this.vpnRulesDraft;
+      if (section === 'hosts') d.hosts.push({ domain: '', value: '', note: '' });
+      else if (section === 'fakeip') d.fakeIpFilter.push({ value: '', note: '' });
+      else if (section === 'dns') d.dnsPolicy.push({ domain: '', server: '', note: '' });
+      this.$nextTick(() => {
+        const inputs = document.querySelectorAll('.vpn-kv-list-' + section + ' .vpn-kv-first');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      });
+    },
+
+    vpnMoveRow(list, i, delta) {
+      const j = i + delta;
+      if (j < 0 || j >= list.length) return;
+      const [item] = list.splice(i, 1);
+      list.splice(j, 0, item);
+    },
+
+    async vpnBulkAdd() {
+      if (!this.vpnBulk.text.trim()) return;
+      this.vpnBulk.busy = true;
       try {
-        this.vpnEnhanceData = await window['go']['app']['App']['GetVPNEnhanceData']();
+        const rules = await window['go']['app']['App']['ParseVPNRuleLines'](this.vpnBulk.text, this.vpnBulk.target);
+        const n = this.vpnMergeDraft({ prepend: rules || [] });
+        this.vpnBulk = { open: false, text: '', target: this.vpnBulk.target, busy: false };
+        this.showSuccess(`已添加 ${n} 条规则，确认无误后点「保存并生效」`);
       } catch (e) {
-        this.vpnMsg = '加载增强配置失败: ' + e;
+        this.showError('解析失败：' + e);
       } finally {
-        this.vpnEnhanceLoading = false;
+        this.vpnBulk.busy = false;
       }
     },
 
-    vpnEnhanceRuleType(rule) {
-      if (!rule) return '';
-      const prefix = rule.split(',')[0].trim().toUpperCase();
-      const map = {
-        'DOMAIN': '域名', 'DOMAIN-SUFFIX': '域名后缀', 'DOMAIN-KEYWORD': '域名关键词',
-        'IP-CIDR': 'IP段', 'IP-CIDR6': 'IPv6段', 'GEOIP': '地理IP',
-        'PROCESS-NAME': '进程', 'MATCH': '默认'
-      };
-      return map[prefix] || prefix;
+    // Appends template / bulk output to the draft, skipping exact duplicates.
+    vpnMergeDraft(add) {
+      const d = this.vpnRulesDraft;
+      let n = 0;
+      const ruleKeys = new Set([...d.prepend, ...d.append].map(r => this.vpnRuleToString(r)));
+      (add.prepend || []).forEach(r => {
+        const k = this.vpnRuleToString(r);
+        if (!ruleKeys.has(k)) { ruleKeys.add(k); d.prepend.push(r); n++; }
+      });
+      (add.hosts || []).forEach(h => {
+        const cur = d.hosts.find(x => x.domain === h.domain);
+        if (cur) { if (cur.value !== h.value) { cur.value = h.value; n++; } } else { d.hosts.push(h); n++; }
+      });
+      (add.fakeIpFilter || []).forEach(f => {
+        if (!d.fakeIpFilter.some(x => x.value === f.value)) { d.fakeIpFilter.push(f); n++; }
+      });
+      (add.dnsPolicy || []).forEach(p => {
+        const cur = d.dnsPolicy.find(x => x.domain === p.domain);
+        if (cur) { if (cur.server !== p.server) { cur.server = p.server; n++; } } else { d.dnsPolicy.push(p); n++; }
+      });
+      return n;
     },
 
-    vpnEnhanceRuleTarget(rule) {
-      if (!rule) return '';
-      const parts = rule.split(',');
-      return parts[parts.length - 1]?.replace(',no-resolve', '').trim() || '';
+    vpnRestoreFakeIP(mode) {
+      const sub = (this.vpnRules && this.vpnRules.subscriptionFakeIp) || [];
+      if (mode === 'reset') {
+        this.vpnRulesDraft.fakeIpFilter = sub.map(v => ({ value: v, note: '' }));
+        return;
+      }
+      const have = new Set(this.vpnRulesDraft.fakeIpFilter.map(f => f.value));
+      sub.filter(v => !have.has(v)).forEach(v => this.vpnRulesDraft.fakeIpFilter.push({ value: v, note: '订阅默认' }));
     },
 
-    vpnEnhanceRuleValue(rule) {
-      if (!rule) return '';
-      const parts = rule.split(',');
-      return parts.length >= 2 ? parts[1]?.trim() : '';
+    vpnMissingFakeIP() {
+      const sub = (this.vpnRules && this.vpnRules.subscriptionFakeIp) || [];
+      const have = new Set(((this.vpnRulesDraft && this.vpnRulesDraft.fakeIpFilter) || []).map(f => f.value));
+      return sub.filter(v => !have.has(v));
+    },
+
+    // ── Templates ──
+    vpnTemplateCategories() {
+      return [
+        { id: 'all', label: '全部' }, { id: 'fix', label: '修复问题' }, { id: 'speed', label: '加速访问' },
+        { id: 'direct', label: '直连' }, { id: 'block', label: '拦截' }, { id: 'custom', label: '自定义' },
+      ];
+    },
+
+    vpnFilteredTemplates() {
+      return this.vpnRuleTemplates.filter(t => this.vpnTplCategory === 'all' || t.category === this.vpnTplCategory);
+    },
+
+    openVPNTemplate(t) {
+      const inputs = {};
+      (t.inputs || []).forEach(inp => { inputs[inp.key] = inp.kind === 'target' ? this.vpnDefaultTarget() : (inp.default || ''); });
+      this.vpnTpl = { tpl: t, inputs, busy: false, error: '' };
+    },
+
+    // Pattern lines with placeholders replaced by readable hints, for the dialog preview.
+    vpnTplPreview(t) {
+      const label = { domains: '〈你的域名〉', apps: '〈应用名〉', target: '〈代理组〉', ip: '〈IP〉', cidr: '〈IP 段〉', dns: '〈DNS〉' };
+      const fill = (line) => line.replace(/\{(\w+)\}/g, (_, k) => label[k] || k);
+      const rows = [];
+      (t.rules || []).forEach(l => rows.push({ kind: '规则', text: fill(l) }));
+      (t.hosts || []).forEach(l => rows.push({ kind: 'Hosts', text: fill(l).replace('=', ' → ') }));
+      (t.fakeIp || []).forEach(l => rows.push({ kind: 'Fake-IP', text: fill(l) }));
+      (t.dns || []).forEach(l => rows.push({ kind: 'DNS', text: fill(l).replace('=', ' → ') }));
+      return rows;
+    },
+
+    async applyVPNTemplate() {
+      const st = this.vpnTpl;
+      if (!st) return;
+      st.busy = true;
+      st.error = '';
+      try {
+        const add = await window['go']['app']['App']['ExpandVPNRuleTemplate'](st.tpl.id, st.inputs);
+        const n = this.vpnMergeDraft(add || {});
+        const firstSection = (add.prepend || []).length ? 'rules' : (add.fakeIpFilter || []).length ? 'fakeip' : (add.hosts || []).length ? 'hosts' : 'dns';
+        this.vpnRulesSection = firstSection;
+        this.vpnTpl = null;
+        this.showSuccess(n ? `「${st.tpl.title}」已加入 ${n} 项，检查无误后点「保存并生效」` : '这些内容已经存在，无需重复添加');
+        this.$nextTick(() => {
+          const el = document.querySelector('.vpn-editor-section');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      } catch (e) {
+        st.error = String(e);
+      } finally {
+        if (this.vpnTpl) this.vpnTpl.busy = false;
+      }
+    },
+
+    // ── Rule tester ──
+    async runVPNRuleTest() {
+      const t = this.vpnRuleTest;
+      if (!t.input.trim()) return;
+      t.busy = true;
+      t.error = '';
+      try {
+        t.result = await window['go']['app']['App']['TestVPNRule'](t.input, this.vpnRulesDraft);
+      } catch (e) {
+        t.result = null;
+        t.error = String(e);
+      } finally {
+        t.busy = false;
+      }
+    },
+
+    vpnTestVerdict(r) {
+      if (!r.matched) return '没有规则能确定结果';
+      if (r.target === 'DIRECT') return '✅ 直连，不走代理';
+      if (/^REJECT/.test(r.target)) return '⛔ 被拦截，无法访问';
+      return '🌐 走代理：' + r.target;
+    },
+
+    vpnTestSource(r) {
+      if (!r.matched) return '';
+      if (r.source === 'custom') return `命中你的第 ${r.position} 条自定义规则`;
+      if (r.source === 'append') return `命中第 ${r.position} 条追加规则`;
+      return `命中订阅自带的第 ${r.position} 条规则`;
+    },
+
+    vpnTestNotes(r) {
+      const notes = [];
+      if (r.hostsValue) notes.push(`Hosts：${r.host} 固定解析到 ${r.hostsValue}`);
+      if (r.fakeIpBypass) notes.push(`Fake-IP 过滤命中「${r.fakeIpBypass}」，会解析出真实 IP`);
+      if (r.dnsServer) notes.push(`DNS 分流：由 ${r.dnsServer} 解析`);
+      if (r.uncertainCount) notes.push(`在它之前有 ${r.uncertainCount} 条规则要在真实连接时才能判断（如 ${r.uncertain[0]}），实际可能先命中它们`);
+      return notes;
     },
   };
 };

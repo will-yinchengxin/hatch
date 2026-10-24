@@ -3528,35 +3528,28 @@
     <!-- Layout: sidenav + content -->
     <div class="ai-layout">
       <nav class="ai-sidenav">
-        <button class="ai-sidenav-item" :class="vpnSubTab==='overview' ? 'active' : ''"
-          @click="vpnSubTab='overview'; loadVPNOverview()">
+        <button class="ai-sidenav-item" :class="vpnSubTab==='overview' ? 'active' : ''" @click="vpnGo('overview')">
           <span class="ai-sidenav-icon">📋</span>
           <span>体检</span>
         </button>
-        <button class="ai-sidenav-item" :class="vpnSubTab==='config' ? 'active' : ''"
-          @click="vpnSubTab='config'; loadVPNConfig()">
-          <span class="ai-sidenav-icon">📝</span>
-          <span>高级配置</span>
+        <button class="ai-sidenav-item" :class="vpnSubTab==='subs' ? 'active' : ''" @click="vpnGo('subs')">
+          <span class="ai-sidenav-icon">☁️</span>
+          <span>订阅</span>
+          <span class="ai-sidenav-count" x-show="vpnSubs && vpnSubs.subscriptions.length" x-text="vpnSubs && vpnSubs.subscriptions.length"></span>
         </button>
-        <button class="ai-sidenav-item" :class="vpnSubTab==='profiles' ? 'active' : ''"
-          @click="vpnSubTab='profiles'; loadVPNOverview()">
-          <span class="ai-sidenav-icon">🗂</span>
-          <span>Profile 原文</span>
-          <span class="ai-sidenav-count" x-show="vpnProfiles.length > 0" x-text="vpnProfiles.length"></span>
+        <button class="ai-sidenav-item" :class="vpnSubTab==='rules' ? 'active' : ''" @click="vpnGo('rules')">
+          <span class="ai-sidenav-icon">✦</span>
+          <span>自定义规则</span>
+          <span class="ai-sidenav-count vpn-dirty-dot" x-show="vpnRulesDirty()" title="有未保存的修改">●</span>
         </button>
-        <button class="ai-sidenav-item" :class="vpnSubTab==='backup' ? 'active' : ''"
-          @click="vpnSubTab='backup'; loadVPNOverview()">
+        <button class="ai-sidenav-item" :class="vpnSubTab==='backup' ? 'active' : ''" @click="vpnGo('backup')">
           <span class="ai-sidenav-icon">💾</span>
           <span>备份恢复</span>
           <span class="ai-sidenav-count" x-show="vpnBackups.length > 0" x-text="vpnBackups.length"></span>
         </button>
-        <button class="ai-sidenav-item" :class="vpnSubTab==='enhance' ? 'active' : ''"
-          @click="vpnSubTab='enhance'; loadVPNEnhanceData()">
-          <span class="ai-sidenav-icon">✦</span>
-          <span>自定义规则</span>
-          <span class="ai-sidenav-count"
-            x-show="vpnEnhanceData && vpnEnhanceData.hasData"
-            x-text="(vpnEnhanceData && vpnEnhanceData.prependRules && vpnEnhanceData.prependRules.length || 0) + (vpnEnhanceData && vpnEnhanceData.dnsFakeIPFilter && vpnEnhanceData.dnsFakeIPFilter.length || 0)"></span>
+        <button class="ai-sidenav-item" :class="vpnSubTab==='config' ? 'active' : ''" @click="vpnGo('config')">
+          <span class="ai-sidenav-icon">📝</span>
+          <span>高级配置</span>
         </button>
       </nav>
 
@@ -3606,9 +3599,12 @@
             </template>
           </section>
 
-          <!-- 当前激活 Profile -->
+          <!-- 当前订阅 -->
           <section class="settings-section">
-            <h3>当前激活 Profile</h3>
+            <div class="section-header-row">
+              <h3>当前订阅</h3>
+              <button class="btn-edit" @click="vpnGo('subs')">查看订阅详情 →</button>
+            </div>
             <template x-if="vpnCurrentProfile">
               <div class="vpn-current-card">
                 <div class="vpn-current-main">
@@ -3617,18 +3613,12 @@
                     x-text="vpnProfileTypeBadge(vpnCurrentProfile.type)"></span>
                 </div>
                 <div class="vpn-current-meta">
-                  <span class="muted">UID: </span><code x-text="vpnCurrentProfile.uid"></code>
-                  &nbsp;·&nbsp;
-                  <span class="muted">更新: </span><span x-text="vpnFormatTs(vpnCurrentProfile.updated)"></span>
-                </div>
-                <div class="vpn-current-url" x-show="vpnCurrentProfile.url">
-                  <span class="muted">订阅: </span>
-                  <span class="vpn-url-masked" x-text="vpnCurrentProfile.url ? vpnCurrentProfile.url.replace(/\/link\/[^?]+/, '/link/***') : ''"></span>
+                  <span class="muted">更新于 </span><span x-text="vpnRelTime(vpnCurrentProfile.updated)"></span>
                 </div>
               </div>
             </template>
             <template x-if="!vpnCurrentProfile">
-              <p class="muted">未检测到激活的 Profile，请确认 Clash Verge Rev 已安装。</p>
+              <p class="muted">未检测到正在使用的订阅，请确认 Clash Verge Rev 已安装并导入订阅。</p>
             </template>
           </section>
 
@@ -3669,42 +3659,37 @@
             </div>
           </section>
 
-          <!-- 全部 Profiles -->
-          <section class="settings-section">
-            <h3>全部 Profiles</h3>
-            <template x-if="vpnProfiles.length === 0">
-              <p class="muted">暂无 Profile 数据。</p>
-            </template>
-            <div class="vpn-profile-list">
-              <template x-for="p in vpnProfiles" :key="p.uid">
-                <div class="vpn-profile-row" :class="p.isCurrent ? 'vpn-profile-current' : ''">
-                  <span class="vpn-type-badge" :class="'vpn-type-' + p.type" x-text="vpnProfileTypeBadge(p.type)"></span>
-                  <span class="vpn-profile-name" x-text="p.name || p.uid"></span>
-                  <span class="vpn-profile-ts muted" x-text="vpnFormatTs(p.updated)"></span>
-                  <span class="vpn-current-mark" x-show="p.isCurrent">✓ 当前</span>
-                  <button class="btn-edit" @click="vpnSubTab='profiles'; openVPNProfile(p)">编辑</button>
-                </div>
-              </template>
-            </div>
-          </section>
         </div>
 
         <!-- ══ 配置编辑 ════════════════════════════════════════════ -->
         <div x-show="vpnSubTab==='config'">
           <section class="settings-section">
             <h3>高级配置编辑</h3>
-            <p class="settings-desc">适合熟悉 Clash 配置的人使用。普通排障优先看「体检」和「备份恢复」。保存前会校验 YAML 并自动创建 <code>.bak</code> 备份文件。</p>
+            <p class="settings-desc">直接编辑原始文件，适合熟悉 Clash 配置的人。日常调整网站走向请用「自定义规则」，看订阅状态请用「订阅」。保存前会校验 YAML，并自动备份原文件。</p>
             <div class="vpn-config-toolbar">
               <select x-model="vpnConfigFile" @change="loadVPNConfig()" class="vpn-file-select">
-                <option value="verge.yaml">verge.yaml（应用设置）</option>
-                <option value="config.yaml">config.yaml（Clash 核心）</option>
-                <option value="dns_config.yaml">dns_config.yaml（DNS 策略）</option>
-                <option value="clash-verge.yaml">clash-verge.yaml</option>
-                <option value="profiles.yaml">profiles.yaml（Profile 列表）</option>
+                <optgroup label="Clash Verge 设置">
+                  <option value="verge.yaml">verge.yaml（应用设置）</option>
+                  <option value="config.yaml">config.yaml（Clash 核心）</option>
+                  <option value="dns_config.yaml">dns_config.yaml（DNS 覆写）</option>
+                  <option value="clash-verge.yaml">clash-verge.yaml（最终生效配置，自动生成）</option>
+                  <option value="profiles.yaml">profiles.yaml（订阅列表）</option>
+                </optgroup>
+                <optgroup label="订阅与增强文件">
+                  <template x-for="f in (vpnSubs && vpnSubs.files || [])" :key="f.file">
+                    <option :value="'profile:' + f.file" :selected="vpnConfigFile === 'profile:' + f.file" x-text="f.label + '（' + f.file + '）'"></option>
+                  </template>
+                </optgroup>
               </select>
               <button class="btn-edit btn-primary" @click="saveVPNConfig()" :aria-busy="vpnConfigSaving" :disabled="vpnConfigSaving">
                 💾 保存
               </button>
+            </div>
+            <div class="vpn-rules-warning" x-show="vpnConfigRemoteFile()">
+              这是远程订阅文件：Clash Verge 下次更新订阅时会用服务商的版本整体覆盖，这里的修改不会长期保留。需要长期生效的改动请到「自定义规则」。
+            </div>
+            <div class="vpn-rules-warning" x-show="vpnConfigFile === 'clash-verge.yaml'">
+              这是 Clash Verge 自动生成的最终配置，每次切换订阅或修改设置都会重新生成，手动修改会被覆盖。
             </div>
             <div class="vpn-config-error" x-show="vpnConfigError" x-text="vpnConfigError"></div>
             <textarea
@@ -3716,46 +3701,131 @@
           </section>
         </div>
 
-        <!-- ══ Profiles ═══════════════════════════════════════════ -->
-        <div x-show="vpnSubTab==='profiles'">
+        <!-- ══ 订阅 ═══════════════════════════════════════════════ -->
+        <div x-show="vpnSubTab==='subs'">
           <section class="settings-section">
-            <h3>Profile 原文编辑</h3>
-            <p class="settings-desc">这里直接编辑 Clash Verge Rev 的 Profile 文件。若只是想确认当前订阅是否可用，先回到「体检」查看结论。</p>
-            <template x-if="vpnProfiles.length === 0">
-              <p class="muted">暂无 Profile，请先加载。</p>
-            </template>
-            <div class="vpn-profile-items">
-              <template x-for="p in vpnProfiles" :key="p.uid">
-                <div class="vpn-item" :class="[p.isCurrent ? 'vpn-item-current' : '', vpnProfileEditing && vpnProfileEditing.uid===p.uid ? 'vpn-item-editing' : '']">
-                  <div class="vpn-item-row">
-                    <span class="vpn-type-badge" :class="'vpn-type-' + p.type" x-text="vpnProfileTypeBadge(p.type)"></span>
-                    <span class="vpn-item-name" x-text="p.name || p.uid"></span>
-                    <span class="vpn-item-file muted" x-text="p.file"></span>
-                    <span class="vpn-current-mark" x-show="p.isCurrent">✓ 当前</span>
-                    <span class="vpn-item-ts muted" x-text="vpnFormatTs(p.updated)"></span>
-                    <div class="skill-actions">
-                      <button class="btn-edit" @click="vpnProfileEditing && vpnProfileEditing.uid===p.uid ? closeVPNProfile() : openVPNProfile(p)">
-                        <span x-text="vpnProfileEditing && vpnProfileEditing.uid===p.uid ? '收起' : '编辑'"></span>
-                      </button>
-                    </div>
-                  </div>
+            <div class="section-header-row">
+              <h3>订阅是怎么生效的</h3>
+              <div class="vpn-inline-actions">
+                <button class="btn-edit" @click="loadVPNSubscriptions()" :aria-busy="vpnSubsLoading">↻ 刷新</button>
+                <button class="btn-edit" @click="openVPNApp()">打开 Clash Verge</button>
+              </div>
+            </div>
+            <div class="vpn-flow">
+              <div class="vpn-flow-step">
+                <span class="vpn-flow-icon">☁️</span>
+                <strong>订阅</strong>
+                <span>服务商提供的节点和默认规则，每次更新都会被整体覆盖</span>
+              </div>
+              <span class="vpn-flow-op">＋</span>
+              <button class="vpn-flow-step vpn-flow-mine" @click="vpnGo('rules')">
+                <span class="vpn-flow-icon">✦</span>
+                <strong>你的自定义规则</strong>
+                <span>分流、Hosts、DNS 等修改，更新订阅后依然保留</span>
+              </button>
+              <span class="vpn-flow-op">＝</span>
+              <div class="vpn-flow-step">
+                <span class="vpn-flow-icon">⚡</span>
+                <strong>最终生效</strong>
+                <span>Clash 内核实际运行的配置</span>
+              </div>
+            </div>
+            <p class="settings-desc vpn-flow-tip">想让某个网站直连、走代理或屏蔽，请到「自定义规则」修改；直接改订阅原文会在下次更新时丢失。切换订阅、更新订阅、选择节点请在 Clash Verge 中操作。</p>
+          </section>
 
-                  <!-- 内联编辑器 -->
-                  <div class="skill-editor-panel" x-show="vpnProfileEditing && vpnProfileEditing.uid===p.uid">
-                    <div class="vpn-config-error" x-show="vpnProfileError" x-text="vpnProfileError"></div>
-                    <textarea
-                      class="skill-editor-textarea"
-                      x-model="vpnProfileContent"
-                      spellcheck="false"
-                    ></textarea>
-                    <div class="skill-editor-footer">
-                      <button class="btn-edit btn-primary" @click="saveVPNProfile()" :aria-busy="vpnProfileSaving" :disabled="vpnProfileSaving">
-                        💾 保存
-                      </button>
-                      <button class="btn-edit" @click="closeVPNProfile()">取消</button>
-                      <span class="muted" style="font-size:11px">保存前会自动创建 .bak 备份</span>
+          <template x-if="vpnSubsLoading && !vpnSubs">
+            <div class="vpn-enhance-loading">加载中…</div>
+          </template>
+          <div class="vpn-config-error" x-show="vpnSubsError" x-text="vpnSubsError"></div>
+          <template x-if="vpnSubs && !vpnSubs.subscriptions.length">
+            <section class="settings-section"><p class="muted">还没有订阅。请在 Clash Verge 中导入订阅链接。</p></section>
+          </template>
+
+          <template x-for="s in (vpnSubs && vpnSubs.subscriptions || [])" :key="s.uid">
+            <section class="settings-section vpn-sub-card" :class="s.isCurrent ? 'vpn-sub-current' : ''">
+              <div class="vpn-sub-head">
+                <div class="vpn-sub-title">
+                  <span class="vpn-sub-name" x-text="s.name"></span>
+                  <span class="vpn-sub-badge vpn-sub-badge-on" x-show="s.isCurrent">● 正在使用</span>
+                  <span class="vpn-sub-badge" x-text="s.type === 'remote' ? '远程订阅' : '本地配置'"></span>
+                </div>
+                <span class="muted vpn-sub-host" x-show="s.urlHost" x-text="s.urlHost"></span>
+              </div>
+              <div class="vpn-config-error" x-show="s.error" x-text="s.error"></div>
+
+              <div class="vpn-sub-usage" x-show="s.total > 0">
+                <progress class="vpn-usage-bar" :value="s.upload + s.download" :max="s.total"></progress>
+                <div class="vpn-sub-usage-text">
+                  <span>已用 <strong x-text="vpnFormatBytes(s.upload + s.download)"></strong> / <span x-text="vpnFormatBytes(s.total)"></span></span>
+                  <span :class="vpnExpireClass(s.expire)" x-text="vpnExpireText(s.expire)"></span>
+                </div>
+              </div>
+
+              <div class="vpn-sub-stats">
+                <div class="vpn-sub-stat"><strong x-text="s.nodeCount"></strong><span>节点</span></div>
+                <div class="vpn-sub-stat"><strong x-text="s.groups.length"></strong><span>策略组</span></div>
+                <div class="vpn-sub-stat"><strong x-text="s.ruleCount"></strong><span>订阅规则</span></div>
+                <div class="vpn-sub-stat">
+                  <strong x-text="vpnRelTime(s.updated)"></strong>
+                  <span x-text="s.autoUpdate ? ('每' + vpnIntervalText(s.updateInterval) + '自动更新') : (s.type === 'remote' ? '未开启自动更新' : '本地文件')"></span>
+                </div>
+              </div>
+
+              <div class="vpn-sub-block" x-show="s.groups.length">
+                <div class="vpn-sub-label">策略组 <span class="muted">· 节点在 Clash Verge 中切换</span></div>
+                <div class="vpn-chip-row">
+                  <template x-for="g in s.groups" :key="g.name">
+                    <span class="vpn-group-chip">
+                      <strong x-text="g.name"></strong>
+                      <span class="muted" x-text="vpnGroupTypeLabel(g.type) + ' · ' + g.count + ' 个'"></span>
+                      <span class="vpn-group-now" x-show="g.now" x-text="'→ ' + g.now"></span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+
+              <div class="vpn-sub-block" x-show="s.regions.length">
+                <div class="vpn-sub-label">节点分布</div>
+                <div class="vpn-chip-row">
+                  <template x-for="r in s.regions" :key="r.name">
+                    <span class="vpn-region-chip"><span x-text="r.name"></span><b x-text="r.count"></b></span>
+                  </template>
+                </div>
+              </div>
+
+              <div class="vpn-sub-block" x-show="s.enhancements.length">
+                <div class="vpn-sub-label">你对这个订阅做的自定义</div>
+                <div class="vpn-enh-list">
+                  <template x-for="e in s.enhancements" :key="e.kind">
+                    <div class="vpn-enh-row">
+                      <span class="vpn-enh-dot" :class="e.customized ? 'on' : ''"></span>
+                      <span class="vpn-enh-label" x-text="vpnEnhanceLabel(e)"></span>
+                      <span class="muted vpn-enh-summary" x-text="e.summary"></span>
+                      <button class="btn-edit" x-show="s.isCurrent && (e.kind === 'rules' || e.kind === 'merge')" @click="vpnGo('rules')">可视化编辑</button>
+                      <button class="btn-edit" @click="openVPNRawFile(e.file)">原文</button>
                     </div>
-                  </div>
+                  </template>
+                </div>
+              </div>
+
+              <div class="vpn-sub-actions">
+                <button class="btn-edit btn-primary" x-show="s.isCurrent" @click="vpnGo('rules')">✦ 管理自定义规则</button>
+                <button class="btn-edit" x-show="s.type === 'remote'" @click="copyVPNSubURL(s)">复制订阅链接</button>
+                <button class="btn-edit" @click="openVPNRawFile(s.file)">查看订阅原文</button>
+                <button class="btn-edit" @click="openVPNApp()" x-text="s.isCurrent ? '在 Clash Verge 中更新' : '在 Clash Verge 中切换到它'"></button>
+              </div>
+            </section>
+          </template>
+
+          <section class="settings-section" x-show="vpnSubs && vpnSubs.global.length">
+            <h3>全局增强 <span class="muted vpn-h3-note">· 对所有订阅生效</span></h3>
+            <div class="vpn-enh-list">
+              <template x-for="e in (vpnSubs && vpnSubs.global || [])" :key="e.file">
+                <div class="vpn-enh-row">
+                  <span class="vpn-enh-dot" :class="e.customized ? 'on' : ''"></span>
+                  <span class="vpn-enh-label" x-text="vpnEnhanceLabel(e)"></span>
+                  <span class="muted vpn-enh-summary" x-text="e.summary"></span>
+                  <button class="btn-edit" @click="openVPNRawFile(e.file)">原文</button>
                 </div>
               </template>
             </div>
@@ -3822,90 +3892,388 @@
         </div>
 
         <!-- ══ 自定义规则 ═══════════════════════════════════════════ -->
-        <div x-show="vpnSubTab==='enhance'">
-
-          <template x-if="vpnEnhanceLoading">
+        <div x-show="vpnSubTab==='rules'" class="vpn-rules-page">
+          <template x-if="vpnRulesLoading && !vpnRules">
             <div class="vpn-enhance-loading">加载中…</div>
           </template>
-
-          <template x-if="!vpnEnhanceLoading && (!vpnEnhanceData || !vpnEnhanceData.hasData)">
+          <template x-if="vpnRulesError && !vpnRules">
             <section class="settings-section">
-              <p class="settings-desc">未检测到 Merge 类型的 Profile，或该 Profile 中没有自定义的 prepend / hosts / dns 配置。</p>
-              <p class="settings-desc">你可以在 Clash Verge Rev 中创建一个 <strong>Merge</strong> 类型的 Profile，添加自定义规则后在此查看。</p>
+              <div class="vpn-config-error" x-text="vpnRulesError"></div>
+              <button class="btn-edit" @click="fetchVPNRules()">重试</button>
             </section>
           </template>
 
-          <template x-if="!vpnEnhanceLoading && vpnEnhanceData && vpnEnhanceData.hasData">
+          <template x-if="vpnRules && vpnRulesDraft">
             <div>
-              <!-- 来源说明 -->
-              <div class="vpn-enhance-source" x-show="vpnEnhanceData.sourceFiles && vpnEnhanceData.sourceFiles.length">
-                <span class="vpn-enhance-source-label">来源 Profile：</span>
-                <template x-for="src in (vpnEnhanceData.sourceFiles || [])">
-                  <span class="vpn-cidr-tag" x-text="src"></span>
-                </template>
+              <!-- 状态条 -->
+              <div class="vpn-rules-status">
+                <span>正在编辑：<strong x-text="vpnRules.profileName"></strong></span>
+                <span class="vpn-core-pill" :class="vpnRules.coreReachable ? 'on' : 'off'"
+                  x-text="vpnRules.coreReachable ? '● 内核在线 · 保存后立即生效' : '○ 内核未连接 · 保存后下次启动 Clash Verge 生效'"></span>
+                <button class="btn-edit" @click="loadVPNRules(true)">↻ 重新读取</button>
               </div>
+              <template x-for="w in vpnRules.warnings">
+                <div class="vpn-rules-warning" x-text="w"></div>
+              </template>
 
-              <!-- Prepend 规则 -->
-              <section class="settings-section" x-show="vpnEnhanceData.prependRules && vpnEnhanceData.prependRules.length">
+              <!-- 常用场景 -->
+              <section class="settings-section">
                 <div class="section-header-row">
-                  <h3>Prepend 规则
-                    <span class="ai-sidenav-count" x-text="vpnEnhanceData.prependRules && vpnEnhanceData.prependRules.length"></span>
-                  </h3>
-                  <span class="muted" style="font-size:11px">优先于订阅规则匹配</span>
-                </div>
-                <p class="settings-desc">这些规则会被插入到订阅规则列表的最前面，优先匹配。格式：<code>类型,值,目标</code></p>
-                <div class="vpn-enhance-table">
-                  <div class="vpn-enhance-thead">
-                    <span>类型</span><span>值</span><span>目标</span>
+                  <h3>常用场景 · 一键添加</h3>
+                  <div class="vpn-chip-tabs">
+                    <template x-for="c in vpnTemplateCategories()" :key="c.id">
+                      <button class="vpn-chip-tab" :class="vpnTplCategory === c.id ? 'active' : ''" @click="vpnTplCategory = c.id" x-text="c.label"></button>
+                    </template>
                   </div>
-                  <template x-for="rule in (vpnEnhanceData.prependRules || [])">
-                    <div class="vpn-enhance-row">
-                      <span class="vpn-rule-type-tag" x-text="vpnEnhanceRuleType(rule)"></span>
-                      <code class="vpn-rule-value" x-text="vpnEnhanceRuleValue(rule)"></code>
-                      <span class="vpn-rule-target" :class="vpnEnhanceRuleTarget(rule)==='DIRECT'?'vpn-target-direct':'vpn-target-proxy'"
-                            x-text="vpnEnhanceRuleTarget(rule)"></span>
-                    </div>
+                </div>
+                <p class="settings-desc">遇到问题先在这里找对应的场景，点一下就能生成规则；添加后还可以继续修改，点「保存并生效」才会真正写入。</p>
+                <div class="vpn-tpl-grid">
+                  <template x-for="t in vpnFilteredTemplates()" :key="t.id">
+                    <button class="vpn-tpl-card" @click="openVPNTemplate(t)">
+                      <span class="vpn-tpl-icon" x-text="t.icon"></span>
+                      <span class="vpn-tpl-body">
+                        <span class="vpn-tpl-title" x-text="t.title"></span>
+                        <span class="vpn-tpl-problem" x-text="t.problem"></span>
+                      </span>
+                    </button>
                   </template>
                 </div>
               </section>
 
-              <!-- Hosts 覆盖 -->
-              <section class="settings-section" x-show="vpnEnhanceData.hosts && Object.keys(vpnEnhanceData.hosts).length">
+              <!-- 测试 -->
+              <section class="settings-section">
                 <div class="section-header-row">
-                  <h3>Hosts 覆盖
-                    <span class="ai-sidenav-count" x-text="Object.keys(vpnEnhanceData.hosts || {}).length"></span>
-                  </h3>
-                  <span class="muted" style="font-size:11px">强制域名 → IP 映射</span>
+                  <h3>🧪 测试一下：这个网址会走哪里？</h3>
+                  <span class="muted vpn-hint">按当前编辑内容判断（包括未保存的修改）</span>
                 </div>
-                <p class="settings-desc">这些 Hosts 条目会覆盖系统 DNS 解析，将指定域名强制解析到特定 IP。用于内网服务或访问控制。</p>
-                <div class="vpn-enhance-table">
-                  <div class="vpn-enhance-thead">
-                    <span>域名</span><span>→ IP</span>
+                <div class="vpn-test-row">
+                  <input type="text" class="vpn-input" x-model="vpnRuleTest.input"
+                    placeholder="输入网址、域名或 IP，例如 https://chatgpt.com 或 192.168.1.1"
+                    @keydown.enter="runVPNRuleTest()">
+                  <button class="btn-primary vpn-test-btn" @click="runVPNRuleTest()" :aria-busy="vpnRuleTest.busy"
+                    :disabled="vpnRuleTest.busy || !vpnRuleTest.input.trim()">测试</button>
+                </div>
+                <div class="vpn-config-error" x-show="vpnRuleTest.error" x-text="vpnRuleTest.error"></div>
+                <template x-if="vpnRuleTest.result">
+                  <div class="vpn-test-result" :class="vpnTargetClass(vpnRuleTest.result.target)">
+                    <div class="vpn-test-verdict" x-text="vpnTestVerdict(vpnRuleTest.result)"></div>
+                    <div class="vpn-test-source" x-show="vpnRuleTest.result.matched">
+                      <span x-text="vpnTestSource(vpnRuleTest.result)"></span>
+                      <code x-text="vpnRuleTest.result.rule"></code>
+                    </div>
+                    <ul class="vpn-test-notes" x-show="vpnTestNotes(vpnRuleTest.result).length">
+                      <template x-for="n in vpnTestNotes(vpnRuleTest.result)">
+                        <li x-text="n"></li>
+                      </template>
+                    </ul>
                   </div>
-                  <template x-for="[host, ip] in Object.entries(vpnEnhanceData.hosts || {})">
-                    <div class="vpn-enhance-row vpn-hosts-row">
-                      <code class="vpn-rule-value" x-text="host"></code>
-                      <span class="vpn-hosts-ip" x-text="ip"></span>
-                    </div>
+                </template>
+              </section>
+
+              <!-- 编辑器 -->
+              <section class="settings-section vpn-editor-section">
+                <div class="vpn-sec-tabs">
+                  <template x-for="sec in vpnRuleSections()" :key="sec.id">
+                    <button class="vpn-sec-tab" :class="[vpnRulesSection === sec.id ? 'active' : '', sec.issues ? 'has-issue' : '']" @click="vpnRulesSection = sec.id">
+                      <span class="vpn-sec-tab-title">
+                        <span x-text="sec.title"></span>
+                        <span class="ai-sidenav-count" x-text="sec.count"></span>
+                      </span>
+                      <span class="vpn-sec-tab-desc" x-text="sec.desc"></span>
+                    </button>
                   </template>
+                </div>
+
+                <!-- 分流规则 -->
+                <div x-show="vpnRulesSection === 'rules'">
+                  <div class="vpn-sec-intro">
+                    <p>规则<strong>从上往下</strong>匹配，命中第一条就停止。这里的规则排在订阅自带的 <strong x-text="vpnRules.subscriptionRuleCount"></strong> 条规则<strong>之前</strong>，所以总是优先生效。</p>
+                    <button class="btn-edit" @click="vpnRuleTypeHelpOpen = !vpnRuleTypeHelpOpen" x-text="vpnRuleTypeHelpOpen ? '收起说明' : '规则类型怎么选？'"></button>
+                  </div>
+                  <div class="vpn-type-help" x-show="vpnRuleTypeHelpOpen">
+                    <template x-for="rt in vpnRules.ruleTypes" :key="rt.type">
+                      <div class="vpn-type-help-row">
+                        <span class="vpn-type-help-label" x-text="rt.label"></span>
+                        <code x-text="rt.type"></code>
+                        <span class="muted" x-text="rt.desc"></span>
+                      </div>
+                    </template>
+                    <div class="vpn-type-help-row">
+                      <span class="vpn-type-help-label">命中后去哪</span>
+                      <code>目标</code>
+                      <span class="muted">直连 = 不走代理；拦截 = 禁止访问；代理 · 组名 = 走该代理组（在 Clash Verge 中选的节点）。IP 类规则建议勾选「不解析」，避免为了匹配而额外查询 DNS。</span>
+                    </div>
+                  </div>
+
+                  <div class="vpn-rule-list vpn-rule-list-prepend">
+                    <template x-if="!vpnRulesDraft.prepend.length">
+                      <div class="vpn-empty">还没有自定义规则。可以从上面的「常用场景」一键添加，或点下方「＋ 添加规则」。</div>
+                    </template>
+                    <template x-for="(r, i) in vpnRulesDraft.prepend">
+                      <div class="vpn-rule-item" :class="vpnIssue('prepend', i) ? 'has-issue' : ''">
+                        <div class="vpn-rule-row">
+                          <span class="vpn-rule-idx" x-text="i + 1"></span>
+                          <template x-if="!r.raw">
+                            <div class="vpn-rule-fields">
+                              <select class="vpn-input vpn-rule-type" @change="vpnSetRuleType(r, $event.target.value)" :title="(vpnRuleTypeInfo(r.type) || {}).desc">
+                                <template x-for="rt in vpnRuleTypeOptions(r.type).basic" :key="rt.type">
+                                  <option :value="rt.type" :selected="rt.type === r.type" x-text="rt.label"></option>
+                                </template>
+                                <optgroup label="更多类型">
+                                  <template x-for="rt in vpnRuleTypeOptions(r.type).advanced" :key="rt.type">
+                                    <option :value="rt.type" x-text="rt.label"></option>
+                                  </template>
+                                  <option value="__raw">原样编辑（高级）</option>
+                                </optgroup>
+                              </select>
+                              <input type="text" class="vpn-input vpn-rule-value" x-model="r.value"
+                                :placeholder="(vpnRuleTypeInfo(r.type) || {}).placeholder || ''">
+                              <select class="vpn-input vpn-rule-target" :class="vpnTargetClass(r.target)" @change="r.target = $event.target.value">
+                                <template x-for="o in vpnTargetOptions(r.target)" :key="o.value">
+                                  <option :value="o.value" :selected="o.value === r.target" x-text="o.label"></option>
+                                </template>
+                              </select>
+                              <label class="vpn-nr-toggle" x-show="(vpnRuleTypeInfo(r.type) || {}).noResolve" title="匹配时不为域名查询 DNS（推荐）">
+                                <input type="checkbox" x-model="r.noResolve"> 不解析
+                              </label>
+                            </div>
+                          </template>
+                          <template x-if="r.raw">
+                            <div class="vpn-rule-fields">
+                              <span class="vpn-raw-badge">高级</span>
+                              <input type="text" class="vpn-input vpn-rule-value vpn-mono" x-model="r.raw" placeholder="类型,值,目标">
+                              <button class="btn-edit" @click="vpnRuleToSimple(r)" title="转回表单编辑">表单</button>
+                            </div>
+                          </template>
+                          <input type="text" class="vpn-input vpn-rule-note" x-model="r.note" placeholder="备注（可选）">
+                          <div class="vpn-row-actions">
+                            <button class="icon-btn-xs" @click="vpnMoveRow(vpnRulesDraft.prepend, i, -1)" :disabled="i === 0" title="上移（更优先）">↑</button>
+                            <button class="icon-btn-xs" @click="vpnMoveRow(vpnRulesDraft.prepend, i, 1)" :disabled="i === vpnRulesDraft.prepend.length - 1" title="下移">↓</button>
+                            <button class="icon-btn-xs vpn-row-del" @click="vpnRulesDraft.prepend.splice(i, 1)" title="删除">✕</button>
+                          </div>
+                        </div>
+                        <div class="vpn-row-issue" x-show="vpnIssue('prepend', i)" x-text="vpnIssue('prepend', i)"></div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div class="vpn-list-actions">
+                    <button class="btn-edit btn-primary" @click="vpnAddRule(vpnRulesDraft.prepend)">＋ 添加规则</button>
+                    <button class="btn-edit" @click="vpnBulk.open = !vpnBulk.open">📋 批量粘贴</button>
+                  </div>
+                  <div class="vpn-bulk" x-show="vpnBulk.open">
+                    <p class="settings-desc">每行一个：可以直接粘贴网址 / 域名 / IP（会按下面选的去向生成规则），也可以粘贴完整规则如 <code>DOMAIN-SUFFIX,example.com,DIRECT</code>。</p>
+                    <textarea class="vpn-input vpn-mono" rows="5" x-model="vpnBulk.text" placeholder="https://example.com&#10;github.com&#10;10.0.0.0/8&#10;DOMAIN-KEYWORD,google,DIRECT"></textarea>
+                    <div class="vpn-bulk-actions">
+                      <span class="muted">网址 / 域名 / IP 统一</span>
+                      <select class="vpn-input vpn-rule-target" @change="vpnBulk.target = $event.target.value">
+                        <template x-for="o in vpnTargetOptions(vpnBulk.target)" :key="o.value">
+                          <option :value="o.value" :selected="o.value === vpnBulk.target" x-text="o.label"></option>
+                        </template>
+                      </select>
+                      <button class="btn-edit btn-primary" @click="vpnBulkAdd()" :aria-busy="vpnBulk.busy" :disabled="vpnBulk.busy || !vpnBulk.text.trim()">解析并添加</button>
+                      <button class="btn-edit" @click="vpnBulk.open = false">取消</button>
+                    </div>
+                  </div>
+
+                  <!-- 追加规则（高级） -->
+                  <div class="vpn-append-block">
+                    <button class="vpn-append-toggle" @click="vpnAppendOpen = !vpnAppendOpen">
+                      <span x-text="vpnAppendOpen ? '▾' : '▸'"></span>
+                      追加规则（高级）<span class="ai-sidenav-count" x-text="vpnRulesDraft.append.length"></span>
+                    </button>
+                    <div x-show="vpnAppendOpen">
+                      <p class="settings-desc">追加规则排在订阅规则<strong>之后</strong>，只有订阅规则都没命中时才会用到。
+                        <span class="vpn-text-warn" x-show="vpnRules.subscriptionEndsMatch">当前订阅最后一条是 MATCH 兜底规则，追加规则基本不会被命中，一般请用上面的规则。</span>
+                      </p>
+                      <div class="vpn-rule-list vpn-rule-list-append">
+                        <template x-for="(r, i) in vpnRulesDraft.append">
+                          <div class="vpn-rule-item" :class="vpnIssue('append', i) ? 'has-issue' : ''">
+                            <div class="vpn-rule-row">
+                              <span class="vpn-rule-idx" x-text="i + 1"></span>
+                              <div class="vpn-rule-fields">
+                                <input type="text" class="vpn-input vpn-rule-value vpn-mono" :value="vpnRuleToString(r)"
+                                  @change="Object.assign(r, { raw: $event.target.value.trim() })" placeholder="类型,值,目标">
+                              </div>
+                              <input type="text" class="vpn-input vpn-rule-note" x-model="r.note" placeholder="备注（可选）">
+                              <div class="vpn-row-actions">
+                                <button class="icon-btn-xs" @click="vpnMoveRow(vpnRulesDraft.append, i, -1)" :disabled="i === 0">↑</button>
+                                <button class="icon-btn-xs" @click="vpnMoveRow(vpnRulesDraft.append, i, 1)" :disabled="i === vpnRulesDraft.append.length - 1">↓</button>
+                                <button class="icon-btn-xs vpn-row-del" @click="vpnRulesDraft.append.splice(i, 1)" title="删除">✕</button>
+                              </div>
+                            </div>
+                            <div class="vpn-row-issue" x-show="vpnIssue('append', i)" x-text="vpnIssue('append', i)"></div>
+                          </div>
+                        </template>
+                      </div>
+                      <button class="btn-edit" @click="vpnRulesDraft.append.push({ type: '', value: '', target: '', noResolve: false, raw: 'DOMAIN-SUFFIX,example.com,DIRECT', note: '' })">＋ 添加追加规则</button>
+                      <p class="muted vpn-hint" x-show="vpnRules.deleteCount">另有 <span x-text="vpnRules.deleteCount"></span> 条「删除订阅规则」设置，保持不变（可在高级配置中编辑）。</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Hosts -->
+                <div x-show="vpnRulesSection === 'hosts'">
+                  <div class="vpn-sec-intro">
+                    <p>把域名<strong>固定解析</strong>到指定 IP，效果和修改系统 hosts 文件一样，但只在 Clash 中生效。常用于访问内网服务、测试环境。支持 <code>*.example.com</code>（一级子域名）和 <code>+.example.com</code>（所有子域名及自身）。</p>
+                  </div>
+                  <div class="vpn-kv-list vpn-kv-list-hosts">
+                    <template x-if="!vpnRulesDraft.hosts.length">
+                      <div class="vpn-empty">还没有 Hosts 映射。</div>
+                    </template>
+                    <template x-for="(h, i) in vpnRulesDraft.hosts">
+                      <div class="vpn-rule-item" :class="vpnIssue('hosts', i) ? 'has-issue' : ''">
+                        <div class="vpn-rule-row">
+                          <span class="vpn-rule-idx" x-text="i + 1"></span>
+                          <div class="vpn-rule-fields">
+                            <input type="text" class="vpn-input vpn-kv-first vpn-mono" x-model="h.domain" placeholder="域名，如 git.corp.com">
+                            <span class="vpn-kv-arrow">→</span>
+                            <input type="text" class="vpn-input vpn-mono" x-model="h.value" placeholder="IP，如 10.0.0.8（多个用逗号）">
+                          </div>
+                          <input type="text" class="vpn-input vpn-rule-note" x-model="h.note" placeholder="备注（可选）">
+                          <div class="vpn-row-actions">
+                            <button class="icon-btn-xs vpn-row-del" @click="vpnRulesDraft.hosts.splice(i, 1)" title="删除">✕</button>
+                          </div>
+                        </div>
+                        <div class="vpn-row-issue" x-show="vpnIssue('hosts', i)" x-text="vpnIssue('hosts', i)"></div>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="vpn-list-actions">
+                    <button class="btn-edit btn-primary" @click="vpnAddRow('hosts')">＋ 添加 Hosts</button>
+                  </div>
+                </div>
+
+                <!-- Fake-IP 过滤 -->
+                <div x-show="vpnRulesSection === 'fakeip'">
+                  <div class="vpn-sec-intro">
+                    <p>Fake-IP 模式下，Clash 会先给域名返回一个 <code>198.18.x.x</code> 的假 IP 来加速。少数场景需要<strong>真实 IP</strong>：内网域名、语音/视频通话（STUN）、游戏联机、系统联网检测。把它们加到这里即可。</p>
+                  </div>
+                  <div class="vpn-rules-warning" x-show="vpnMissingFakeIP().length">
+                    <span>订阅自带的 <strong x-text="vpnMissingFakeIP().length"></strong> 条过滤被你的设置覆盖掉了（如 <code x-text="vpnMissingFakeIP().slice(0, 3).join('、')"></code>），可能导致局域网设备、通话或游戏异常。</span>
+                    <button class="btn-edit btn-primary" @click="vpnRestoreFakeIP('merge')">一键补回</button>
+                  </div>
+                  <p class="muted vpn-hint">这里是<strong>最终生效的完整列表</strong>（会替换订阅自带的列表）。
+                    <span x-show="vpnRules.subscriptionFakeIp.length">
+                      <button class="vpn-link-btn" @click="vpnRestoreFakeIP('reset')">恢复为订阅默认</button>（保存后将重新跟随订阅更新）
+                    </span>
+                  </p>
+                  <div class="vpn-kv-list vpn-kv-list-fakeip">
+                    <template x-if="!vpnRulesDraft.fakeIpFilter.length">
+                      <div class="vpn-empty">列表为空，保存后将使用订阅自带的列表。</div>
+                    </template>
+                    <template x-for="(f, i) in vpnRulesDraft.fakeIpFilter">
+                      <div class="vpn-rule-item" :class="vpnIssue('fakeip', i) ? 'has-issue' : ''">
+                        <div class="vpn-rule-row">
+                          <span class="vpn-rule-idx" x-text="i + 1"></span>
+                          <div class="vpn-rule-fields">
+                            <input type="text" class="vpn-input vpn-kv-first vpn-mono" x-model="f.value" placeholder="如 +.corp.com、*.lan、+.stun.*.*">
+                          </div>
+                          <input type="text" class="vpn-input vpn-rule-note" x-model="f.note" placeholder="备注（可选）">
+                          <div class="vpn-row-actions">
+                            <button class="icon-btn-xs vpn-row-del" @click="vpnRulesDraft.fakeIpFilter.splice(i, 1)" title="删除">✕</button>
+                          </div>
+                        </div>
+                        <div class="vpn-row-issue" x-show="vpnIssue('fakeip', i)" x-text="vpnIssue('fakeip', i)"></div>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="vpn-list-actions">
+                    <button class="btn-edit btn-primary" @click="vpnAddRow('fakeip')">＋ 添加过滤</button>
+                  </div>
+                </div>
+
+                <!-- DNS 分流 -->
+                <div x-show="vpnRulesSection === 'dns'">
+                  <div class="vpn-sec-intro">
+                    <p>让指定域名使用<strong>指定的 DNS 服务器</strong>解析，例如公司域名交给公司内网 DNS。这里只列出你添加的条目，订阅自带的 DNS 分流保持不变。</p>
+                  </div>
+                  <div class="vpn-kv-list vpn-kv-list-dns">
+                    <template x-if="!vpnRulesDraft.dnsPolicy.length">
+                      <div class="vpn-empty">还没有 DNS 分流。</div>
+                    </template>
+                    <template x-for="(p, i) in vpnRulesDraft.dnsPolicy">
+                      <div class="vpn-rule-item" :class="vpnIssue('dns', i) ? 'has-issue' : ''">
+                        <div class="vpn-rule-row">
+                          <span class="vpn-rule-idx" x-text="i + 1"></span>
+                          <div class="vpn-rule-fields">
+                            <input type="text" class="vpn-input vpn-kv-first vpn-mono" x-model="p.domain" placeholder="域名，如 +.corp.com">
+                            <span class="vpn-kv-arrow">→</span>
+                            <input type="text" class="vpn-input vpn-mono" x-model="p.server" placeholder="DNS，如 10.0.0.53 或 https://dns.alidns.com/dns-query">
+                          </div>
+                          <input type="text" class="vpn-input vpn-rule-note" x-model="p.note" placeholder="备注（可选）">
+                          <div class="vpn-row-actions">
+                            <button class="icon-btn-xs vpn-row-del" @click="vpnRulesDraft.dnsPolicy.splice(i, 1)" title="删除">✕</button>
+                          </div>
+                        </div>
+                        <div class="vpn-row-issue" x-show="vpnIssue('dns', i)" x-text="vpnIssue('dns', i)"></div>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="vpn-list-actions">
+                    <button class="btn-edit btn-primary" @click="vpnAddRow('dns')">＋ 添加 DNS 分流</button>
+                  </div>
                 </div>
               </section>
 
-              <!-- DNS Fake-IP 过滤 -->
-              <section class="settings-section" x-show="vpnEnhanceData.dnsFakeIPFilter && vpnEnhanceData.dnsFakeIPFilter.length">
-                <div class="section-header-row">
-                  <h3>DNS Fake-IP 过滤
-                    <span class="ai-sidenav-count" x-text="vpnEnhanceData.dnsFakeIPFilter && vpnEnhanceData.dnsFakeIPFilter.length"></span>
-                  </h3>
-                  <span class="muted" style="font-size:11px">不使用 Fake-IP 的域名</span>
+              <!-- 保存条 -->
+              <div class="vpn-save-bar" x-show="vpnRulesDirty() || vpnRulesIssues.length">
+                <span class="vpn-save-text" x-text="vpnRulesIssues.length ? ('有 ' + vpnRulesIssues.length + ' 处需要修改（已标红）') : '有未保存的修改'"></span>
+                <button class="btn-edit" @click="discardVPNRules()" :disabled="vpnRulesSaving">放弃修改</button>
+                <button class="btn-primary vpn-save-btn" @click="saveVPNRules()" :aria-busy="vpnRulesSaving" :disabled="vpnRulesSaving"
+                  x-text="vpnRules.coreReachable ? '保存并生效' : '保存'"></button>
+              </div>
+            </div>
+          </template>
+
+          <!-- 场景模板弹窗 -->
+          <template x-if="vpnTpl">
+            <div class="modal-backdrop" @click.self="vpnTpl = null" @keydown.escape.window="vpnTpl = null">
+              <div class="modal-panel vpn-tpl-modal" role="dialog" aria-modal="true">
+                <div class="modal-head">
+                  <h3><span x-text="vpnTpl.tpl.icon"></span> <span x-text="vpnTpl.tpl.title"></span></h3>
+                  <button class="icon-btn" @click="vpnTpl = null" title="关闭">✕</button>
                 </div>
-                <p class="settings-desc">列表中的域名不会返回 Fake-IP，而是使用真实 DNS 解析。通常用于需要真实 IP 的内网或特定服务域名。</p>
-                <div class="vpn-enhance-chips">
-                  <template x-for="domain in (vpnEnhanceData.dnsFakeIPFilter || [])">
-                    <span class="vpn-enhance-chip" x-text="domain"></span>
+                <div class="vpn-tpl-modal-body">
+                  <div class="vpn-tpl-problem-box">
+                    <span class="vpn-tpl-problem-label">适用于</span>
+                    <span x-text="vpnTpl.tpl.problem"></span>
+                  </div>
+                  <p class="settings-desc" x-text="vpnTpl.tpl.desc"></p>
+                  <template x-for="inp in (vpnTpl.tpl.inputs || [])" :key="inp.key">
+                    <label class="vpn-field">
+                      <span class="vpn-field-label" x-text="inp.label"></span>
+                      <template x-if="inp.kind === 'list'">
+                        <textarea class="vpn-input vpn-mono" rows="3" x-model="vpnTpl.inputs[inp.key]" :placeholder="inp.placeholder"></textarea>
+                      </template>
+                      <template x-if="inp.kind === 'text'">
+                        <input type="text" class="vpn-input vpn-mono" x-model="vpnTpl.inputs[inp.key]" :placeholder="inp.placeholder">
+                      </template>
+                      <template x-if="inp.kind === 'target'">
+                        <select class="vpn-input" @change="vpnTpl.inputs[inp.key] = $event.target.value">
+                          <template x-for="o in vpnTargetOptions(vpnTpl.inputs[inp.key], true)" :key="o.value">
+                            <option :value="o.value" :selected="o.value === vpnTpl.inputs[inp.key]" x-text="o.label"></option>
+                          </template>
+                        </select>
+                      </template>
+                      <span class="muted vpn-field-hint" x-show="inp.hint" x-text="inp.hint"></span>
+                    </label>
                   </template>
+                  <details class="vpn-tpl-preview">
+                    <summary x-text="'会添加哪些内容（' + vpnTplPreview(vpnTpl.tpl).length + ' 项）'"></summary>
+                    <div class="vpn-tpl-preview-list">
+                      <template x-for="row in vpnTplPreview(vpnTpl.tpl)">
+                        <div class="vpn-tpl-preview-row"><span class="vpn-raw-badge" x-text="row.kind"></span><code x-text="row.text"></code></div>
+                      </template>
+                    </div>
+                  </details>
+                  <div class="vpn-config-error" x-show="vpnTpl.error" x-text="vpnTpl.error"></div>
+                  <div class="vpn-tpl-actions">
+                    <button class="btn-sm" @click="vpnTpl = null">取消</button>
+                    <button class="btn-primary" @click="applyVPNTemplate()" :aria-busy="vpnTpl.busy" :disabled="vpnTpl.busy">添加到规则</button>
+                  </div>
                 </div>
-              </section>
+              </div>
             </div>
           </template>
         </div>
