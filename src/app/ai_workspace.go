@@ -103,12 +103,12 @@ func (a *App) CaptureCurrentAIWorkspaceProfile(name, rootPath string) (config.AI
 			profile.Skills = append(profile.Skills, config.AgentResourceSelection{ID: s.Name, Claude: s.InClaude, Codex: s.InCodex})
 		}
 	}
-	a.mu.RLock()
-	for _, s := range a.cfg.MCPServers {
-		if s.EnabledInClaude || s.EnabledInCodex {
-			profile.MCPServers = append(profile.MCPServers, config.AgentResourceSelection{ID: s.ID, Claude: s.EnabledInClaude, Codex: s.EnabledInCodex})
+	for _, st := range a.globalMCPStates() {
+		if st.Claude || st.Codex {
+			profile.MCPServers = append(profile.MCPServers, config.AgentResourceSelection{ID: st.Name, Claude: st.Claude, Codex: st.Codex})
 		}
 	}
+	a.mu.RLock()
 	for _, h := range a.cfg.Hooks {
 		if h.EnabledInClaude || h.EnabledInCodex {
 			profile.Hooks = append(profile.Hooks, config.AgentResourceSelection{ID: h.ID, Claude: h.EnabledInClaude, Codex: h.EnabledInCodex})
@@ -214,16 +214,15 @@ func (a *App) GetAIEnvironmentHealth() workspace.Health {
 		}
 	}
 	a.mu.RLock()
-	managedMCP := append([]config.MCPServer(nil), a.cfg.MCPServers...)
 	managedHooks := hooks.Clone(a.cfg.Hooks)
 	last := a.cfg.LastAppliedWorkspaceID
 	a.mu.RUnlock()
-	for _, server := range managedMCP {
-		if !(server.EnabledInClaude || server.EnabledInCodex) || server.Transport != mcp.TransportStdio {
-			continue
-		}
-		if macos.FindCLI(server.Command) == "" {
-			health.Add(workspace.HealthCheck{ID: "mcp-" + server.ID, Label: "MCP: " + server.Name, Status: "warn", Detail: "命令不可用: " + server.Command, Suggestion: "安装命令或在 MCP 中改为可执行入口"})
+	for _, st := range a.globalMCPStates() {
+		for _, e := range st.Entries {
+			if !e.Enabled || e.Spec.Transport != mcp.TransportStdio || mcpCommandAvailable(e.Spec.Command) {
+				continue
+			}
+			health.Add(workspace.HealthCheck{ID: "mcp-" + st.Name + "-" + e.Location.Client, Label: "MCP: " + st.Name + " (" + e.Label + ")", Status: "warn", Detail: "命令不可用: " + e.Spec.Command, Suggestion: "安装命令，或在 MCP 页编辑为可执行入口"})
 		}
 	}
 	for _, hook := range managedHooks {
@@ -271,7 +270,6 @@ func (a *App) previewWorkspaceProfile(p config.AIWorkspaceProfile) workspace.Pre
 		out.Changes = append(out.Changes, "Codex 模型、推理档位或 Goals 将更新")
 	}
 	a.mu.RLock()
-	servers := append([]config.MCPServer(nil), a.cfg.MCPServers...)
 	hookList := hooks.Clone(a.cfg.Hooks)
 	a.mu.RUnlock()
 
@@ -301,22 +299,27 @@ func (a *App) previewWorkspaceProfile(p config.AIWorkspaceProfile) workspace.Pre
 			}
 		}
 	}
+	states := map[string]globalMCPState{}
+	for _, st := range a.globalMCPStates() {
+		states[st.Name] = st
+	}
 	for _, s := range p.MCPServers {
-		server, ok := mcp.Find(servers, s.ID)
+		st, ok := states[s.ID]
 		if !ok {
-			out.Errors = append(out.Errors, "MCP 不存在: "+s.ID)
+			out.Errors = append(out.Errors, "MCP 不存在于 Claude 全局 / Codex 配置: "+s.ID)
 			continue
 		}
-		if server.Transport == mcp.TransportStdio && strings.TrimSpace(server.Command) == "" {
-			out.Errors = append(out.Errors, "MCP 未配置命令: "+s.ID)
-		} else if server.Transport == mcp.TransportStdio && macos.FindCLI(server.Command) == "" {
-			out.Warnings = append(out.Warnings, "MCP 命令暂不可用: "+server.Command)
+		if s.Claude && !st.HasClaude {
+			out.Errors = append(out.Errors, "Claude 全局配置中没有 MCP「"+s.ID+"」，请先在 MCP 页复制到 Claude")
 		}
-		if server.Transport == mcp.TransportHTTP && strings.TrimSpace(server.URL) == "" {
-			out.Errors = append(out.Errors, "HTTP MCP 未配置 URL: "+s.ID)
+		if s.Codex && !st.HasCodex {
+			out.Errors = append(out.Errors, "Codex 配置中没有 MCP「"+s.ID+"」，请先在 MCP 页复制到 Codex")
 		}
-		if (s.Claude != server.EnabledInClaude) || (s.Codex != server.EnabledInCodex) {
-			out.Changes = append(out.Changes, "MCP「"+server.Name+"」同步状态将更新")
+	}
+	for name, st := range states {
+		desired := workspace.SelectionFor(p.MCPServers, name)
+		if (st.HasClaude && desired.Claude != st.Claude) || (st.HasCodex && desired.Codex != st.Codex) {
+			out.Changes = append(out.Changes, "MCP「"+name+"」启用状态将更新")
 		}
 	}
 	for _, s := range p.Hooks {
@@ -372,18 +375,17 @@ func (a *App) applyWorkspaceProfile(p config.AIWorkspaceProfile) error {
 		}
 	}
 	a.mu.RLock()
-	servers := append([]config.MCPServer(nil), a.cfg.MCPServers...)
 	hookList := hooks.Clone(a.cfg.Hooks)
 	a.mu.RUnlock()
-	for _, s := range servers {
-		desired := workspace.SelectionFor(p.MCPServers, s.ID)
-		if desired.Claude != s.EnabledInClaude {
-			if err := a.SetMCPEnabled(s.ID, mcp.TargetClaude, desired.Claude); err != nil {
+	for _, st := range a.globalMCPStates() {
+		desired := workspace.SelectionFor(p.MCPServers, st.Name)
+		if st.HasClaude && desired.Claude != st.Claude {
+			if err := a.SetMCPEnabled(st.Name, claudeUserKey, desired.Claude); err != nil {
 				return err
 			}
 		}
-		if desired.Codex != s.EnabledInCodex {
-			if err := a.SetMCPEnabled(s.ID, mcp.TargetCodex, desired.Codex); err != nil {
+		if st.HasCodex && desired.Codex != st.Codex {
+			if err := a.SetMCPEnabled(st.Name, codexUserKey, desired.Codex); err != nil {
 				return err
 			}
 		}
@@ -438,9 +440,6 @@ func (a *App) captureWorkspaceSnapshot(p config.AIWorkspaceProfile) (workspace.S
 	}
 	a.mu.RLock()
 	snap.LastProfile = a.cfg.LastAppliedWorkspaceID
-	for _, s := range a.cfg.MCPServers {
-		snap.MCPStates = append(snap.MCPStates, config.AgentResourceSelection{ID: s.ID, Claude: s.EnabledInClaude, Codex: s.EnabledInCodex})
-	}
 	for _, h := range a.cfg.Hooks {
 		snap.HookStates = append(snap.HookStates, config.AgentResourceSelection{ID: h.ID, Claude: h.EnabledInClaude, Codex: h.EnabledInCodex})
 	}
@@ -462,10 +461,6 @@ func (a *App) restoreWorkspaceSnapshot(s workspace.Snapshot) error {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for i := range a.cfg.MCPServers {
-		state := workspace.SelectionFor(s.MCPStates, a.cfg.MCPServers[i].ID)
-		a.cfg.MCPServers[i].EnabledInClaude, a.cfg.MCPServers[i].EnabledInCodex = state.Claude, state.Codex
-	}
 	for i := range a.cfg.Hooks {
 		state := workspace.SelectionFor(s.HookStates, a.cfg.Hooks[i].ID)
 		a.cfg.Hooks[i].EnabledInClaude, a.cfg.Hooks[i].EnabledInCodex = state.Claude, state.Codex
@@ -482,4 +477,51 @@ func (a *App) workspaceProfile(id string) (config.AIWorkspaceProfile, error) {
 		}
 	}
 	return config.AIWorkspaceProfile{}, fmt.Errorf("工作区画像不存在")
+}
+
+var (
+	claudeUserKey = mcp.Location{Client: mcp.ClientClaude, Scope: mcp.ScopeUser}.Key()
+	codexUserKey  = mcp.Location{Client: mcp.ClientCodex, Scope: mcp.ScopeUser}.Key()
+)
+
+// globalMCPState is one server's state in the two global locations that
+// workspace profiles switch: Claude user scope and the Codex user config.
+type globalMCPState struct {
+	Name                string
+	HasClaude, HasCodex bool // defined there (live or parked)
+	Claude, Codex       bool // currently enabled
+	Entries             []mcp.Entry
+}
+
+func (a *App) globalMCPStates() []globalMCPState {
+	var out []globalMCPState
+	for _, r := range a.GetMCPInventory(false).Rows {
+		st := globalMCPState{Name: r.Name}
+		for _, e := range r.Entries {
+			switch e.LocationKey {
+			case claudeUserKey:
+				st.HasClaude, st.Claude = true, e.Enabled
+			case codexUserKey:
+				st.HasCodex, st.Codex = true, e.Enabled
+			default:
+				continue
+			}
+			st.Entries = append(st.Entries, e)
+		}
+		if st.HasClaude || st.HasCodex {
+			out = append(out, st)
+		}
+	}
+	return out
+}
+
+func mcpCommandAvailable(cmd string) bool {
+	if filepath.IsAbs(cmd) {
+		_, err := os.Stat(cmd)
+		return err == nil
+	}
+	if strings.HasPrefix(cmd, ".") || strings.HasPrefix(cmd, "~") {
+		return true // relative to the client's cwd / home; not checkable here
+	}
+	return macos.FindCLI(cmd) != ""
 }

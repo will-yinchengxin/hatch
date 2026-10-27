@@ -30,6 +30,7 @@
       <button class="tab" x-show="moduleOn('ai')"      :class="tab==='ai'      ? 'active' : ''" @click="openTab('ai')">✦ AI</button>
       <button class="tab" x-show="moduleOn('vpn')"     :class="tab==='vpn'     ? 'active' : ''" @click="openTab('vpn')">🔒 VPN</button>
       <button class="tab" x-show="moduleOn('memo')"    :class="tab==='memo'    ? 'active' : ''" @click="openTab('memo')">✓ 备忘录</button>
+      <button class="tab" x-show="moduleOn('host')"    :class="tab==='host'    ? 'active' : ''" @click="openTab('host')">◉ 主机</button>
     </nav>
 
     <div class="header-right">
@@ -177,6 +178,42 @@
   <!-- ══════════════════════════════════════════════════════════════════
        SCRIPTS — Directory list
   ══════════════════════════════════════════════════════════════════ -->
+  <main x-show="tab==='host' && !selectedDir" class="host-page">
+    <section class="host-hero">
+      <div><p class="host-eyebrow">YOUR MAC · 实时监控</p><h1>主机状况</h1><p>让机器的每一次呼吸，都清晰可见。</p></div>
+      <div class="host-hero-meta"><span class="host-live-dot"></span> <span x-text="hostLoading ? '正在采样' : '实时采样' "></span><small x-text="hostSnapshot ? new Date(hostSnapshot.timestamp).toLocaleTimeString() : '等待数据'"></small></div>
+    </section>
+    <p class="host-warning" x-show="hostError" x-text="hostError"></p>
+    <section class="host-stat-grid">
+      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.cpuPercent != null && hostSnapshot.cpuPercent >= 80 }"><span class="host-label">处理器使用率</span><strong x-text="hostSnapshot?.cpuPercent == null ? '—' : hostSnapshot.cpuPercent.toFixed(1) + '%'"></strong><small>系统采样 · CPU</small><small class="host-card-warning" x-show="hostSnapshot?.cpuPercent != null && hostSnapshot.cpuPercent >= 80">使用率较高（≥ 80%）</small></article>
+      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.memoryTotal > 0 && hostSnapshot.memoryUsed / hostSnapshot.memoryTotal >= 0.85 }"><span class="host-label">活跃 / 固定 / 压缩内存</span><strong x-text="hostBytes(hostSnapshot?.memoryUsed)"></strong><small x-text="'物理内存 ' + hostBytes(hostSnapshot?.memoryTotal)"></small><small class="host-card-warning" x-show="hostSnapshot?.memoryTotal > 0 && hostSnapshot.memoryUsed / hostSnapshot.memoryTotal >= 0.85">使用量较高（≥ 85%）</small></article>
+      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.diskTotal > 0 && hostSnapshot.diskAvailable / hostSnapshot.diskTotal <= 0.1 }"><span class="host-label">磁盘可用空间</span><strong x-text="hostBytes(hostSnapshot?.diskAvailable)"></strong><small x-text="'APFS 容器总量 ' + hostBytes(hostSnapshot?.diskTotal)"></small><small class="host-card-warning" x-show="hostSnapshot?.diskTotal > 0 && hostSnapshot.diskAvailable / hostSnapshot.diskTotal <= 0.1">可用空间不足（≤ 10%）</small></article>
+      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.cpuTemperature != null && hostSnapshot.cpuTemperature >= 85 }"><span class="host-label">CPU 温度</span><strong x-text="hostSnapshot?.cpuTemperature == null ? '—' : hostSnapshot.cpuTemperature.toFixed(1) + ' °C'"></strong><small x-text="hostSnapshot?.fanSpeeds?.length ? '风扇 ' + hostSnapshot.fanSpeeds.map(speed => speed + ' RPM').join(' / ') : '风扇读数不可用或设备无风扇'"></small><small class="host-card-warning" x-show="hostSnapshot?.cpuTemperature != null && hostSnapshot.cpuTemperature >= 85">温度较高（≥ 85 °C）</small></article>
+    </section>
+    <div class="host-grid">
+      <section class="host-panel"><div class="host-panel-head"><div><span class="host-eyebrow">STORAGE</span><h2>磁盘空间与测速</h2></div><span class="host-tag">本机存储</span></div>
+        <div class="host-storage"><strong x-text="hostSnapshot?.diskTotal ? ((1 - hostSnapshot.diskAvailable / hostSnapshot.diskTotal) * 100).toFixed(1) + '%' : '—'"></strong><span>容器空间已使用或不可用</span></div>
+        <progress :value="hostSnapshot?.diskTotal ? hostSnapshot.diskTotal - hostSnapshot.diskAvailable : 0" :max="hostSnapshot?.diskTotal || 1"></progress>
+        <p class="host-muted">可用 <b x-text="hostBytes(hostSnapshot?.diskAvailable)"></b> / 总计 <b x-text="hostBytes(hostSnapshot?.diskTotal)"></b>。空间可能包含可清除数据及系统保留空间。</p>
+        <div class="host-actions"><button @click="hostDiskTest()" :disabled="hostDiskBusy" x-text="hostDiskBusy ? '正在测速…' : '重新测速'"></button><span>进入主机页面时自动测速：写入并同步 64 MiB 临时文件，结束后删除；读取可能命中缓存。</span></div>
+        <div class="host-result" x-show="hostDiskResult"><div><small>顺序写入</small><strong x-text="hostBytes(hostDiskResult?.writeBytesPerSecond) + '/s'"></strong></div><div><small>顺序读取</small><strong x-text="hostBytes(hostDiskResult?.readBytesPerSecond) + '/s'"></strong></div></div>
+        <div class="host-actions"><button class="secondary" @click="hostAnalyzeStorage()" :disabled="hostStorageBusy" x-text="hostStorageBusy ? '正在分析…' : '分析 Mac 目录'"></button><span>统计根目录各项（含隐藏目录）；不跨挂载点，权限不足或超时会标记为不完整。完整磁盘访问权限可提高覆盖率。</span></div>
+        <div class="host-network-list" x-show="hostStorage"><template x-for="entry in (hostStorage || [])" :key="entry.name"><div class="host-network-row"><b x-text="entry.name"></b><span x-text="entry.partial ? '不完整' : '已统计'"></span><span x-text="entry.partial && !entry.bytes ? '—' : hostBytes(entry.bytes)"></span></div></template></div>
+      </section>
+      <section class="host-panel"><div class="host-panel-head"><div><span class="host-eyebrow">NETWORK</span><h2>网络流量与测速</h2></div><span class="host-tag">按网卡统计</span></div>
+        <div class="host-network-list"><template x-for="network in hostRates" :key="network.name"><div class="host-network-row"><b x-text="network.name"></b><span>↓ <span x-text="network.receive == null ? '采样中' : hostBytes(network.receive) + '/s'"></span></span><span>↑ <span x-text="network.send == null ? '采样中' : hostBytes(network.send) + '/s'"></span></span></div></template><p class="host-muted" x-show="!hostRates.length">等待网络接口数据</p></div>
+        <p class="host-muted">按下载和上传速率之和降序排列；VPN / 虚拟接口可能与物理接口重复，不能直接相加。</p>
+        <div class="host-actions"><button @click="hostNetworkTest()" :disabled="hostNetworkBusy" x-text="hostNetworkBusy ? '正在测速…' : '重新测速'"></button><span>进入主机页面时自动使用 macOS networkQuality 测速，可能消耗大量流量，结果受代理和测试节点影响。</span></div>
+        <div class="host-result" x-show="hostNetworkResult"><div><small>下载</small><strong x-text="((hostNetworkResult?.downloadBps || 0) / 1000000).toFixed(1) + ' Mbps'"></strong></div><div><small>上传</small><strong x-text="((hostNetworkResult?.uploadBps || 0) / 1000000).toFixed(1) + ' Mbps'"></strong></div><div><small>延迟</small><strong x-text="(hostNetworkResult?.latencyMs || 0).toFixed(0) + ' ms'"></strong></div></div>
+        <p class="host-muted" x-show="hostNetworkResult" x-text="'测速接口 ' + (hostNetworkResult?.interface || '未知') + ' · 消耗 ' + hostBytes((hostNetworkResult?.downloadBytes || 0) + (hostNetworkResult?.uploadBytes || 0))"></p>
+        <div class="host-actions"><button class="secondary" @click="hostLoadPorts()" :disabled="hostPortsBusy" x-text="hostPortsBusy ? '正在读取…' : '查看网络端口'"></button><span>显示当前用户可见的 TCP 监听与 UDP 端口，系统权限可能限制结果。</span></div>
+        <div class="host-network-list" x-show="hostPorts"><template x-for="port in (hostPorts || [])" :key="`${port.pid}-${port.protocol}-${port.address}`"><div class="host-network-row"><b x-text="port.process + ' · ' + port.pid"></b><span x-text="port.protocol"></span><span x-text="port.address"></span></div></template><p class="host-muted" x-show="hostPorts && !hostPorts.length">未发现可见端口</p></div>
+      </section>
+    </div>
+    <section class="host-panel host-hardware"><div class="host-panel-head"><div><span class="host-eyebrow">HARDWARE</span><h2>设备详情</h2></div><span class="host-tag" x-text="hostHardware?.os ? 'macOS ' + hostHardware.os : 'macOS'"></span></div>
+      <div class="host-details"><div><small>设备</small><b x-text="hostHardware?.model || '—'"></b></div><div><small>芯片</small><b x-text="hostHardware?.chip || '—'"></b></div><div><small>核心</small><b x-text="hostHardware?.cores || '—'"></b></div><div><small>图形处理器</small><b x-text="hostHardware?.gpu || '—'"></b></div><div><small>显示器分辨率</small><b x-text="hostHardware?.display || '—'"></b></div><div><small>物理内存</small><b x-text="hostHardware?.memory || '—'"></b></div><div><small>当前电量</small><b x-text="hostSnapshot?.batteryPercent == null ? '—' : hostSnapshot.batteryPercent + '% · ' + hostSnapshot.batteryStatus"></b></div><div><small>电池循环</small><b x-text="hostHardware?.batteryCycles || '—'"></b></div><div><small>电池最大容量</small><b x-text="hostHardware?.batteryMaximum || '—'"></b></div><div><small>电池状况</small><b x-text="hostHardware?.batteryHealth || '—'"></b></div></div>
+    </section>
+  </main>
   <main x-show="tab==='scripts' && !selectedDir">
     <section class="page-hero">
       <div>
@@ -644,7 +681,7 @@
         <div class="hero-stat-card">
           <div class="hero-stat-label">MCP</div>
           <div class="hero-stat-body">
-            <span class="hero-stat-total" x-text="mcpServers.length || 0"></span>
+            <span class="hero-stat-total" x-text="mcpRowCount"></span>
             <div class="hero-stat-breakdown">
               <div>enabled: <strong x-text="mcpEnabledCount"></strong></div>
               <div>failed: <strong x-text="mcpFailedCount"></strong></div>
@@ -701,7 +738,7 @@
           @click="aiSubTab='mcp'; loadMCP()">
           <span class="ai-sidenav-icon">🧩</span>
           <span>MCP</span>
-          <span class="ai-sidenav-count" x-show="mcpServers.length > 0" x-text="mcpServers.length"></span>
+          <span class="ai-sidenav-count" x-show="mcpRowCount > 0" x-text="mcpRowCount"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='hooks' ? 'active' : ''"
           @click="aiSubTab='hooks'; loadHooks()">
@@ -830,7 +867,7 @@
                   <span class="badge badge-warn" x-show="mcpFailedCount > 0" x-text="mcpFailedCount + ' 失败'"></span>
                 </div>
                 <div class="ai-dash-body">
-                  <div class="ai-dash-stat" x-text="(mcpServers.length||0)"></div>
+                  <div class="ai-dash-stat" x-text="mcpRowCount"></div>
                   <div class="muted text-xs" x-text="'已启用 ' + mcpEnabledCount + ' 个'"></div>
                 </div>
               </div>
@@ -1356,478 +1393,328 @@
         <!-- ══ MCP ═══════════════════════════════════════════════════ -->
         <div x-show="aiSubTab==='mcp'">
           <section class="settings-section ai-mcp-section">
-            <div class="mcp-manual-card" role="button" tabindex="0" @dblclick="openMCPManual()" @keydown.enter.prevent="openMCPManual()" @keydown.space.prevent="openMCPManual()" title="双击打开 MCP 操作手册">
-              <div class="mcp-manual-main">
-                <span class="mcp-manual-kicker">操作手册</span>
-                <strong>MCP 获取、配置、同步分步说明</strong>
-                <span class="muted text-sm">双击查看安装下载地址、Claude Code / Codex 同步规则、MySQL 示例和推荐 MCP 服务。</span>
-              </div>
-              <button class="btn-sm btn-primary" @click.stop="openMCPManual()">打开</button>
-            </div>
-
-            <template x-if="mcpManualOpen">
-              <div class="modal-backdrop" @click.self="closeMCPManual()" @keydown.escape.window="closeMCPManual()">
-                <div class="modal-panel mcp-manual-modal" role="dialog" aria-modal="true" aria-labelledby="mcpManualTitle">
-                  <div class="modal-head">
-                    <h3 id="mcpManualTitle">MCP 操作手册</h3>
-                    <button class="icon-btn" @click="closeMCPManual()" title="关闭">✕</button>
-                  </div>
-                  <div class="mcp-manual-content">
-                    <section>
-                      <h4>使用流程</h4>
-                      <ol>
-                        <li>第一步只负责获取 MCP：从 GitHub 克隆、本地目录导入，或记录 npm / npx 包名。</li>
-                        <li>第二步才编辑运行配置：stdio 填 <code>command</code>、每行一个 <code>args</code>、可选 <code>cwd</code> 和环境变量；HTTP 填 URL、Bearer token 环境变量和 headers。</li>
-                        <li>保存配置后，再按目标打开 Claude 或 Codex 开关。Hatch 只写入全局配置，不常驻运行 MCP 服务。</li>
-                        <li>点击“测 Claude”或“测 Codex”。Claude 会做健康检查；Codex 当前通常只能证明配置可读取，因此可能显示“未知”而不是成功。</li>
-                        <li>页面默认明文展示 MCP 命令、参数、headers 和环境变量，方便你复制、审查和排错。</li>
-                      </ol>
-                    </section>
-                    <section>
-                      <h4>Claude Code / Codex 适配</h4>
-                      <p>Claude Code 写入 <code>~/.claude.json</code> 的 <code>mcpServers</code>；Codex 写入 <code>~/.codex/config.toml</code> 的 <code>[mcp_servers.&lt;id&gt;]</code>。首次同步如果目标里已有同名 MCP，Hatch 会拒绝覆盖，避免误改手工配置。</p>
-                      <p>编辑已启用的 MCP 并保存时，页面会重新同步到已经打开的目标。删除 Hatch 记录时，也会清理已同步的 Claude/Codex 目标条目。</p>
-                    </section>
-                    <section>
-                      <h4>MySQL 示例</h4>
-                      <div class="mcp-manual-code">
-                        <code>ID: mysql</code>
-                        <code>Command: npx</code>
-                        <code>Args: -y / @benborla29/mcp-server-mysql</code>
-                        <code>Env: MYSQL_HOST=127.0.0.1, MYSQL_PORT=3306, MYSQL_USER=root, MYSQL_PASS=..., MYSQL_DB=...</code>
-                      </div>
-                      <p>建议先保留 <code>ALLOW_INSERT_OPERATION</code>、<code>ALLOW_UPDATE_OPERATION</code>、<code>ALLOW_DELETE_OPERATION</code> 为 <code>false</code>，确认只读查询正常后再按需开启写操作。</p>
-                    </section>
-                    <section>
-                      <h4>推荐 MCP 下载地址</h4>
-                      <div class="mcp-service-grid">
-                        <div><strong>官方 Registry</strong><code>https://registry.modelcontextprotocol.io</code><span>发现公开 MCP 服务</span></div>
-                        <div><strong>参考合集</strong><code>https://github.com/modelcontextprotocol/servers</code><span>Filesystem / Git / Memory / Fetch / Postgres</span></div>
-                        <div><strong>GitHub 官方</strong><code>https://github.com/github/github-mcp-server</code><span>远程: https://api.githubcopilot.com/mcp/</span></div>
-                        <div><strong>Playwright</strong><code>https://github.com/microsoft/playwright-mcp</code><span>npx @playwright/mcp@latest</span></div>
-                        <div><strong>Context7</strong><code>https://github.com/upstash/context7</code><span>npx -y @upstash/context7-mcp</span></div>
-                        <div><strong>Firecrawl</strong><code>https://github.com/firecrawl/firecrawl-mcp-server</code><span>npx -y firecrawl-mcp</span></div>
-                        <div><strong>MySQL</strong><code>@benborla29/mcp-server-mysql</code><span>127.0.0.1:3306</span></div>
-                        <div><strong>Postgres</strong><code>@modelcontextprotocol/server-postgres</code><span>postgresql://localhost/mydb</span></div>
-                        <div><strong>Redis</strong><code>@modelcontextprotocol/server-redis</code><span>127.0.0.1:6379</span></div>
-                        <div><strong>Elasticsearch</strong><code>docker.elastic.co/mcp/elasticsearch</code><span>官方 Docker stdio；npx 仅作备选</span></div>
-                      </div>
-                    </section>
-                    <section>
-                      <h4>安全注意</h4>
-                      <p>MCP 环境变量和 AI Key 一样保存在本机明文配置中。不要把含密钥的截图、日志或配置文件发给外部系统。</p>
-                    </section>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- Toolbar row -->
-            <div class="section-header-row mcp-step-head">
-              <h3>MCP 管理</h3>
-              <div class="mcp-header-actions">
-                <button class="btn-sm btn-primary" @click="openMCPAddModal('git')">+ 添加 MCP</button>
-                <button class="btn-sm" @click="openMCPTemplateGallery()">模板库</button>
-                <button class="btn-sm" @click="openMCPServerEditor()">手动新建</button>
-                <button class="btn-sm" @click="loadMCP()" :aria-busy="mcpLoading">↻</button>
-              </div>
-            </div>
-
-            <!-- MCP dir config row -->
-            <div class="mcp-settings-row">
-              <div class="mcp-settings-info">
-                <span class="data-path-label">管理目录</span>
-                <code class="data-path-val" x-text="mcpSettings.mcpDir || mcpSettings.defaultMCPDir"></code>
-                <span class="badge badge-ok text-xs" x-show="mcpSettings.mcpDirIsSet">自定义</span>
-                <span class="muted text-xs" x-show="!mcpSettings.mcpDirIsSet">默认</span>
-              </div>
-              <input class="field-input mcp-dir-input" x-model="mcpSettingsForm.mcpDir" :placeholder="mcpSettings.defaultMCPDir" />
-              <button class="btn-sm btn-primary" @click="saveMCPSettings()" :aria-busy="mcpSettingsSaving">保存</button>
-            </div>
-
-            <div class="mcp-recommend-panel">
-              <div class="mcp-recommend-head">
-                <div>
-                  <span class="mcp-step-kicker">AI 推荐</span>
-                  <h3>按需求选择 MCP 和安装方式</h3>
-                </div>
-                <span class="muted text-xs">推荐结果只会填入编辑器，保存和同步仍由你确认。</span>
-              </div>
-              <div class="mcp-recommend-search">
-                <input class="field-input" x-model="mcpRecommendQuery" placeholder="例如：es 的 MCP，适配 Codex 和 Claude Code" @keydown.enter.prevent="suggestMCPRecommendations()" />
-                <button class="btn-sm btn-primary" @click="suggestMCPRecommendations()" :aria-busy="mcpRecommendBusy">生成推荐</button>
-              </div>
-              <template x-if="mcpRecommendation">
-                <div class="mcp-recommend-result">
-                  <div class="mcp-recommend-summary">
-                    <strong x-text="mcpRecommendation.summary"></strong>
-                    <span class="muted text-xs" x-text="mcpRecommendation.sourceNote"></span>
-                  </div>
-                  <div class="mcp-recommend-cards">
-                    <template x-for="c in (mcpRecommendation.candidates || [])" :key="c.id">
-                      <div class="mcp-recommend-card" :class="mcpSelectedRecommendationID === c.id ? 'active' : ''">
-                        <div class="mcp-recommend-card-head">
-                          <div>
-                            <strong x-text="c.name || c.id"></strong>
-                            <span class="muted text-xs" x-text="c.source"></span>
-                          </div>
-                          <span class="mcp-source-badge" x-text="c.installMethod"></span>
-                        </div>
-                        <div class="mcp-version-row" x-show="c.version || c.versionNote">
-                          <span x-show="c.version" x-text="c.version"></span>
-                          <code x-show="c.versionNote" x-text="c.versionNote"></code>
-                        </div>
-                        <p class="text-sm" x-text="c.recommendation"></p>
-                        <p class="muted text-sm" x-text="c.fit"></p>
-                        <p class="mcp-risk text-xs" x-text="c.risk"></p>
-                        <div class="mcp-support-row">
-                          <span class="mcp-enabled-badge" x-show="c.claudeSupported">Claude Code</span>
-                          <span class="mcp-enabled-badge mcp-enabled-codex" x-show="c.codexSupported">Codex</span>
-                        </div>
-                        <details class="mcp-install-details">
-                          <summary>安装方法与参数</summary>
-                          <ol>
-                            <template x-for="step in (c.installSteps || [])" :key="c.id + step">
-                              <li x-text="step"></li>
-                            </template>
-                          </ol>
-                          <div class="mcp-required-env">
-                            <span>必填</span>
-                            <code x-text="(c.requiredEnv || []).join(' / ') || '无'"></code>
-                          </div>
-                          <div class="mcp-required-env">
-                            <span>可选</span>
-                            <code x-text="(c.optionalEnv || []).join(' / ') || '无'"></code>
-                          </div>
-                        </details>
-                        <div class="mcp-recommend-actions">
-                          <button class="btn-sm" @click="mcpSelectedRecommendationID = c.id">选择</button>
-                          <button class="btn-sm btn-primary" @click="mcpSelectedRecommendationID = c.id; applyMCPRecommendation(c)">套用到编辑器</button>
-                        </div>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-              </template>
-            </div>
-
-            <!-- Add MCP modal -->
-            <template x-if="mcpAddModalOpen">
-              <div class="modal-backdrop" @click.self="closeMCPAddModal()" @keydown.escape.window="closeMCPAddModal()">
-                <div class="modal-panel mcp-add-modal" role="dialog" aria-modal="true" aria-labelledby="mcpAddTitle">
-                  <div class="modal-head">
-                    <h3 id="mcpAddTitle">添加 MCP</h3>
-                    <button class="icon-btn" @click="closeMCPAddModal()" title="关闭">✕</button>
-                  </div>
-                  <div class="mcp-modal-content">
-                    <div class="mcp-add-modal-tabs">
-                      <button class="mcp-tab-btn" :class="mcpAddTab==='git' ? 'active' : ''" @click="mcpAddTab='git'">Git 克隆</button>
-                      <button class="mcp-tab-btn" :class="mcpAddTab==='npm' ? 'active' : ''" @click="mcpAddTab='npm'">npm / npx</button>
-                      <button class="mcp-tab-btn" :class="mcpAddTab==='local' ? 'active' : ''" @click="mcpAddTab='local'">本地目录</button>
-                    </div>
-
-                    <div x-show="mcpAddTab==='git'" class="mcp-add-modal-body">
-                      <p class="muted text-sm">从 GitHub 克隆到管理目录，Hatch 自动识别 command 和 args。克隆完成后再打开 Claude / Codex 开关即可使用。</p>
-                      <label class="field-stack">
-                        <span>Git URL</span>
-                        <input class="field-input" x-model="mcpGitURL" placeholder="https://github.com/org/mcp-server.git" @keydown.enter.prevent="installMCPGit()" />
-                      </label>
-                      <label class="field-stack">
-                        <span>自定义 ID / 名称（可选）</span>
-                        <input class="field-input" x-model="mcpGitName" placeholder="留空自动从仓库名推断" />
-                      </label>
-                      <div class="mcp-modal-actions">
-                        <button class="btn-primary" @click="installMCPGit()" :aria-busy="mcpImportBusy==='git'">克隆到本地</button>
-                        <button class="btn-sm" @click="closeMCPAddModal()">取消</button>
-                      </div>
-                    </div>
-
-                    <div x-show="mcpAddTab==='npm'" class="mcp-add-modal-body">
-                      <p class="muted text-sm">公开 npm 包，Hatch 记录包名，运行时由 npx 按需下载。不占本地磁盘，但需要网络和 Node。</p>
-                      <label class="field-stack">
-                        <span>npm 包名</span>
-                        <input class="field-input" x-model="mcpNpmPackage" placeholder="@modelcontextprotocol/server-filesystem" @keydown.enter.prevent="addNpmMCP()" />
-                      </label>
-                      <label class="field-stack">
-                        <span>显示名称（可选）</span>
-                        <input class="field-input" x-model="mcpNpmName" placeholder="Filesystem" />
-                      </label>
-                      <div class="mcp-modal-actions">
-                        <button class="btn-primary" @click="addNpmMCP()" :aria-busy="mcpImportBusy==='npm'">添加到 Hatch</button>
-                        <button class="btn-sm" @click="closeMCPAddModal()">取消</button>
-                      </div>
-                    </div>
-
-                    <div x-show="mcpAddTab==='local'" class="mcp-add-modal-body">
-                      <p class="muted text-sm">已有本地 MCP 项目，只登记路径到 Hatch，Hatch 不会复制或移动文件。</p>
-                      <label class="field-stack">
-                        <span>本地目录绝对路径</span>
-                        <input class="field-input" x-model="mcpLocalPath" placeholder="/Users/you/MyHub/mcp/mysql-mcp-server" @keydown.enter.prevent="importMCPLocal()" />
-                      </label>
-                      <div class="mcp-modal-actions">
-                        <button class="btn-primary" @click="importMCPLocal()" :aria-busy="mcpImportBusy==='local'">导入到 Hatch</button>
-                        <button class="btn-sm" @click="closeMCPAddModal()">取消</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- Template gallery modal -->
-            <template x-if="mcpTemplateGalleryOpen">
-              <div class="modal-backdrop" @click.self="closeMCPTemplateGallery()" @keydown.escape.window="closeMCPTemplateGallery()">
-                <div class="modal-panel mcp-gallery-modal" role="dialog" aria-modal="true" aria-labelledby="mcpGalleryTitle">
-                  <div class="modal-head">
-                    <h3 id="mcpGalleryTitle">MCP 模板库</h3>
-                    <button class="icon-btn" @click="closeMCPTemplateGallery()" title="关闭">✕</button>
-                  </div>
-                  <div class="mcp-gallery-content">
-                    <p class="muted text-sm mcp-gallery-hint">选择模板后进入编辑器填写环境变量等配置，保存后再开启同步。</p>
-                    <div class="mcp-gallery-grid">
-                      <template x-for="tpl in mcpTemplates" :key="tpl.id">
-                        <div class="mcp-gallery-card" role="button" tabindex="0"
-                          @click="closeMCPTemplateGallery(); openMCPTemplate(tpl)"
-                          @keydown.enter.prevent="closeMCPTemplateGallery(); openMCPTemplate(tpl)">
-                          <div class="mcp-gallery-card-head">
-                            <strong x-text="tpl.name || tpl.id"></strong>
-                            <span class="mcp-source-badge" :class="'mcp-src-' + (tpl.sourceType || 'npm')" x-text="tpl.sourceType || 'npm'"></span>
-                          </div>
-                          <p class="mcp-gallery-desc muted text-sm" x-text="tpl.description || tpl.packageName || tpl.url || ''"></p>
-                          <code class="mcp-gallery-cmd text-xs" x-show="tpl.command" x-text="tpl.command + ' ' + (tpl.args || []).join(' ')"></code>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- Delete confirmation modal -->
-            <template x-if="mcpDeleteModal.open">
-              <div class="modal-backdrop" @click.self="closeMCPDeleteModal()" @keydown.escape.window="closeMCPDeleteModal()">
-                <div class="modal-panel mcp-delete-modal" role="dialog" aria-modal="true" aria-labelledby="mcpDeleteTitle">
-                  <div class="modal-head">
-                    <h3 id="mcpDeleteTitle">删除 MCP</h3>
-                    <button class="icon-btn" @click="closeMCPDeleteModal()" title="关闭">✕</button>
-                  </div>
-                  <div class="mcp-modal-content">
-                    <p class="mcp-delete-confirm-text">确定删除 <strong x-text="mcpDeleteModal.name"></strong>？<br><span class="muted text-sm">此操作会从 Hatch 注册表和 Claude/Codex 全局配置中移除。</span></p>
-                    <template x-if="mcpDeleteModal.canCleanDisk">
-                      <div class="mcp-delete-disk-info">
-                        <p class="muted text-sm">检测到本地文件目录，可同时删除（不使用不留残留）：</p>
-                        <code class="text-xs" x-text="mcpDeleteModal.localPath"></code>
-                      </div>
-                    </template>
-                    <div class="mcp-modal-actions mcp-delete-actions">
-                      <template x-if="mcpDeleteModal.canCleanDisk">
-                        <button class="btn-danger-fill" @click="confirmDeleteMCP(true)">删除 + 清理本地文件</button>
-                      </template>
-                      <button class="btn-sm btn-danger" @click="confirmDeleteMCP(false)">仅从 Hatch 删除</button>
-                      <button class="btn-sm" @click="closeMCPDeleteModal()">取消</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <div class="section-header-row mcp-step-head">
+            <div class="section-header-row mcp-page-head">
               <div>
-                <span class="mcp-step-kicker">已注册</span>
-                <h3>配置并同步到 Claude Code / Codex</h3>
+                <h3>MCP 服务</h3>
+                <p class="muted text-sm mcp-page-sub">直接读取 Claude Code 与 Codex 的真实配置；所有修改先预览再写入，停用不会丢配置。</p>
               </div>
-              <span class="muted text-xs">打开目标开关 → Hatch 写入全局配置，立即可用；关闭即移除。</span>
-            </div>
-
-            <div class="mcp-editor-panel" x-show="mcpForm" x-transition>
-              <div class="mcp-editor-head">
-                <strong x-text="mcpForm?.id ? '编辑 MCP' : '新建 MCP'"></strong>
-                <button class="icon-btn" @click="closeMCPEditor()" title="关闭">✕</button>
-              </div>
-              <div class="mcp-form-grid">
-                <label class="field-stack">
-                  <span>ID</span>
-                  <input class="field-input" x-model="mcpForm.id" placeholder="mysql" />
-                </label>
-                <label class="field-stack">
-                  <span>名称</span>
-                  <input class="field-input" x-model="mcpForm.name" placeholder="MySQL" />
-                </label>
-                <label class="field-stack">
-                  <span>来源</span>
-                  <select class="field-input" x-model="mcpForm.sourceType">
-                    <option value="local">local</option>
-                    <option value="git">git</option>
-                    <option value="npm">npm</option>
-                    <option value="remote">remote</option>
-                  </select>
-                </label>
-                <label class="field-stack">
-                  <span>Transport</span>
-                  <select class="field-input" x-model="mcpForm.transport">
-                    <option value="stdio">stdio</option>
-                    <option value="http">http</option>
-                  </select>
-                </label>
-              </div>
-
-              <label class="field-stack">
-                <span>描述</span>
-                <input class="field-input" x-model="mcpForm.description" placeholder="这个 MCP 提供什么能力" />
-              </label>
-
-              <template x-if="mcpForm && mcpForm.transport === 'stdio'">
-                <div class="mcp-stdio-fields">
-                  <label class="field-stack">
-                    <span>Command</span>
-                    <input class="field-input" x-model="mcpForm.command" placeholder="node / npx / /path/to/server" />
-                  </label>
-                  <label class="field-stack">
-                    <span>Args（每行一个）</span>
-                    <textarea class="field-textarea" x-model="mcpForm.argsRaw" rows="3" placeholder="-y&#10;@scope/mcp-server"></textarea>
-                  </label>
-                  <label class="field-stack">
-                    <span>CWD</span>
-                    <input class="field-input" x-model="mcpForm.cwd" placeholder="/path/to/mcp" />
-                  </label>
-                </div>
-              </template>
-
-              <template x-if="mcpForm && mcpForm.transport === 'http'">
-                <div class="mcp-http-fields">
-                  <label class="field-stack">
-                    <span>URL</span>
-                    <input class="field-input" x-model="mcpForm.url" placeholder="https://example.com/mcp" />
-                  </label>
-                  <label class="field-stack">
-                    <span>Bearer Token Env Var</span>
-                    <input class="field-input" x-model="mcpForm.bearerTokenEnvVar" placeholder="MCP_TOKEN" />
-                  </label>
-                  <div class="mcp-env-box">
-                    <div class="mcp-env-head">
-                      <span>HTTP Headers</span>
-                      <button class="btn-sm" @click="addMCPHeaderRow()">+ 添加</button>
-                    </div>
-                    <template x-for="(row, idx) in (mcpForm.headerRows || [])" :key="'h'+idx">
-                      <div class="mcp-env-row">
-                        <input class="field-input" x-model="row.key" placeholder="Header" />
-                        <input class="field-input" x-model="row.value" placeholder="Value" />
-                        <button class="icon-btn danger" @click="removeMCPHeaderRow(idx)">✕</button>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-              </template>
-
-              <div class="mcp-env-box" x-show="mcpForm && mcpForm.transport === 'stdio'">
-                <div class="mcp-env-head">
-                  <span>环境变量</span>
-                  <span class="muted text-xs">默认明文展示，便于复制和排错</span>
-                  <button class="btn-sm" @click="addMCPEnvRow()">+ 添加</button>
-                </div>
-                <template x-for="(row, idx) in (mcpForm.envRows || [])" :key="idx">
-                  <div class="mcp-env-row">
-                    <input class="field-input" x-model="row.key" placeholder="KEY" />
-                    <input class="field-input" type="text" x-model="row.value" placeholder="VALUE" autocomplete="off" />
-                    <button class="icon-btn danger" @click="removeMCPEnvRow(idx)">✕</button>
-                  </div>
-                </template>
-              </div>
-
-              <div class="mcp-form-grid">
-                <label class="field-stack">
-                  <span>启动超时（秒）</span>
-                  <input class="field-input" type="number" min="0" x-model.number="mcpForm.startupTimeoutSec" />
-                </label>
-                <label class="field-stack">
-                  <span>工具超时（秒）</span>
-                  <input class="field-input" type="number" min="0" x-model.number="mcpForm.toolTimeoutSec" />
-                </label>
-                <label class="field-stack">
-                  <span>Tags</span>
-                  <input class="field-input" x-model="mcpForm.tagsRaw" placeholder="mysql, db" />
-                </label>
-              </div>
-              <div class="mcp-editor-actions">
-                <button class="btn-primary" @click="saveMCPForm()">保存</button>
-                <button class="secondary" @click="closeMCPEditor()">取消</button>
+              <div class="mcp-head-actions">
+                <button class="btn-sm" @click="loadMCP(true)" :aria-busy="mcpCLILoading" :disabled="mcpCLILoading" title="额外调用 claude mcp list / codex mcp list，显示插件和 claude.ai 连接器（约 10 秒）">↻ 含插件/连接器</button>
+                <button class="btn-sm" @click="probeAllMCP()" :aria-busy="mcpProbingAll" :disabled="mcpProbingAll">测试全部</button>
+                <button class="btn-sm btn-primary" @click="openMCPAdd('paste')">+ 添加 MCP</button>
               </div>
             </div>
 
             <div class="mcp-filter-bar">
               <div class="skill-filter-tabs">
-                <button class="skill-filter-tab" :class="mcpFilter==='all' ? 'active' : ''" @click="mcpFilter='all'">全部</button>
-                <button class="skill-filter-tab" :class="mcpFilter==='claude' ? 'active' : ''" @click="mcpFilter='claude'">Claude</button>
-                <button class="skill-filter-tab" :class="mcpFilter==='codex' ? 'active' : ''" @click="mcpFilter='codex'">Codex</button>
-                <button class="skill-filter-tab" :class="mcpFilter==='failed' ? 'active' : ''" @click="mcpFilter='failed'">失败</button>
+                <template x-for="f in [['all','全部'],['claude','Claude'],['codex','Codex'],['drift','有差异'],['off','已停用'],['readonly','只读']]" :key="f[0]">
+                  <button class="skill-filter-tab" :class="mcpFilter===f[0] ? 'active' : ''" @click="mcpFilter=f[0]" x-text="f[1]"></button>
+                </template>
               </div>
-              <input type="search" x-model="mcpSearch" placeholder="搜索 MCP…" class="skill-search-input" />
+              <input type="search" x-model="mcpSearch" placeholder="搜索名称 / 命令 / URL…" class="skill-search-input" />
             </div>
 
-            <div class="bulk-action-bar" x-show="!mcpLoading && filteredMCPServers.length > 0">
-              <span class="muted text-xs">批量（按当前筛选）：</span>
-              <button class="btn-sm" @click="bulkMCPEnable('claude', true)">全部 → Claude</button>
-              <button class="btn-sm" @click="bulkMCPEnable('codex', true)">全部 → Codex</button>
-              <button class="btn-sm" @click="bulkTestMCP()">测全部</button>
+            <div class="mcp-sources" x-show="mcpInventory">
+              <template x-for="src in (mcpInventory?.sources || [])" :key="src.label">
+                <span class="mcp-source" :class="'mcp-source-' + src.status" :title="src.error || src.path">
+                  <span x-text="src.label"></span>
+                  <strong x-text="src.status === 'ok' ? src.count : (src.status === 'missing' ? '无' : '错误')"></strong>
+                </span>
+              </template>
+              <span class="mcp-source mcp-source-ok" x-show="mcpInventory?.cliIncluded">已包含插件 / 连接器</span>
             </div>
 
-            <div x-show="mcpLoading" class="muted text-sm mcp-empty">加载中…</div>
-            <div x-show="!mcpLoading && mcpServers.length === 0" class="muted text-sm mcp-empty">暂无 MCP。可以从本地目录、Git 或 npm 添加。</div>
-            <div class="mcp-list" x-show="!mcpLoading && filteredMCPServers.length > 0">
-              <template x-for="s in filteredMCPServers" :key="s.id">
-                <div class="mcp-item" :class="(s.enabledInClaude || s.enabledInCodex) ? 'mcp-item-active' : ''">
-                  <div class="mcp-row">
-                    <div class="mcp-info">
+            <template x-if="(mcpInventory?.legacy || []).length > 0">
+              <div class="mcp-legacy">
+                <strong>旧版 Hatch 注册表中有未写入任何客户端的 MCP</strong>
+                <span class="muted text-sm">新版只管理 Claude / Codex 的真实配置。可选择写入，或丢弃。</span>
+                <template x-for="d in mcpInventory.legacy" :key="d.name">
+                  <div class="mcp-legacy-row">
+                    <code x-text="d.name"></code>
+                    <span class="muted text-sm mcp-ellipsis" x-text="mcpSummary(d.spec)"></span>
+                    <button class="btn-sm" @click="openMCPLegacy(d)">写入…</button>
+                    <button class="btn-sm btn-danger" @click="discardLegacyMCP(d)">丢弃</button>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <div x-show="mcpLoading && !mcpInventory" class="muted text-sm mcp-empty">读取配置中…</div>
+            <div x-show="mcpInventory && filteredMCPRows.length === 0" class="muted text-sm mcp-empty">
+              <span x-text="(mcpInventory?.rows || []).length ? '没有符合筛选条件的 MCP' : '还没有配置任何 MCP。点击「+ 添加 MCP」，粘贴 README 里的配置片段即可。'"></span>
+            </div>
+
+            <div class="mcp-list">
+              <template x-for="row in filteredMCPRows" :key="row.name">
+                <div class="mcp-row-card" :class="mcpExpanded[row.name] ? 'is-open' : ''">
+                  <div class="mcp-row-main">
+                    <button class="mcp-expand" @click="toggleMCPRow(row.name)" :aria-expanded="!!mcpExpanded[row.name]" x-text="mcpExpanded[row.name] ? '▾' : '▸'"></button>
+                    <div class="mcp-row-info" @click="toggleMCPRow(row.name)">
                       <div class="mcp-title-row">
-                        <span class="skill-name" x-text="s.name || s.id"></span>
-                        <code class="mcp-id" x-text="s.id"></code>
-                        <span class="skill-badge" x-text="s.transport || 'stdio'"></span>
-                        <span class="mcp-source-badge" :class="'mcp-src-' + (s.sourceType || 'local')" x-text="s.sourceType || 'local'"></span>
-                        <span class="mcp-enabled-badge" x-show="s.enabledInClaude">Claude ✓</span>
-                        <span class="mcp-enabled-badge mcp-enabled-codex" x-show="s.enabledInCodex">Codex ✓</span>
+                        <span class="skill-name" x-text="row.name"></span>
+                        <span class="skill-badge" x-text="row.entries[0]?.spec?.transport || 'stdio'"></span>
+                        <span class="mcp-drift-badge" x-show="row.drift" title="同名服务在不同位置的配置不一致">配置不一致</span>
                       </div>
-                      <span class="skill-desc muted text-sm" x-text="s.description || s.localPath || s.packageName || s.url || '无描述'"></span>
-                      <div class="mcp-config-lines" x-show="mcpConfigLines(s).length > 0">
-                        <template x-for="line in mcpConfigLines(s)" :key="s.id+line.label+line.value">
-                          <div class="mcp-config-line">
-                            <span x-text="line.label"></span>
-                            <code x-text="line.value || '空值'"></code>
-                          </div>
-                        </template>
-                      </div>
-                      <div class="mcp-test-row">
-                        <template x-for="target in ['claude','codex']" :key="s.id+target">
-                          <span class="mcp-test-pill" :class="mcpStatusClass((s.lastTestResults||{})[target])">
-                            <strong x-text="mcpTargetLabel(target)"></strong>
-                            <span x-text="((s.lastTestResults||{})[target]?.summary) || '未测试'"></span>
-                          </span>
-                        </template>
-                      </div>
+                      <code class="mcp-cmd mcp-ellipsis" x-text="mcpSummary(row.entries[0]?.spec)"></code>
                     </div>
-                    <div class="skill-sync-group">
-                      <label class="skill-sync-toggle" :class="mcpSyncBusy[s.id+':claude'] ? 'sync-busy' : ''">
-                        <input type="checkbox" :checked="s.enabledInClaude" :disabled="!!mcpSyncBusy[s.id+':claude']" @change="toggleMCPEnabled(s.id, 'claude', $event.target.checked)" />
-                        <span class="sync-label" :class="s.enabledInClaude ? 'sync-on' : 'sync-off'">Claude</span>
-                      </label>
-                      <label class="skill-sync-toggle" :class="mcpSyncBusy[s.id+':codex'] ? 'sync-busy' : ''">
-                        <input type="checkbox" :checked="s.enabledInCodex" :disabled="!!mcpSyncBusy[s.id+':codex']" @change="toggleMCPEnabled(s.id, 'codex', $event.target.checked)" />
-                        <span class="sync-label" :class="s.enabledInCodex ? 'sync-on' : 'sync-off'">Codex</span>
-                      </label>
-                    </div>
-                    <div class="mcp-actions">
-                      <button class="btn-sm" @click="testMCP(s.id, 'claude')" :disabled="!s.enabledInClaude || !!mcpTestBusy[s.id+':claude']" :aria-busy="!!mcpTestBusy[s.id+':claude']" title="需先开启 Claude 同步">测 Claude</button>
-                      <button class="btn-sm" @click="testMCP(s.id, 'codex')" :disabled="!s.enabledInCodex || !!mcpTestBusy[s.id+':codex']" :aria-busy="!!mcpTestBusy[s.id+':codex']" title="需先开启 Codex 同步">测 Codex</button>
-                      <button class="btn-sm" @click="copyToClipboard(renderMCPSnippet(s, 'claude'), 'Claude 配置')" title="复制 Claude (~/.claude.json) 配置块">⧉ Claude</button>
-                      <button class="btn-sm" @click="copyToClipboard(renderMCPSnippet(s, 'codex'), 'Codex 配置')" title="复制 Codex (config.toml) 配置块">⧉ Codex</button>
-                      <button class="btn-sm" x-show="s.sourceType === 'git'" @click="updateMCPFromGit(s.id)" :aria-busy="!!mcpUpdateBusy[s.id]" title="git pull 更新">更新</button>
-                      <button class="btn-sm" @click="openMCPServerEditor(s)">编辑</button>
-                      <button class="btn-sm btn-danger" @click="openMCPDeleteModal(s)">删除</button>
+                    <div class="mcp-chips">
+                      <template x-for="e in row.entries" :key="e.locationKey">
+                        <span class="mcp-chip" :class="mcpEntryState(e).cls" :title="e.readOnlyReason || e.file || ''">
+                          <template x-if="!e.readOnly">
+                            <input type="checkbox" :checked="e.enabled" :disabled="mcpIsBusy(row.name, e.locationKey, 'toggle') || (e.stale && !e.enabled)" @change="setMCPEntryEnabled(row, e, $event.target.checked)" />
+                          </template>
+                          <span x-text="e.label"></span>
+                          <span class="mcp-probe-dot" :class="mcpProbeClass(e.probe)" :title="e.probe ? e.probe.summary : '未测试'"></span>
+                        </span>
+                      </template>
                     </div>
                   </div>
+
+                  <template x-if="mcpExpanded[row.name]">
+                    <div class="mcp-row-detail">
+                      <template x-if="row.drift">
+                        <p class="mcp-drift-hint">各位置的配置不一致。在下方选择一个版本，点击「以此为准同步」覆盖其他可写位置。</p>
+                      </template>
+                      <template x-for="e in row.entries" :key="e.locationKey">
+                        <div class="mcp-entry">
+                          <div class="mcp-entry-head">
+                            <strong x-text="e.label"></strong>
+                            <span class="mcp-chip-state" :class="mcpEntryState(e).cls" x-text="mcpEntryState(e).text"></span>
+                            <span class="muted text-xs mcp-ellipsis" x-text="e.file || e.readOnlyReason"></span>
+                            <span class="muted text-xs" x-show="e.cliStatus" x-text="'CLI：' + e.cliStatus"></span>
+                          </div>
+                          <div class="mcp-entry-actions">
+                            <button class="btn-sm" @click="probeMCPEntry(row, e)" :aria-busy="mcpIsBusy(row.name, e.locationKey, 'probe')" :disabled="mcpIsBusy(row.name, e.locationKey, 'probe') || e.location.scope === 'connector'">测试连接</button>
+                            <button class="btn-sm" x-show="!e.readOnly && !e.stale" @click="openMCPEdit(row, e)">编辑</button>
+                            <button class="btn-sm" x-show="e.location.scope !== 'connector'" @click="openMCPCopy(row, e)">复制到…</button>
+                            <button class="btn-sm" x-show="row.drift && !e.readOnly && !e.stale" @click="syncMCPFrom(row, e)" :aria-busy="mcpIsBusy(row.name, e.locationKey, 'sync')">以此为准同步</button>
+                            <button class="btn-sm btn-danger" x-show="!e.readOnly" @click="removeMCPEntry(row, e)" :aria-busy="mcpIsBusy(row.name, e.locationKey, 'remove')">删除</button>
+                          </div>
+                          <template x-if="e.probe">
+                            <div class="mcp-probe" :class="mcpProbeClass(e.probe)">
+                              <div class="mcp-probe-head">
+                                <strong x-text="mcpProbeLabel(e.probe)"></strong>
+                                <span x-text="e.probe.summary"></span>
+                                <span class="muted text-xs" x-show="e.probe.serverName" x-text="e.probe.serverName + (e.probe.serverVersion ? ' ' + e.probe.serverVersion : '')"></span>
+                                <span class="muted text-xs" x-text="new Date(e.probe.checkedAt * 1000).toLocaleString()"></span>
+                              </div>
+                              <template x-if="(e.probe.tools || []).length > 0">
+                                <div class="mcp-tools">
+                                  <template x-for="t in e.probe.tools" :key="t.name">
+                                    <label class="mcp-tool" :title="t.description">
+                                      <template x-if="e.location.client === 'codex' && !e.readOnly">
+                                        <input type="checkbox" :checked="!mcpDisabledTools(e).includes(t.name)" :disabled="mcpIsBusy(row.name, e.locationKey, 'tools')" @change="toggleMCPTool(row, e, t.name, $event.target.checked)" />
+                                      </template>
+                                      <code x-text="t.name"></code>
+                                      <span class="muted text-xs mcp-ellipsis" x-text="t.description"></span>
+                                    </label>
+                                  </template>
+                                </div>
+                              </template>
+                              <template x-if="e.probe.stderrTail && e.probe.status !== 'ok'">
+                                <pre class="mcp-stderr" x-text="e.probe.stderrTail"></pre>
+                              </template>
+                            </div>
+                          </template>
+                          <details class="mcp-raw">
+                            <summary>配置原文</summary>
+                            <pre x-text="e.raw"></pre>
+                          </details>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
           </section>
+
+          <!-- Add / edit / copy -->
+          <template x-if="mcpAdd">
+            <div class="modal-backdrop" @click.self="closeMCPAdd()" @keydown.escape.window="closeMCPAdd()">
+              <div class="modal-panel mcp-add-panel" role="dialog" aria-modal="true" aria-labelledby="mcpAddTitle">
+                <div class="modal-head">
+                  <h3 id="mcpAddTitle" x-text="mcpAdd.mode === 'edit' ? ('编辑「' + mcpAdd.form.name + '」· ' + mcpAdd.editLabel) : (mcpAdd.copyFrom ? ('复制「' + mcpAdd.form.name + '」（来自 ' + mcpAdd.copyFrom + '）') : '添加 MCP')"></h3>
+                  <button class="icon-btn" @click="closeMCPAdd()" title="关闭">✕</button>
+                </div>
+                <div class="mcp-add-body">
+                  <div class="skill-filter-tabs mcp-add-tabs" x-show="mcpAdd.mode === 'add' && !mcpAdd.copyFrom">
+                    <button class="skill-filter-tab" :class="mcpAdd.tab==='paste' ? 'active' : ''" @click="mcpAdd.tab='paste'">粘贴</button>
+                    <button class="skill-filter-tab" :class="mcpAdd.tab==='catalog' ? 'active' : ''" @click="mcpAdd.tab='catalog'">精选目录</button>
+                    <button class="skill-filter-tab" :class="mcpAdd.tab==='registry' ? 'active' : ''" @click="mcpAdd.tab='registry'">MCP Registry</button>
+                    <button class="skill-filter-tab" :class="mcpAdd.tab==='form' ? 'active' : ''" @click="mcpAdd.tab='form'">配置表单</button>
+                  </div>
+
+                  <template x-if="mcpAdd.tab === 'paste'">
+                    <div class="mcp-add-step">
+                      <p class="muted text-sm">支持：README 里的 JSON 片段（mcpServers / servers）、<code>claude mcp add …</code>、<code>codex mcp add …</code>、Codex TOML、远程 URL、npm 包名、Registry 名称（如 io.github.upstash/context7）、npx / uvx / docker 命令。</p>
+                      <textarea class="field-textarea mcp-paste" x-model="mcpAdd.pasteText" rows="9" placeholder='{"mcpServers": {"context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp"]}}}'></textarea>
+                      <div class="mcp-add-actions">
+                        <button class="btn-primary" @click="parseMCPPaste()" :aria-busy="mcpAdd.parsing" :disabled="mcpAdd.parsing">识别</button>
+                        <button class="secondary" @click="mcpAdd.tab='form'">手动填写</button>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="mcpAdd.tab === 'catalog'">
+                    <div class="mcp-catalog">
+                      <template x-for="item in mcpCatalog" :key="item.id">
+                        <button class="mcp-catalog-card" @click="pickMCPCatalog(item)">
+                          <span class="mcp-catalog-head"><strong x-text="item.title"></strong><span class="skill-badge" x-text="item.category"></span></span>
+                          <span class="muted text-sm" x-text="item.description"></span>
+                          <code class="mcp-ellipsis" x-text="mcpSummary(item.spec)"></code>
+                        </button>
+                      </template>
+                    </div>
+                  </template>
+
+                  <template x-if="mcpAdd.tab === 'registry'">
+                    <div class="mcp-add-step">
+                      <p class="muted text-sm">官方 MCP Registry：输入精确名称（如 <code>io.github.github/github-mcp-server</code>）直接获取安装信息；输入关键词则按名称搜索（结果未排序，噪声较多）。</p>
+                      <div class="mcp-registry-search">
+                        <input class="field-input" x-model="mcpAdd.registryQuery" @keydown.enter="searchMCPRegistry()" placeholder="名称或关键词" />
+                        <button class="btn-primary" @click="searchMCPRegistry()" :aria-busy="mcpAdd.registryBusy" :disabled="mcpAdd.registryBusy">查询</button>
+                      </div>
+                      <p class="muted text-sm" x-show="mcpAdd.registryLooked && mcpAdd.registryHits.length === 0">没有结果。Registry 只按名称子串匹配，可尝试更短的关键词或精确名称。</p>
+                      <div class="mcp-registry-hits">
+                        <template x-for="h in mcpAdd.registryHits" :key="h.name">
+                          <button class="mcp-registry-hit" @click="lookupMCPRegistry(h.name)">
+                            <code x-text="h.name"></code>
+                            <span class="muted text-xs" x-text="h.kinds"></span>
+                            <span class="muted text-sm mcp-ellipsis" x-text="h.description"></span>
+                          </button>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
+                  <template x-if="mcpAdd.tab === 'form'">
+                    <div class="mcp-add-step">
+                      <template x-if="mcpAdd.drafts.length > 1">
+                        <div class="mcp-draft-switch">
+                          <span class="muted text-sm">识别到多个方案：</span>
+                          <template x-for="(d, i) in mcpAdd.drafts" :key="i">
+                            <button class="btn-sm" :class="mcpAdd.draftIdx === i ? 'active' : ''" @click="selectMCPDraft(i)" x-text="d.variant || d.name"></button>
+                          </template>
+                        </div>
+                      </template>
+                      <template x-if="(mcpAdd.form.notes || []).length || mcpAdd.parseNotes.length || mcpAdd.form.description">
+                        <div class="mcp-notes">
+                          <p x-show="mcpAdd.form.description" x-text="mcpAdd.form.description"></p>
+                          <template x-for="n in [...mcpAdd.parseNotes, ...(mcpAdd.form.notes || [])]" :key="n"><p class="muted text-sm" x-text="'· ' + n"></p></template>
+                          <a class="text-sm" x-show="mcpAdd.form.homepage" :href="mcpAdd.form.homepage" target="_blank" x-text="mcpAdd.form.homepage"></a>
+                        </div>
+                      </template>
+
+                      <div class="mcp-form-grid">
+                        <label class="field-stack">
+                          <span>名称（客户端中的 key）</span>
+                          <input class="field-input" x-model="mcpAdd.form.name" :disabled="mcpAdd.mode === 'edit'" @input="mcpAdd.plan=null" placeholder="context7" />
+                        </label>
+                        <label class="field-stack">
+                          <span>传输</span>
+                          <select class="field-input" x-model="mcpAdd.form.transport" @change="mcpAdd.plan=null">
+                            <option value="stdio">stdio（本地进程）</option>
+                            <option value="http">HTTP（远程）</option>
+                            <option value="sse">SSE（旧版远程，仅 Claude）</option>
+                          </select>
+                        </label>
+                        <label class="field-stack">
+                          <span>启动超时（秒）</span>
+                          <input class="field-input" type="number" min="0" x-model.number="mcpAdd.form.startupTimeoutSec" @input="mcpAdd.plan=null" />
+                        </label>
+                        <label class="field-stack">
+                          <span>工具超时（秒，Codex）</span>
+                          <input class="field-input" type="number" min="0" x-model.number="mcpAdd.form.toolTimeoutSec" @input="mcpAdd.plan=null" />
+                        </label>
+                      </div>
+
+                      <template x-if="mcpAdd.form.transport === 'stdio'">
+                        <div class="mcp-stdio-fields">
+                          <label class="field-stack"><span>命令</span><input class="field-input" x-model="mcpAdd.form.command" @input="mcpAdd.plan=null" placeholder="npx / uvx / docker / /path/to/bin" /></label>
+                          <label class="field-stack"><span>参数（每行一个）</span><textarea class="field-textarea" rows="3" x-model="mcpAdd.form.argsRaw" @input="mcpAdd.plan=null"></textarea></label>
+                          <label class="field-stack"><span>工作目录（可选）</span><input class="field-input" x-model="mcpAdd.form.cwd" @input="mcpAdd.plan=null" /></label>
+                        </div>
+                      </template>
+                      <template x-if="mcpAdd.form.transport !== 'stdio'">
+                        <div class="mcp-stdio-fields">
+                          <label class="field-stack"><span>URL</span><input class="field-input" x-model="mcpAdd.form.url" @input="mcpAdd.plan=null" placeholder="https://example.com/mcp" /></label>
+                          <label class="field-stack"><span>Bearer Token 环境变量（可选）</span><input class="field-input" x-model="mcpAdd.form.bearerTokenEnvVar" @input="mcpAdd.plan=null" placeholder="GITHUB_TOKEN" /></label>
+                        </div>
+                      </template>
+
+                      <template x-for="kind in (mcpAdd.form.transport === 'stdio' ? ['envRows'] : ['headerRows'])" :key="kind">
+                        <div class="mcp-env-box">
+                          <div class="mcp-env-head">
+                            <span x-text="kind === 'envRows' ? '环境变量' : 'HTTP Headers'"></span>
+                            <button class="btn-sm" @click="addMCPFormRow(kind); mcpAdd.plan=null">+ 添加</button>
+                          </div>
+                          <template x-for="(r, idx) in mcpAdd.form[kind]" :key="kind + idx">
+                            <div class="mcp-env-row">
+                              <input class="field-input" x-model="r.key" @input="mcpAdd.plan=null" placeholder="KEY" />
+                              <input class="field-input" :class="r.required && !String(r.value || '').replace(/^Bearer\s*/, '').trim() ? 'mcp-input-missing' : ''" :type="r.secret && !mcpAdd.reveal[kind + idx] ? 'password' : 'text'" x-model="r.value" @input="mcpAdd.plan=null" :placeholder="r.desc || (r.required ? '必填' : 'VALUE')" autocomplete="off" />
+                              <span class="mcp-row-tools">
+                                <button class="icon-btn" x-show="r.secret" @click="mcpAdd.reveal = { ...mcpAdd.reveal, [kind + idx]: !mcpAdd.reveal[kind + idx] }" title="显示 / 隐藏">👁</button>
+                                <button class="icon-btn danger" @click="removeMCPFormRow(kind, idx); mcpAdd.plan=null">✕</button>
+                              </span>
+                            </div>
+                          </template>
+                        </div>
+                      </template>
+                      <p class="muted text-xs" x-show="mcpAdd.form.extra">此条目还带有 Hatch 未建模的字段（如 alwaysLoad、工具审批），写回时会原样保留。</p>
+
+                      <div class="mcp-targets" x-show="mcpAdd.mode !== 'edit'">
+                        <strong>写入位置</strong>
+                        <label><input type="checkbox" x-model="mcpAdd.targets['claude:user']" @change="mcpAdd.plan=null" /> Claude Code · 全局（user）</label>
+                        <label :class="['sse','ws'].includes(mcpAdd.form.transport) ? 'muted' : ''"><input type="checkbox" x-model="mcpAdd.targets['codex:user']" :disabled="['sse','ws'].includes(mcpAdd.form.transport)" @change="mcpAdd.plan=null" /> Codex · 全局</label>
+                        <div class="mcp-target-project">
+                          <select class="field-input" x-model="mcpAdd.project" @change="mcpAdd.plan=null">
+                            <option value="">（可选）写入某个项目…</option>
+                            <template x-for="p in (mcpInventory?.projects || [])" :key="p.path">
+                              <option :value="p.path" x-text="p.name + ' — ' + p.path"></option>
+                            </template>
+                          </select>
+                          <template x-if="mcpAdd.project">
+                            <div class="mcp-target-scopes">
+                              <label><input type="checkbox" x-model="mcpAdd.projectLocal" @change="mcpAdd.plan=null" /> Claude 本地（仅自己）</label>
+                              <label><input type="checkbox" x-model="mcpAdd.projectShared" @change="mcpAdd.plan=null" /> Claude .mcp.json（随仓库共享）</label>
+                              <label :class="mcpSelectedProject?.codexTrusted ? '' : 'muted'" :title="mcpSelectedProject?.codexTrusted ? '' : 'Codex 只对 trusted 项目读取 .codex/config.toml'"><input type="checkbox" x-model="mcpAdd.projectCodex" :disabled="!mcpSelectedProject?.codexTrusted" @change="mcpAdd.plan=null" /> Codex 项目配置</label>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <p class="mcp-missing" x-show="mcpMissingInputs.length" x-text="'还有必填项未填写：' + mcpMissingInputs.join('、') + '（可以先写入，之后再编辑）'"></p>
+
+                      <template x-if="mcpAdd.plan">
+                        <div class="mcp-plan">
+                          <template x-for="it in mcpAdd.plan.items" :key="it.locationKey + it.action">
+                            <div class="mcp-plan-item" :class="'mcp-plan-' + it.action">
+                              <div class="mcp-plan-head">
+                                <strong x-text="it.label || '请求'"></strong>
+                                <span class="mcp-plan-action" x-text="{add:'新增', update:'更新', unchanged:'无变化', error:'无法写入'}[it.action]"></span>
+                                <span class="muted text-xs mcp-ellipsis" x-text="it.file"></span>
+                              </div>
+                              <p class="mcp-plan-error" x-show="it.error" x-text="it.error"></p>
+                              <div class="mcp-diff" x-show="it.after && it.action !== 'unchanged'">
+                                <pre class="mcp-diff-before" x-show="it.before" x-text="it.before"></pre>
+                                <pre class="mcp-diff-after" x-text="it.after"></pre>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </template>
+
+                      <div class="mcp-add-actions">
+                        <button class="secondary" @click="previewMCPApply()" :aria-busy="mcpAdd.previewing" :disabled="mcpAdd.previewing">预览变更</button>
+                        <button class="btn-primary" @click="applyMCPForm()" :disabled="!mcpAdd.plan?.canApply || mcpAdd.applying" :aria-busy="mcpAdd.applying" x-text="mcpAdd.plan ? '确认写入' : '先预览再写入'"></button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- ══ Hooks ═════════════════════════════════════════════════ -->

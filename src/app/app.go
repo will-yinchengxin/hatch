@@ -33,6 +33,7 @@ type App struct {
 	store    *store.Store
 	services map[string]*executor.ServiceManager
 	mu       sync.RWMutex
+	mcpOpMu  sync.Mutex // serializes MCP config writes (CLI remove+add is not atomic)
 
 	tracesMu sync.Mutex
 	traces   []llm.Trace

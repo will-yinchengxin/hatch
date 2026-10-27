@@ -24,7 +24,7 @@ help:
 
 ## dev      — 启动热更新开发模式（自动打开窗口）
 dev:
-	cd $(BACKEND) && $(WAILS) dev
+	cd $(BACKEND) && CGO_ENABLED=1 $(WAILS) dev
 
 ## ─── 测试 ────────────────────────────────────────────────────────────────────
 
@@ -40,11 +40,11 @@ test-short:
 
 ## build    — 编译 darwin/arm64（增量，不清理旧产物）
 build:
-	cd $(BACKEND) && $(WAILS) build -platform $(PLATFORM)
+	cd $(BACKEND) && CGO_ENABLED=1 $(WAILS) build -platform $(PLATFORM)
 
 ## build-clean — 完整重新编译（清理旧产物后再构建）
 build-clean:
-	cd $(BACKEND) && $(WAILS) build -platform $(PLATFORM) -clean
+	cd $(BACKEND) && CGO_ENABLED=1 $(WAILS) build -platform $(PLATFORM) -clean
 
 ## ─── 签名 & 打包 ─────────────────────────────────────────────────────────────
 

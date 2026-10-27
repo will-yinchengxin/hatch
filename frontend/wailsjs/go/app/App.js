@@ -6,6 +6,10 @@ export function AddDirectory(arg1, arg2, arg3) {
   return window['go']['app']['App']['AddDirectory'](arg1, arg2, arg3);
 }
 
+export function AnalyzeHostStorage() {
+  return window['go']['app']['App']['AnalyzeHostStorage']();
+}
+
 export function ApplyAIWorkspaceProfile(arg1) {
   return window['go']['app']['App']['ApplyAIWorkspaceProfile'](arg1);
 }
@@ -14,8 +18,16 @@ export function ApplyAllSchedules() {
   return window['go']['app']['App']['ApplyAllSchedules']();
 }
 
+export function ApplyMCP(arg1) {
+  return window['go']['app']['App']['ApplyMCP'](arg1);
+}
+
 export function ApplyRetention() {
   return window['go']['app']['App']['ApplyRetention']();
+}
+
+export function ApplyVPNEnhanceEdit(arg1, arg2) {
+  return window['go']['app']['App']['ApplyVPNEnhanceEdit'](arg1, arg2);
 }
 
 export function ApplyZshrcOrganization(arg1) {
@@ -54,6 +66,10 @@ export function ClearAITraces() {
   return window['go']['app']['App']['ClearAITraces']();
 }
 
+export function CopyMCPEntry(arg1, arg2, arg3) {
+  return window['go']['app']['App']['CopyMCPEntry'](arg1, arg2, arg3);
+}
+
 export function CreateScriptFile(arg1, arg2, arg3) {
   return window['go']['app']['App']['CreateScriptFile'](arg1, arg2, arg3);
 }
@@ -76,10 +92,6 @@ export function DeleteCodexPreset(arg1) {
 
 export function DeleteHook(arg1) {
   return window['go']['app']['App']['DeleteHook'](arg1);
-}
-
-export function DeleteMCPServer(arg1) {
-  return window['go']['app']['App']['DeleteMCPServer'](arg1);
 }
 
 export function DeleteMemo(arg1) {
@@ -112,6 +124,10 @@ export function DeleteVPNBackup(arg1) {
 
 export function DeleteVocabEntry(arg1) {
   return window['go']['app']['App']['DeleteVocabEntry'](arg1);
+}
+
+export function DiscardLegacyMCP(arg1) {
+  return window['go']['app']['App']['DiscardLegacyMCP'](arg1);
 }
 
 export function ExportBackup(arg1) {
@@ -210,12 +226,24 @@ export function GetHooksStats() {
   return window['go']['app']['App']['GetHooksStats']();
 }
 
-export function GetMCPSettings() {
-  return window['go']['app']['App']['GetMCPSettings']();
+export function GetHostHardware() {
+  return window['go']['app']['App']['GetHostHardware']();
 }
 
-export function GetMCPTemplates() {
-  return window['go']['app']['App']['GetMCPTemplates']();
+export function GetHostPorts() {
+  return window['go']['app']['App']['GetHostPorts']();
+}
+
+export function GetHostSnapshot() {
+  return window['go']['app']['App']['GetHostSnapshot']();
+}
+
+export function GetMCPCatalog() {
+  return window['go']['app']['App']['GetMCPCatalog']();
+}
+
+export function GetMCPInventory(arg1) {
+  return window['go']['app']['App']['GetMCPInventory'](arg1);
 }
 
 export function GetMemoAttachmentPreview(arg1) {
@@ -274,8 +302,8 @@ export function GetVPNCurrentIP() {
   return window['go']['app']['App']['GetVPNCurrentIP']();
 }
 
-export function GetVPNEnhanceData() {
-  return window['go']['app']['App']['GetVPNEnhanceData']();
+export function GetVPNEnhanceInfo(arg1) {
+  return window['go']['app']['App']['GetVPNEnhanceInfo'](arg1);
 }
 
 export function GetVPNHealthReport() {
@@ -290,6 +318,10 @@ export function GetVPNProfiles() {
   return window['go']['app']['App']['GetVPNProfiles']();
 }
 
+export function GetVPNRules() {
+  return window['go']['app']['App']['GetVPNRules']();
+}
+
 export function GetVPNSettings() {
   return window['go']['app']['App']['GetVPNSettings']();
 }
@@ -298,12 +330,16 @@ export function GetVPNStatus() {
   return window['go']['app']['App']['GetVPNStatus']();
 }
 
-export function ImportBackup(arg1) {
-  return window['go']['app']['App']['ImportBackup'](arg1);
+export function GetVPNSubscriptionURL(arg1) {
+  return window['go']['app']['App']['GetVPNSubscriptionURL'](arg1);
 }
 
-export function ImportMCPFromLocalDir(arg1) {
-  return window['go']['app']['App']['ImportMCPFromLocalDir'](arg1);
+export function GetVPNSubscriptions() {
+  return window['go']['app']['App']['GetVPNSubscriptions']();
+}
+
+export function ImportBackup(arg1) {
+  return window['go']['app']['App']['ImportBackup'](arg1);
 }
 
 export function ImportMemoAttachment(arg1, arg2, arg3) {
@@ -316,10 +352,6 @@ export function ImportSkillsFrom(arg1) {
 
 export function ImportVPNBackup(arg1) {
   return window['go']['app']['App']['ImportVPNBackup'](arg1);
-}
-
-export function InstallMCPFromGit(arg1, arg2) {
-  return window['go']['app']['App']['InstallMCPFromGit'](arg1, arg2);
 }
 
 export function ListAIWorkspaceProfiles() {
@@ -336,10 +368,6 @@ export function ListAliasInventory() {
 
 export function ListHooks() {
   return window['go']['app']['App']['ListHooks']();
-}
-
-export function ListMCPServers() {
-  return window['go']['app']['App']['ListMCPServers']();
 }
 
 export function ListMemos() {
@@ -366,6 +394,10 @@ export function ListVocabEntries() {
   return window['go']['app']['App']['ListVocabEntries']();
 }
 
+export function LookupMCPRegistry(arg1) {
+  return window['go']['app']['App']['LookupMCPRegistry'](arg1);
+}
+
 export function LookupVocabWord(arg1) {
   return window['go']['app']['App']['LookupVocabWord'](arg1);
 }
@@ -382,12 +414,24 @@ export function OpenMemoAttachment(arg1) {
   return window['go']['app']['App']['OpenMemoAttachment'](arg1);
 }
 
+export function OpenVPNApp() {
+  return window['go']['app']['App']['OpenVPNApp']();
+}
+
 export function OpenVPNBackupDir() {
   return window['go']['app']['App']['OpenVPNBackupDir']();
 }
 
 export function OpenVPNDir() {
   return window['go']['app']['App']['OpenVPNDir']();
+}
+
+export function ParseMCPInput(arg1) {
+  return window['go']['app']['App']['ParseMCPInput'](arg1);
+}
+
+export function ParseVPNRuleLines(arg1, arg2) {
+  return window['go']['app']['App']['ParseVPNRuleLines'](arg1, arg2);
 }
 
 export function ParseZshrc() {
@@ -398,8 +442,20 @@ export function PreviewAIWorkspaceProfileApply(arg1) {
   return window['go']['app']['App']['PreviewAIWorkspaceProfileApply'](arg1);
 }
 
+export function PreviewMCPApply(arg1) {
+  return window['go']['app']['App']['PreviewMCPApply'](arg1);
+}
+
 export function PreviewVPNBackup(arg1) {
   return window['go']['app']['App']['PreviewVPNBackup'](arg1);
+}
+
+export function PreviewVPNEnhanceEdit(arg1, arg2) {
+  return window['go']['app']['App']['PreviewVPNEnhanceEdit'](arg1, arg2);
+}
+
+export function ProbeMCP(arg1, arg2) {
+  return window['go']['app']['App']['ProbeMCP'](arg1, arg2);
 }
 
 export function ReadScriptFile(arg1) {
@@ -412,6 +468,10 @@ export function RefreshClaudeUsage() {
 
 export function RemoveDirectory(arg1) {
   return window['go']['app']['App']['RemoveDirectory'](arg1);
+}
+
+export function RemoveMCPEntry(arg1, arg2) {
+  return window['go']['app']['App']['RemoveMCPEntry'](arg1, arg2);
 }
 
 export function RemoveSchedule(arg1) {
@@ -428,6 +488,14 @@ export function ReviewVocabEntry(arg1, arg2) {
 
 export function RollbackAIWorkspaceSnapshot(arg1) {
   return window['go']['app']['App']['RollbackAIWorkspaceSnapshot'](arg1);
+}
+
+export function RunHostDiskBenchmark() {
+  return window['go']['app']['App']['RunHostDiskBenchmark']();
+}
+
+export function RunHostNetworkBenchmark() {
+  return window['go']['app']['App']['RunHostNetworkBenchmark']();
 }
 
 export function RunScript(arg1, arg2, arg3) {
@@ -482,24 +550,12 @@ export function SaveHook(arg1) {
   return window['go']['app']['App']['SaveHook'](arg1);
 }
 
-export function SaveMCPServer(arg1) {
-  return window['go']['app']['App']['SaveMCPServer'](arg1);
-}
-
-export function SaveMCPSettings(arg1) {
-  return window['go']['app']['App']['SaveMCPSettings'](arg1);
-}
-
 export function SaveMemo(arg1) {
   return window['go']['app']['App']['SaveMemo'](arg1);
 }
 
 export function SaveMemoSettings(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveMemoSettings'](arg1, arg2, arg3);
-}
-
-export function SaveNpmMCPServer(arg1, arg2) {
-  return window['go']['app']['App']['SaveNpmMCPServer'](arg1, arg2);
 }
 
 export function SavePromptTemplates(arg1) {
@@ -530,6 +586,10 @@ export function SaveVPNProfileContent(arg1, arg2) {
   return window['go']['app']['App']['SaveVPNProfileContent'](arg1, arg2);
 }
 
+export function SaveVPNRules(arg1) {
+  return window['go']['app']['App']['SaveVPNRules'](arg1);
+}
+
 export function SaveVPNSettings(arg1, arg2) {
   return window['go']['app']['App']['SaveVPNSettings'](arg1, arg2);
 }
@@ -548,6 +608,10 @@ export function ScanAll() {
 
 export function ScheduleMemoReminders() {
   return window['go']['app']['App']['ScheduleMemoReminders']();
+}
+
+export function SearchMCPRegistry(arg1) {
+  return window['go']['app']['App']['SearchMCPRegistry'](arg1);
 }
 
 export function ServiceAction(arg1, arg2, arg3) {
@@ -570,6 +634,10 @@ export function SetHookEnabled(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetHookEnabled'](arg1, arg2, arg3);
 }
 
+export function SetMCPDisabledTools(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetMCPDisabledTools'](arg1, arg2, arg3);
+}
+
 export function SetMCPEnabled(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetMCPEnabled'](arg1, arg2, arg3);
 }
@@ -588,10 +656,6 @@ export function SuggestHookEdit(arg1, arg2) {
 
 export function SuggestHookFromDescription(arg1) {
   return window['go']['app']['App']['SuggestHookFromDescription'](arg1);
-}
-
-export function SuggestMCPRecommendations(arg1) {
-  return window['go']['app']['App']['SuggestMCPRecommendations'](arg1);
 }
 
 export function SuggestScriptContent(arg1, arg2, arg3) {
@@ -614,6 +678,14 @@ export function SuggestSkillFromDescription(arg1, arg2) {
   return window['go']['app']['App']['SuggestSkillFromDescription'](arg1, arg2);
 }
 
+export function SuggestVPNEnhanceEdit(arg1, arg2) {
+  return window['go']['app']['App']['SuggestVPNEnhanceEdit'](arg1, arg2);
+}
+
+export function SuggestVPNRuleChange(arg1, arg2) {
+  return window['go']['app']['App']['SuggestVPNRuleChange'](arg1, arg2);
+}
+
 export function SuggestVocabEntry(arg1) {
   return window['go']['app']['App']['SuggestVocabEntry'](arg1);
 }
@@ -630,20 +702,16 @@ export function TestAIConfig(arg1) {
   return window['go']['app']['App']['TestAIConfig'](arg1);
 }
 
-export function TestMCPConnection(arg1, arg2) {
-  return window['go']['app']['App']['TestMCPConnection'](arg1, arg2);
+export function TestVPNNodeDelay(arg1) {
+  return window['go']['app']['App']['TestVPNNodeDelay'](arg1);
 }
 
-export function UninstallMCPFromDisk(arg1) {
-  return window['go']['app']['App']['UninstallMCPFromDisk'](arg1);
+export function TestVPNRule(arg1, arg2) {
+  return window['go']['app']['App']['TestVPNRule'](arg1, arg2);
 }
 
 export function UpdateDirectoryExport(arg1, arg2) {
   return window['go']['app']['App']['UpdateDirectoryExport'](arg1, arg2);
-}
-
-export function UpdateMCPFromGit(arg1) {
-  return window['go']['app']['App']['UpdateMCPFromGit'](arg1);
 }
 
 export function ValidateVPNSettings(arg1, arg2) {

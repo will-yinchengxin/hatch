@@ -137,41 +137,53 @@ type AIWorkspaceProfile struct {
 	UpdatedAt    int64                    `json:"updatedAt"`
 }
 
-// MCPServer represents one MCP server managed by Hatch.
-type MCPServer struct {
-	ID                string                   `json:"id"`
-	Name              string                   `json:"name"`
-	Description       string                   `json:"description,omitempty"`
-	SourceType        string                   `json:"sourceType"` // local | git | npm | remote
-	SourceURL         string                   `json:"sourceUrl,omitempty"`
-	LocalPath         string                   `json:"localPath,omitempty"`
-	PackageName       string                   `json:"packageName,omitempty"`
-	Transport         string                   `json:"transport"` // stdio | http
-	Command           string                   `json:"command,omitempty"`
-	Args              []string                 `json:"args,omitempty"`
-	Cwd               string                   `json:"cwd,omitempty"`
-	URL               string                   `json:"url,omitempty"`
-	Env               map[string]string        `json:"env,omitempty"`
-	HTTPHeaders       map[string]string        `json:"httpHeaders,omitempty"`
-	BearerTokenEnvVar string                   `json:"bearerTokenEnvVar,omitempty"`
-	StartupTimeoutSec int                      `json:"startupTimeoutSec,omitempty"`
-	ToolTimeoutSec    int                      `json:"toolTimeoutSec,omitempty"`
-	Tags              []string                 `json:"tags,omitempty"`
-	EnabledInClaude   bool                     `json:"enabledInClaude,omitempty"`
-	EnabledInCodex    bool                     `json:"enabledInCodex,omitempty"`
-	LastTestResults   map[string]MCPTestResult `json:"lastTestResults,omitempty"`
-	UpdatedAt         int64                    `json:"updatedAt,omitempty"`
+// LegacyMCPServer is the pre-redesign Hatch MCP registry entry. Only read so
+// servers that were never synced to a client can be offered as drafts once.
+type LegacyMCPServer struct {
+	ID                string            `json:"id"`
+	Name              string            `json:"name"`
+	Description       string            `json:"description,omitempty"`
+	Transport         string            `json:"transport"` // stdio | http
+	Command           string            `json:"command,omitempty"`
+	Args              []string          `json:"args,omitempty"`
+	Cwd               string            `json:"cwd,omitempty"`
+	URL               string            `json:"url,omitempty"`
+	Env               map[string]string `json:"env,omitempty"`
+	HTTPHeaders       map[string]string `json:"httpHeaders,omitempty"`
+	BearerTokenEnvVar string            `json:"bearerTokenEnvVar,omitempty"`
+	StartupTimeoutSec int               `json:"startupTimeoutSec,omitempty"`
+	ToolTimeoutSec    int               `json:"toolTimeoutSec,omitempty"`
+	EnabledInClaude   bool              `json:"enabledInClaude,omitempty"`
+	EnabledInCodex    bool              `json:"enabledInCodex,omitempty"`
 }
 
-// MCPTestResult stores the last connection/config check for one MCP target.
-type MCPTestResult struct {
-	Target    string `json:"target"`
-	Status    string `json:"status"` // success | failed | unknown
-	Summary   string `json:"summary"`
-	Detail    string `json:"detail,omitempty"`
-	ExitCode  int    `json:"exitCode,omitempty"`
-	CheckedAt int64  `json:"checkedAt,omitempty"`
-	Mode      string `json:"mode,omitempty"` // connection | config
+// MCPMeta is Hatch's thin overlay on one MCP server name. Server definitions
+// themselves live only in the client config files (Claude / Codex).
+type MCPMeta struct {
+	Name      string              `json:"name"`
+	Origin    string              `json:"origin,omitempty"` // paste | registry:<name> | catalog:<id> | copy:<loc>
+	Notes     string              `json:"notes,omitempty"`
+	Parked    map[string]string   `json:"parked,omitempty"`    // location key -> raw entry JSON stashed while disabled
+	LastProbe map[string]MCPProbe `json:"lastProbe,omitempty"` // location key -> last live probe
+}
+
+// MCPProbe is the result of Hatch connecting to a server as an MCP client.
+type MCPProbe struct {
+	Status          string    `json:"status"` // ok | failed | auth_required | timeout | unsupported
+	Summary         string    `json:"summary"`
+	ServerName      string    `json:"serverName,omitempty"`
+	ServerVersion   string    `json:"serverVersion,omitempty"`
+	ProtocolVersion string    `json:"protocolVersion,omitempty"`
+	Tools           []MCPTool `json:"tools,omitempty"`
+	LatencyMs       int64     `json:"latencyMs,omitempty"`
+	StderrTail      string    `json:"stderrTail,omitempty"`
+	CheckedAt       int64     `json:"checkedAt,omitempty"`
+}
+
+// MCPTool is one entry from a server's tools/list.
+type MCPTool struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 }
 
 // HookDef represents one command hook managed by Hatch. A single definition is
@@ -202,17 +214,18 @@ type Modules struct {
 	AI        bool `json:"ai"`        // ✦ AI
 	VPN       bool `json:"vpn"`       // 🔒 VPN
 	Memo      bool `json:"memo"`      // ✓ 备忘录
+	Host      bool `json:"host"`      // 主机监控
 }
 
 // DefaultModules shows every module.
 func DefaultModules() Modules {
-	return Modules{Workbench: true, AI: true, VPN: true, Memo: true}
+	return Modules{Workbench: true, AI: true, VPN: true, Memo: true, Host: true}
 }
 
 // Normalized guarantees at least one visible module (the workbench) so the
 // window is never empty.
 func (m Modules) Normalized() Modules {
-	if !m.Workbench && !m.AI && !m.VPN && !m.Memo {
+	if !m.Workbench && !m.AI && !m.VPN && !m.Memo && !m.Host {
 		m.Workbench = true
 	}
 	return m
@@ -241,9 +254,8 @@ type Config struct {
 	CodexPresets            []CodexPreset         `json:"codexPresets,omitempty"`            // saved model+effort presets
 	CodexPresetsSeeded      bool                  `json:"codexPresetsSeeded,omitempty"`      // true after first default preset seed
 	ScriptOrders            map[string][]string   `json:"scriptOrders,omitempty"`            // dirPath -> ordered script paths
-	MCPDir                  string                `json:"mcpDir,omitempty"`                  // MCP master dir, default: ~/MyHub/mcp if present
-	MCPServers              []MCPServer           `json:"mcpServers,omitempty"`              // MCP registry managed by Hatch
-	MCPSeeded               bool                  `json:"mcpSeeded,omitempty"`               // true after first MCP directory discovery
+	LegacyMCPServers        []LegacyMCPServer     `json:"mcpServers,omitempty"`              // pre-redesign registry; drained as drafts are applied or discarded
+	MCPMeta                 []MCPMeta             `json:"mcpMeta,omitempty"`                 // per-name overlay: origin, parked entries, last probe
 	Hooks                   []HookDef             `json:"hooks,omitempty"`                   // command hook registry managed by Hatch
 	HooksSeeded             bool                  `json:"hooksSeeded,omitempty"`             // true after the default hook is seeded once
 	AIWorkspaceProfiles     []AIWorkspaceProfile  `json:"aiWorkspaceProfiles,omitempty"`     // manually applied project AI profiles

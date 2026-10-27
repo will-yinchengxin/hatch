@@ -40,7 +40,7 @@ func TestLoadKeepsDefaultsForOmittedModuleKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Modules{Workbench: true, AI: true, VPN: false, Memo: true}
+	want := Modules{Workbench: true, AI: true, VPN: false, Memo: true, Host: true}
 	if cfg.Modules != want {
 		t.Fatalf("modules = %+v, want %+v", cfg.Modules, want)
 	}

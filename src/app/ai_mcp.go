@@ -1,399 +1,281 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"hatch/ai/mcp"
-	"hatch/ai/prompts"
 	"hatch/core/config"
-	"hatch/core/strutil"
+	"hatch/core/fsutil"
 )
 
 // ─── AI · MCP ────────────────────────────────────────────────────────────────
 //
-// The registry lives in config.MCPServers; internal/ai/mcp discovers, installs,
-// renders and syncs it into ~/.claude.json and ~/.codex/config.toml.
+// Claude Code / Codex config files are the source of truth (hatch/ai/mcp scans
+// and edits them in place). Hatch only persists config.MCPMeta: origin, entries
+// it parked while disabled (Claude has no off switch) and last probe results.
 
-// GetMCPSettings returns the MCP master directory configuration.
-func (a *App) GetMCPSettings() mcp.Settings {
+// GetMCPInventory scans every client config; includeCLI also asks the CLIs
+// for plugin / connector servers (slow: claude health-checks each server).
+func (a *App) GetMCPInventory(includeCLI bool) mcp.Inventory {
 	a.mu.RLock()
-	custom := a.cfg.MCPDir
+	opt := mcp.ScanOptions{
+		IncludeCLI: includeCLI,
+		Meta:       append([]config.MCPMeta(nil), a.cfg.MCPMeta...),
+		Legacy:     append([]config.LegacyMCPServer(nil), a.cfg.LegacyMCPServers...),
+	}
+	for _, d := range a.cfg.Directories {
+		opt.ExtraProjects = append(opt.ExtraProjects, d.Path)
+	}
 	a.mu.RUnlock()
-	return mcp.ResolveSettings(custom)
+	return mcp.Scan(opt)
 }
 
-// SaveMCPSettings sets the MCP master directory ("" = default).
-func (a *App) SaveMCPSettings(mcpDir string) error {
-	mcpDir = strings.TrimSpace(mcpDir)
-	if mcpDir != "" {
-		if err := os.MkdirAll(mcpDir, 0o755); err != nil {
+// GetMCPCatalog returns the curated starter list.
+func (a *App) GetMCPCatalog() []mcp.CatalogItem { return mcp.Catalog() }
+
+// ParseMCPInput turns pasted text into drafts; registry names are resolved
+// online. Drafts only fill the form — nothing is written.
+func (a *App) ParseMCPInput(text string) (mcp.ParseResult, error) {
+	res, err := mcp.Parse(text)
+	if err != nil || res.RegistryName == "" {
+		return res, err
+	}
+	drafts, err := a.LookupMCPRegistry(res.RegistryName)
+	if err != nil {
+		return res, err
+	}
+	res.Drafts = drafts
+	return res, nil
+}
+
+// SearchMCPRegistry searches the official MCP Registry by name.
+func (a *App) SearchMCPRegistry(query string) ([]mcp.RegistryHit, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return mcp.SearchRegistry(ctx, query)
+}
+
+// LookupMCPRegistry resolves an exact registry name into install drafts.
+func (a *App) LookupMCPRegistry(name string) ([]mcp.Draft, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return mcp.LookupRegistry(ctx, name)
+}
+
+// PreviewMCPApply dry-runs an apply and returns per-location before/after.
+func (a *App) PreviewMCPApply(req mcp.ApplyRequest) mcp.ApplyPlan {
+	return mcp.Plan(req)
+}
+
+// ApplyMCP writes one server definition to the chosen locations.
+func (a *App) ApplyMCP(req mcp.ApplyRequest) error {
+	a.mcpOpMu.Lock()
+	defer a.mcpOpMu.Unlock()
+	if err := mcp.Apply(req); err != nil {
+		return err
+	}
+	return a.updateMCPMeta(req.Name, func(m *config.MCPMeta) {
+		if req.Origin != "" && req.Origin != "edit" {
+			m.Origin = req.Origin
+		}
+		for _, loc := range req.Targets {
+			delete(m.Parked, loc.Key())
+		}
+	}, req.Name)
+}
+
+// SetMCPEnabled turns one entry on/off without losing its definition.
+func (a *App) SetMCPEnabled(name, locKey string, enabled bool) error {
+	loc, err := mcp.ParseLocationKey(locKey)
+	if err != nil {
+		return err
+	}
+	a.mcpOpMu.Lock()
+	defer a.mcpOpMu.Unlock()
+	parked := a.mcpParked(name, locKey)
+	newParked, err := mcp.SetEnabled(name, loc, enabled, parked)
+	if err != nil {
+		return err
+	}
+	return a.updateMCPMeta(name, func(m *config.MCPMeta) {
+		if newParked == "" {
+			delete(m.Parked, locKey)
+		} else {
+			if m.Parked == nil {
+				m.Parked = map[string]string{}
+			}
+			m.Parked[locKey] = newParked
+		}
+	}, "")
+}
+
+// RemoveMCPEntry deletes one entry (and any parked copy) at a location.
+func (a *App) RemoveMCPEntry(name, locKey string) error {
+	loc, err := mcp.ParseLocationKey(locKey)
+	if err != nil {
+		return err
+	}
+	a.mcpOpMu.Lock()
+	defer a.mcpOpMu.Unlock()
+	if err := mcp.Remove(name, loc); err != nil {
+		return err
+	}
+	return a.updateMCPMeta(name, func(m *config.MCPMeta) {
+		delete(m.Parked, locKey)
+		delete(m.LastProbe, locKey)
+	}, "")
+}
+
+// CopyMCPEntry copies the entry at fromKey to every toKeys location (also
+// used to resolve drift: copy the version you trust over the others).
+func (a *App) CopyMCPEntry(name, fromKey string, toKeys []string) error {
+	src, err := a.findMCPEntry(name, fromKey)
+	if err != nil {
+		return err
+	}
+	req := mcp.ApplyRequest{Name: name, Spec: src.Spec, SourceClient: src.Location.Client, Origin: "copy:" + fromKey}
+	if src.Location.Client == mcp.ClientDesktop {
+		req.SourceClient = mcp.ClientClaude
+	}
+	for _, k := range toKeys {
+		loc, err := mcp.ParseLocationKey(k)
+		if err != nil {
 			return err
 		}
+		req.Targets = append(req.Targets, loc)
 	}
+	return a.ApplyMCP(req)
+}
+
+// ProbeMCP connects to one entry as an MCP client and stores the result.
+func (a *App) ProbeMCP(name, locKey string) (config.MCPProbe, error) {
+	e, err := a.findMCPEntry(name, locKey)
+	if err != nil {
+		return config.MCPProbe{}, err
+	}
+	res := mcp.Probe(e)
+	err = a.updateMCPMeta(name, func(m *config.MCPMeta) {
+		if m.LastProbe == nil {
+			m.LastProbe = map[string]config.MCPProbe{}
+		}
+		m.LastProbe[locKey] = res
+	}, "")
+	return res, err
+}
+
+// SetMCPDisabledTools writes Codex disabled_tools for one entry.
+func (a *App) SetMCPDisabledTools(name, locKey string, disabled []string) error {
+	loc, err := mcp.ParseLocationKey(locKey)
+	if err != nil {
+		return err
+	}
+	a.mcpOpMu.Lock()
+	defer a.mcpOpMu.Unlock()
+	return mcp.SetCodexDisabledTools(name, loc, disabled)
+}
+
+// DiscardLegacyMCP drops a pre-redesign registry entry that was never synced.
+func (a *App) DiscardLegacyMCP(name string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.cfg.MCPDir = mcpDir
+	kept := a.cfg.LegacyMCPServers[:0]
+	for _, s := range a.cfg.LegacyMCPServers {
+		if s.ID != name {
+			kept = append(kept, s)
+		}
+	}
+	a.cfg.LegacyMCPServers = kept
 	return a.cfg.Save()
 }
 
-// GetMCPTemplates returns the built-in MCP starter gallery.
-func (a *App) GetMCPTemplates() []config.MCPServer {
-	return mcp.Templates()
-}
-
-// ListMCPServers returns the registry, newest first. On first call it seeds
-// the registry by discovering subdirectories of the MCP master dir.
-func (a *App) ListMCPServers() ([]config.MCPServer, error) {
-	a.mu.Lock()
-	if !a.cfg.MCPSeeded {
-		if seeded, err := mcp.Discover(mcp.ResolveSettings(a.cfg.MCPDir).MCPDir); err == nil && len(seeded) > 0 {
-			a.cfg.MCPServers = seeded
-		}
-		a.cfg.MCPSeeded = true
-		_ = a.cfg.Save()
-	}
-	out := mcp.Clone(a.cfg.MCPServers)
-	a.mu.Unlock()
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].UpdatedAt == out[j].UpdatedAt {
-			return out[i].ID < out[j].ID
-		}
-		return out[i].UpdatedAt > out[j].UpdatedAt
-	})
-	return out, nil
-}
-
-// SaveMCPServer creates or updates a server (matched by ID), preserving sync
-// flags and the last test results.
-func (a *App) SaveMCPServer(server config.MCPServer) error {
-	server, err := mcp.Normalize(server)
-	if err != nil {
-		return err
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for i, s := range a.cfg.MCPServers {
-		if s.ID == server.ID {
-			server.EnabledInClaude = s.EnabledInClaude
-			server.EnabledInCodex = s.EnabledInCodex
-			if server.LastTestResults == nil {
-				server.LastTestResults = s.LastTestResults
-			}
-			a.cfg.MCPServers[i] = server
-			return a.cfg.Save()
-		}
-	}
-	a.cfg.MCPServers = append(a.cfg.MCPServers, server)
-	return a.cfg.Save()
-}
-
-// DeleteMCPServer removes a server from synced targets and the registry.
-func (a *App) DeleteMCPServer(id string) error {
-	_, err := a.removeMCPServer(id)
-	return err
-}
-
-// UninstallMCPFromDisk is DeleteMCPServer plus deleting the local checkout
-// (git/local sources with a localPath only).
-func (a *App) UninstallMCPFromDisk(id string) error {
-	removed, err := a.removeMCPServer(id)
-	if err != nil || removed == nil {
-		return err
-	}
-	if removed.LocalPath != "" && (removed.SourceType == "git" || removed.SourceType == "local") {
-		if err := os.RemoveAll(removed.LocalPath); err != nil {
-			return fmt.Errorf("从 Hatch 删除成功，但清理本地目录失败: %w", err)
-		}
-	}
-	return nil
-}
-
-// removeMCPServer unsyncs the server from both targets, then drops it from
-// the registry. It returns nil, nil when the id is unknown.
-func (a *App) removeMCPServer(id string) (*config.MCPServer, error) {
-	if !mcp.ValidID(id) {
-		return nil, fmt.Errorf("invalid MCP id")
-	}
-	a.mu.RLock()
-	removed, found := mcp.Find(a.cfg.MCPServers, id)
-	a.mu.RUnlock()
-	if !found {
-		return nil, nil
-	}
-	if removed.EnabledInClaude {
-		if err := mcp.WriteClaude(removed, false); err != nil {
-			return nil, err
-		}
-	}
-	if removed.EnabledInCodex {
-		if err := mcp.WriteCodex(removed, false); err != nil {
-			return nil, err
-		}
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	keep := a.cfg.MCPServers[:0]
-	for _, s := range a.cfg.MCPServers {
-		if s.ID != id {
-			keep = append(keep, s)
-		}
-	}
-	a.cfg.MCPServers = keep
-	return &removed, a.cfg.Save()
-}
-
-// UpdateMCPFromGit runs git pull in a git-sourced server's checkout, re-infers
-// its command and re-syncs enabled targets.
-func (a *App) UpdateMCPFromGit(id string) (config.MCPServer, error) {
-	if !mcp.ValidID(id) {
-		return config.MCPServer{}, fmt.Errorf("invalid MCP id")
-	}
-	a.mu.RLock()
-	server, found := mcp.Find(a.cfg.MCPServers, id)
-	a.mu.RUnlock()
-	if !found {
-		return config.MCPServer{}, fmt.Errorf("MCP not found: %s", id)
-	}
-	if server.SourceType != "git" {
-		return config.MCPServer{}, fmt.Errorf("只有 git 来源的 MCP 支持更新")
-	}
-	if server.LocalPath == "" {
-		return config.MCPServer{}, fmt.Errorf("本地目录路径未设置")
-	}
-	if _, err := os.Stat(server.LocalPath); err != nil {
-		return config.MCPServer{}, fmt.Errorf("本地目录不存在: %s", server.LocalPath)
-	}
-	if err := mcp.GitPull(server.LocalPath); err != nil {
-		return config.MCPServer{}, err
-	}
-	updated := mcp.InferFromDir(server.LocalPath)
-	updated.ID = server.ID
-	updated.Name = server.Name
-	updated.SourceType = server.SourceType
-	updated.SourceURL = server.SourceURL
-	updated.EnabledInClaude = server.EnabledInClaude
-	updated.EnabledInCodex = server.EnabledInCodex
-	updated.Tags = server.Tags
-	updated.LastTestResults = server.LastTestResults
-	if err := a.SaveMCPServer(updated); err != nil {
-		return config.MCPServer{}, err
-	}
-	if updated.EnabledInClaude {
-		_ = mcp.WriteClaude(updated, true)
-	}
-	if updated.EnabledInCodex {
-		_ = mcp.WriteCodex(updated, true)
-	}
-	return updated, nil
-}
-
-// ImportMCPFromLocalDir registers an existing local checkout.
-func (a *App) ImportMCPFromLocalDir(path string) (config.MCPServer, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return config.MCPServer{}, fmt.Errorf("local path is required")
-	}
-	fi, err := os.Stat(path)
-	if err != nil {
-		return config.MCPServer{}, err
-	}
-	if !fi.IsDir() {
-		return config.MCPServer{}, fmt.Errorf("local path is not a directory")
-	}
-	server := mcp.InferFromDir(path)
-	if err := a.SaveMCPServer(server); err != nil {
-		return config.MCPServer{}, err
-	}
-	return server, nil
-}
-
-// InstallMCPFromGit clones url into <mcpDir>/<id> and registers it.
-func (a *App) InstallMCPFromGit(url, name string) (config.MCPServer, error) {
-	url = strings.TrimSpace(url)
-	if url == "" {
-		return config.MCPServer{}, fmt.Errorf("git URL is required")
-	}
-	id := strutil.SanitizeID(name)
-	if id == "" {
-		id = strutil.SanitizeID(strings.TrimSuffix(filepath.Base(url), ".git"))
-	}
-	if !mcp.ValidID(id) {
-		return config.MCPServer{}, fmt.Errorf("invalid MCP id")
-	}
-	base := a.GetMCPSettings().MCPDir
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return config.MCPServer{}, err
-	}
-	dst := filepath.Join(base, id)
-	if _, err := os.Stat(dst); err == nil {
-		return config.MCPServer{}, fmt.Errorf("target directory already exists: %s", dst)
-	}
-	if err := mcp.GitClone(url, dst); err != nil {
-		return config.MCPServer{}, err
-	}
-	server := mcp.InferFromDir(dst)
-	server.ID = id
-	server.Name = strutil.OrDefault(strings.TrimSpace(name), server.Name)
-	server.SourceType = "git"
-	server.SourceURL = url
-	if err := a.SaveMCPServer(server); err != nil {
-		return config.MCPServer{}, err
-	}
-	return server, nil
-}
-
-// SaveNpmMCPServer registers an `npx -y <package>` server.
-func (a *App) SaveNpmMCPServer(packageName, name string) (config.MCPServer, error) {
-	packageName = strings.TrimSpace(packageName)
-	if packageName == "" {
-		return config.MCPServer{}, fmt.Errorf("npm package is required")
-	}
-	id := strutil.SanitizeID(name)
-	if id == "" {
-		id = strutil.SanitizeID(packageName)
-	}
-	server := config.MCPServer{
-		ID:          id,
-		Name:        strutil.OrDefault(strings.TrimSpace(name), packageName),
-		SourceType:  "npm",
-		PackageName: packageName,
-		Transport:   mcp.TransportStdio,
-		Command:     "npx",
-		Args:        []string{"-y", packageName},
-		UpdatedAt:   time.Now().Unix(),
-	}
-	if err := a.SaveMCPServer(server); err != nil {
-		return config.MCPServer{}, err
-	}
-	return server, nil
-}
-
-// SetMCPEnabled syncs (or removes) one server to/from target ("claude" | "codex").
-// First-time enable refuses to clobber a same-named hand-written entry;
-// re-syncing an already-enabled server may overwrite its own entry.
-func (a *App) SetMCPEnabled(id, target string, enabled bool) error {
-	if !mcp.ValidID(id) {
-		return fmt.Errorf("invalid MCP id")
-	}
-	a.mu.RLock()
-	server, found := mcp.Find(a.cfg.MCPServers, id)
-	a.mu.RUnlock()
-	if !found {
-		return fmt.Errorf("MCP not found: %s", id)
-	}
-
-	var err error
-	switch target {
-	case mcp.TargetClaude:
-		if enabled && !server.EnabledInClaude {
-			exists, derr := mcp.ClaudeEntryExists(server.ID)
-			if derr != nil {
-				return derr
-			}
-			if exists {
-				return fmt.Errorf("Claude Code 配置中已存在名为「%s」的 MCP，已跳过以避免覆盖手工配置；如需 Hatch 接管请先在 ~/.claude.json 中删除该条目", server.ID)
-			}
-		}
-		err = mcp.WriteClaude(server, enabled)
-	case mcp.TargetCodex:
-		if enabled && !server.EnabledInCodex && mcp.CodexEntryExists(server.ID) {
-			return fmt.Errorf("Codex 配置中已存在名为「%s」的 MCP，已跳过以避免覆盖手工配置；如需 Hatch 接管请先在 ~/.codex/config.toml 中删除该条目", server.ID)
-		}
-		err = mcp.WriteCodex(server, enabled)
-	default:
-		return fmt.Errorf("unknown MCP target: %s", target)
-	}
-	if err != nil {
-		return err
-	}
-
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for i, s := range a.cfg.MCPServers {
-		if s.ID != id {
+// findMCPEntry locates a live (or parked) entry by name and location key.
+func (a *App) findMCPEntry(name, locKey string) (mcp.Entry, error) {
+	inv := a.GetMCPInventory(false)
+	for _, r := range inv.Rows {
+		if r.Name != name {
 			continue
 		}
-		if target == mcp.TargetClaude {
-			a.cfg.MCPServers[i].EnabledInClaude = enabled
-		} else {
-			a.cfg.MCPServers[i].EnabledInCodex = enabled
+		for _, e := range r.Entries {
+			if e.LocationKey == locKey {
+				return e, nil
+			}
 		}
-		a.cfg.MCPServers[i].UpdatedAt = time.Now().Unix()
-		break
+	}
+	return mcp.Entry{}, fmt.Errorf("找不到 MCP「%s」(%s)，可能已被其他程序修改，请刷新", name, locKey)
+}
+
+func (a *App) mcpParked(name, locKey string) string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	for _, m := range a.cfg.MCPMeta {
+		if m.Name == name {
+			return m.Parked[locKey]
+		}
+	}
+	return ""
+}
+
+// updateMCPMeta edits (creating if needed) the overlay for name, drops empty
+// overlays, mirrors parked entries to disk and, when dropLegacy is set, removes
+// the same-named legacy registry entry.
+func (a *App) updateMCPMeta(name string, edit func(m *config.MCPMeta), dropLegacy string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	idx := -1
+	for i := range a.cfg.MCPMeta {
+		if a.cfg.MCPMeta[i].Name == name {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		a.cfg.MCPMeta = append(a.cfg.MCPMeta, config.MCPMeta{Name: name})
+		idx = len(a.cfg.MCPMeta) - 1
+	}
+	m := &a.cfg.MCPMeta[idx]
+	edit(m)
+	if len(m.Parked) == 0 {
+		m.Parked = nil
+	}
+	if len(m.LastProbe) == 0 {
+		m.LastProbe = nil
+	}
+	writeParkedMirror(*m)
+	if m.Origin == "" && m.Notes == "" && m.Parked == nil && m.LastProbe == nil {
+		a.cfg.MCPMeta = append(a.cfg.MCPMeta[:idx], a.cfg.MCPMeta[idx+1:]...)
+	}
+	if dropLegacy != "" {
+		kept := a.cfg.LegacyMCPServers[:0]
+		for _, s := range a.cfg.LegacyMCPServers {
+			if s.ID != dropLegacy {
+				kept = append(kept, s)
+			}
+		}
+		a.cfg.LegacyMCPServers = kept
 	}
 	return a.cfg.Save()
 }
 
-// TestMCPConnection checks a server via `claude mcp get` / `codex mcp get` and
-// stores the result on the server.
-func (a *App) TestMCPConnection(id, target string) (config.MCPTestResult, error) {
-	if !mcp.ValidID(id) {
-		return config.MCPTestResult{}, fmt.Errorf("invalid MCP id")
+// writeParkedMirror keeps a copy of parked entries outside config.json so a
+// disabled Claude server survives even if Hatch's config is lost.
+func writeParkedMirror(m config.MCPMeta) {
+	dir := fsutil.AppDataPath("mcp-parked")
+	path := filepath.Join(dir, strings.ReplaceAll(m.Name, string(os.PathSeparator), "_")+".json")
+	if len(m.Parked) == 0 {
+		_ = os.Remove(path)
+		return
 	}
-	target = strings.TrimSpace(target)
-	if target != mcp.TargetClaude && target != mcp.TargetCodex {
-		return config.MCPTestResult{}, fmt.Errorf("unknown MCP target: %s", target)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
 	}
-
-	result := mcp.TestConnection(id, target)
-	result.Target = target
-	result.CheckedAt = time.Now().Unix()
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for i := range a.cfg.MCPServers {
-		if a.cfg.MCPServers[i].ID != id {
-			continue
-		}
-		if a.cfg.MCPServers[i].LastTestResults == nil {
-			a.cfg.MCPServers[i].LastTestResults = map[string]config.MCPTestResult{}
-		}
-		a.cfg.MCPServers[i].LastTestResults[target] = result
-		a.cfg.MCPServers[i].UpdatedAt = time.Now().Unix()
-		return result, a.cfg.Save()
+	data, err := json.MarshalIndent(m.Parked, "", "  ")
+	if err == nil {
+		_ = os.WriteFile(path, data, 0o600)
 	}
-	return result, fmt.Errorf("MCP not found: %s", id)
-}
-
-// SuggestMCPRecommendations returns curated candidates for query, re-ranked
-// and annotated by AI when configured; any AI failure falls back to the
-// offline list. Candidates are only filled into the editor, never saved.
-func (a *App) SuggestMCPRecommendations(query string) (mcp.RecommendationResult, error) {
-	query = strings.TrimSpace(query)
-	if query == "" {
-		query = "elasticsearch mcp for Claude Code and Codex"
-	}
-	fallback := mcp.CuratedRecommendations(query)
-
-	ai, err := a.readyAI()
-	if err != nil {
-		fallback.SourceNote = "离线内置推荐；配置 AI 后可基于这些候选生成排序说明。"
-		return fallback, nil
-	}
-	userBytes, _ := json.Marshal(map[string]any{
-		"query":      query,
-		"candidates": fallback.Candidates,
-		"context": []string{
-			"Claude Code 和 Codex 都可使用 stdio MCP；Hatch 会分别写入 ~/.claude.json 和 ~/.codex/config.toml。",
-			"Elastic 官方 mcp-server-elasticsearch 0.4.0+ 使用 docker.elastic.co/mcp/elasticsearch，支持 stdio/http，旧 npm 线已弃用。",
-			"用户通常需要 ES_URL，以及 ES_API_KEY 或 ES_USERNAME/ES_PASSWORD。",
-		},
-	})
-	raw, err := a.callAIOp(prompts.OpSuggestMCPRecommendations, ai, prompts.MCPRecommendations, string(userBytes))
-	if err != nil {
-		fallback.SourceNote = "AI 推荐失败，已使用离线内置推荐。"
-		return fallback, nil
-	}
-	merged, ok := mcp.MergeAIRanking(fallback, raw)
-	if !ok {
-		fallback.SourceNote = "AI 返回无法解析，已使用离线内置推荐。"
-		return fallback, nil
-	}
-	merged.SourceNote = "AI 基于 Hatch 内置候选和当前 Elastic MCP 公开说明完成排序；请在填入密钥前复核来源。"
-	return merged, nil
 }

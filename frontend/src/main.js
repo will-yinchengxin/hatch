@@ -74,20 +74,19 @@ const GetClaudeSettings     = ()                            => window['go']['app
 const SaveClaudeSettings    = (content)                     => window['go']['app']['App']['SaveClaudeSettings'](content);
 const GetCodexConfig        = ()                            => window['go']['app']['App']['GetCodexConfig']();
 const SaveCodexConfig       = (content)                     => window['go']['app']['App']['SaveCodexConfig'](content);
-const GetMCPSettings        = ()                            => window['go']['app']['App']['GetMCPSettings']();
-const SaveMCPSettings       = (mcpDir)                      => window['go']['app']['App']['SaveMCPSettings'](mcpDir);
-const ListMCPServers        = ()                            => window['go']['app']['App']['ListMCPServers']();
-const SaveMCPServer         = (server)                      => window['go']['app']['App']['SaveMCPServer'](server);
-const DeleteMCPServer       = (id)                          => window['go']['app']['App']['DeleteMCPServer'](id);
-const ImportMCPFromLocalDir = (path)                        => window['go']['app']['App']['ImportMCPFromLocalDir'](path);
-const InstallMCPFromGit     = (url, name)                   => window['go']['app']['App']['InstallMCPFromGit'](url, name);
-const SaveNpmMCPServer      = (pkg, name)                   => window['go']['app']['App']['SaveNpmMCPServer'](pkg, name);
-const SetMCPEnabled         = (id, target, enabled)         => window['go']['app']['App']['SetMCPEnabled'](id, target, enabled);
-const TestMCPConnection     = (id, target)                  => window['go']['app']['App']['TestMCPConnection'](id, target);
-const GetMCPTemplates       = ()                            => window['go']['app']['App']['GetMCPTemplates']();
-const UninstallMCPFromDisk  = (id)                          => window['go']['app']['App']['UninstallMCPFromDisk'](id);
-const UpdateMCPFromGit      = (id)                          => window['go']['app']['App']['UpdateMCPFromGit'](id);
-const SuggestMCPRecommendations = (query)                   => window['go']['app']['App']['SuggestMCPRecommendations'](query);
+const GetMCPInventory       = (includeCLI)                  => window['go']['app']['App']['GetMCPInventory'](includeCLI);
+const GetMCPCatalog         = ()                            => window['go']['app']['App']['GetMCPCatalog']();
+const ParseMCPInput         = (text)                        => window['go']['app']['App']['ParseMCPInput'](text);
+const SearchMCPRegistry     = (query)                       => window['go']['app']['App']['SearchMCPRegistry'](query);
+const LookupMCPRegistry     = (name)                        => window['go']['app']['App']['LookupMCPRegistry'](name);
+const PreviewMCPApply       = (req)                         => window['go']['app']['App']['PreviewMCPApply'](req);
+const ApplyMCP              = (req)                         => window['go']['app']['App']['ApplyMCP'](req);
+const SetMCPEnabled         = (name, key, enabled)          => window['go']['app']['App']['SetMCPEnabled'](name, key, enabled);
+const RemoveMCPEntry        = (name, key)                   => window['go']['app']['App']['RemoveMCPEntry'](name, key);
+const CopyMCPEntry          = (name, from, to)              => window['go']['app']['App']['CopyMCPEntry'](name, from, to);
+const ProbeMCP              = (name, key)                   => window['go']['app']['App']['ProbeMCP'](name, key);
+const SetMCPDisabledTools   = (name, key, tools)            => window['go']['app']['App']['SetMCPDisabledTools'](name, key, tools);
+const DiscardLegacyMCP      = (name)                        => window['go']['app']['App']['DiscardLegacyMCP'](name);
 const ListHooks             = ()                            => window['go']['app']['App']['ListHooks']();
 const SaveHook              = (hook)                        => window['go']['app']['App']['SaveHook'](hook);
 const DeleteHook            = (id)                          => window['go']['app']['App']['DeleteHook'](id);
@@ -131,7 +130,22 @@ window.hatchApp = function () {
     // ── State ──────────────────────────────────────────────────────────
     tab: 'ai',
     // Top-level module visibility, from config.json "modules" (GetModuleSettings).
-    modules: { workbench: true, ai: true, vpn: true, memo: true },
+    modules: { workbench: true, ai: true, vpn: true, memo: true, host: true },
+    hostSnapshot: null,
+    hostHardware: null,
+    hostPrevious: null,
+    hostRates: [],
+    hostDiskResult: null,
+    hostNetworkResult: null,
+    hostDiskBusy: false,
+    hostNetworkBusy: false,
+    hostStorageBusy: false,
+    hostStorage: null,
+    hostPorts: null,
+    hostPortsBusy: false,
+    hostLoading: false,
+    hostError: '',
+    hostTimer: null,
 
     selectedDir: null,
     allScripts: [],
@@ -199,7 +213,7 @@ window.hatchApp = function () {
     retentionSaving: false,
 
     // v1.2: prompt templates
-    promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '', SuggestHookFromDescription: '', SuggestHookEdit: '', SuggestMCPRecommendations: '', SuggestVPNRuleChange: '', SuggestVPNEnhanceEdit: '' },
+    promptTemplates: { SuggestScriptMeta: '', SuggestZshrcAnnotation: '', SuggestScriptContent: '', SuggestZshrcOrganization: '', TestAIConfig: '', SuggestHookFromDescription: '', SuggestHookEdit: '', SuggestVPNRuleChange: '', SuggestVPNEnhanceEdit: '' },
     promptDefaults: {},
     promptDefaultsOpen: {},
     promptSaving: false,
@@ -210,7 +224,6 @@ window.hatchApp = function () {
       { key: 'SuggestZshrcOrganization',    label: 'zshrc 整理重排',   group: 'Zshrc' },
       { key: 'SuggestHookFromDescription',  label: 'Hook 起草',        group: 'Hooks' },
       { key: 'SuggestHookEdit',             label: 'Hook 优化',        group: 'Hooks' },
-      { key: 'SuggestMCPRecommendations',   label: 'MCP 选型',         group: 'MCP' },
       { key: 'SuggestVPNRuleChange',        label: '一句话改分流规则', group: 'VPN' },
       { key: 'SuggestVPNEnhanceEdit',       label: '订阅增强文件修改', group: 'VPN' },
       { key: 'TestAIConfig',                label: '配置连通性测试',   group: '系统' },
@@ -330,37 +343,19 @@ window.hatchApp = function () {
     skillImportResult: null,
     skillConflictBusy: {},   // { "source:name": true }
 
-    // MCP management
-    mcpSettings: {},
-    mcpSettingsForm: { mcpDir: '' },
-    mcpSettingsSaving: false,
-    mcpServers: [],
-    mcpTemplates: [],
+    // MCP (live view of Claude Code / Codex config)
+    mcpInventory: null,      // GetMCPInventory result: { rows, projects, sources, legacy, cliIncluded }
+    mcpCatalog: [],
     mcpLoading: false,
+    mcpCLILoading: false,
+    mcpProbingAll: false,
     mcpSearch: '',
-    mcpFilter: 'all',        // 'all' | 'claude' | 'codex' | 'failed'
-    mcpEditTarget: null,
-    mcpForm: null,
-    mcpSyncBusy: {},         // { "id:target": true }
-    mcpTestBusy: {},         // { "id:target": true }
-    mcpLocalPath: '',
-    mcpGitURL: '',
-    mcpGitName: '',
-    mcpNpmPackage: '',
-    mcpNpmName: '',
-    mcpImportBusy: '',
-    mcpManualOpen: false,
-    mcpAddModalOpen: false,
-    mcpAddTab: 'git',            // 'git' | 'npm' | 'local'
-    mcpDeleteModal: { open: false, id: '', name: '', canCleanDisk: false, localPath: '' },
+    mcpFilter: 'all',        // all | claude | codex | drift | off | readonly
+    mcpExpanded: {},         // { name: true }
+    mcpBusy: {},             // { "name|locationKey|op": true }
+    mcpAdd: null,            // add / edit / copy drawer state
     confirmDialog: { open: false, title: '', message: '', confirmText: '', danger: true },
     confirmResolve: null,
-    mcpTemplateGalleryOpen: false,
-    mcpUpdateBusy: {},           // { id: true }
-    mcpRecommendQuery: 'es 的 MCP，适配 Codex 和 Claude Code',
-    mcpRecommendBusy: false,
-    mcpRecommendation: null,
-    mcpSelectedRecommendationID: '',
 
     // Hooks management
     hooks: [],
@@ -695,6 +690,7 @@ window.hatchApp = function () {
       if (this.tab === 'ai' && this.aiSubTab === 'overview') this.loadOverview();
       if (this.tab === 'memo') this.loadMemoModule();
       if (this.tab === 'vpn') { this.loadVPNOverview(); if (this.vpnSubTab !== 'overview') this.vpnGo(this.vpnSubTab); }
+      if (this.tab === 'host') this.openHost();
       this.setupEvents();
       this.setupModuleReload();
       this.setupSearchShortcuts();
@@ -713,11 +709,13 @@ window.hatchApp = function () {
 
     openTab(tab) {
       if (!this.moduleOn(tab)) return;
+      if (this.hostTimer) { clearTimeout(this.hostTimer); this.hostTimer = null; }
       this.tab = tab;
       this.selectedDir = null;
       if (tab === 'ai') { this.loadAIUsageStatuses(); this.loadAITraces(); }
       else if (tab === 'vpn') this.loadVPNOverview();
       else if (tab === 'memo') this.loadMemoModule();
+      else if (tab === 'host') this.openHost();
     },
 
     // Re-reads module visibility from config.json; if the current tab was
@@ -732,11 +730,12 @@ window.hatchApp = function () {
             ai: m.ai !== false,
             vpn: m.vpn !== false,
             memo: m.memo !== false,
+            host: m.host !== false,
           };
         }
       } catch (_) {}
       if (this.moduleOn(this.tab)) return;
-      const next = ['ai', 'scripts', 'vpn', 'memo'].find(t => this.moduleOn(t)) || 'scripts';
+      const next = ['ai', 'scripts', 'vpn', 'memo', 'host'].find(t => this.moduleOn(t)) || 'scripts';
       if (init) {
         this.tab = next;
         this.selectedDir = null;
@@ -1707,204 +1706,6 @@ window.hatchApp = function () {
       }
     },
 
-    // ── MCP management ────────────────────────────────────────────────
-    async loadMCP() {
-      this.mcpLoading = true;
-      try {
-        const [settings, servers, templates] = await Promise.all([
-          GetMCPSettings(),
-          ListMCPServers(),
-          GetMCPTemplates(),
-        ]);
-        this.mcpSettings = settings || {};
-        this.mcpSettingsForm = { mcpDir: this.mcpSettings.mcpDir || '' };
-        this.mcpServers = servers || [];
-        this.mcpTemplates = templates || [];
-      } catch (e) {
-        this.showError(`加载 MCP 失败: ${e}`);
-      } finally {
-        this.mcpLoading = false;
-      }
-    },
-
-    async suggestMCPRecommendations() {
-      const query = (this.mcpRecommendQuery || '').trim();
-      if (!query) { this.showError('请先描述想要的 MCP，例如 Elasticsearch / ES'); return; }
-      this.mcpRecommendBusy = true;
-      try {
-        const result = await SuggestMCPRecommendations(query);
-        this.mcpRecommendation = result || null;
-        const first = (result?.candidates || [])[0];
-        this.mcpSelectedRecommendationID = first?.id || '';
-        if (first) this.showSuccess(`已生成 MCP 推荐：${first.name || first.id}`);
-      } catch (e) {
-        this.showError(`生成 MCP 推荐失败: ${e}`);
-      } finally {
-        this.mcpRecommendBusy = false;
-      }
-    },
-
-    selectedMCPRecommendation() {
-      const list = this.mcpRecommendation?.candidates || [];
-      return list.find(c => c.id === this.mcpSelectedRecommendationID) || list[0] || null;
-    },
-
-    applyMCPRecommendation(candidate) {
-      const c = candidate || this.selectedMCPRecommendation();
-      if (!c?.server) { this.showError('没有可应用的 MCP 推荐'); return; }
-      const copy = JSON.parse(JSON.stringify(c.server));
-      copy.enabledInClaude = false;
-      copy.enabledInCodex = false;
-      copy.lastTestResults = {};
-      this.openMCPServerEditor(copy);
-      if (c.quickEnv && this.mcpForm?.transport === 'stdio') {
-        const existing = {};
-        for (const row of this.mcpForm.envRows || []) {
-          const key = (row.key || '').trim();
-          if (key) existing[key] = row.value || '';
-        }
-        this.mcpForm.envRows = Object.entries({ ...c.quickEnv, ...existing })
-          .map(([key, value]) => ({ key, value }));
-      }
-      this.showSuccess(`已套用「${c.name || c.id}」，请补齐参数后保存`);
-    },
-
-    async saveMCPSettings() {
-      this.mcpSettingsSaving = true;
-      try {
-        await SaveMCPSettings((this.mcpSettingsForm.mcpDir || '').trim());
-        await this.loadMCP();
-        this.showSuccess('MCP 管理目录已保存');
-      } catch (e) {
-        this.showError(`保存 MCP 目录失败: ${e}`);
-      } finally {
-        this.mcpSettingsSaving = false;
-      }
-    },
-
-    openMCPServerEditor(server) {
-      this.mcpEditTarget = server?.id || 'new';
-      this.mcpForm = this.mcpFormFromServer(server || {
-        id: '',
-        name: '',
-        sourceType: 'local',
-        transport: 'stdio',
-        env: {},
-        httpHeaders: {},
-      });
-    },
-
-    openMCPTemplate(template) {
-      const copy = JSON.parse(JSON.stringify(template || {}));
-      copy.enabledInClaude = false;
-      copy.enabledInCodex = false;
-      copy.lastTestResults = {};
-      this.openMCPServerEditor(copy);
-    },
-
-    closeMCPEditor() {
-      this.mcpEditTarget = null;
-      this.mcpForm = null;
-    },
-
-    openMCPManual() {
-      this.mcpManualOpen = true;
-    },
-
-    closeMCPManual() {
-      this.mcpManualOpen = false;
-    },
-
-    mcpFormFromServer(server) {
-      const env = server.env || {};
-      const headers = server.httpHeaders || {};
-      return {
-        ...server,
-        argsRaw: (server.args || []).join('\n'),
-        tagsRaw: (server.tags || []).join(', '),
-        envRows: Object.keys(env).sort().map(k => ({ key: k, value: env[k] })),
-        headerRows: Object.keys(headers).sort().map(k => ({ key: k, value: headers[k] })),
-      };
-    },
-
-    mcpServerFromForm() {
-      const f = this.mcpForm || {};
-      const env = {};
-      for (const row of f.envRows || []) {
-        const key = (row.key || '').trim();
-        if (key) env[key] = row.value || '';
-      }
-      const httpHeaders = {};
-      for (const row of f.headerRows || []) {
-        const key = (row.key || '').trim();
-        if (key) httpHeaders[key] = row.value || '';
-      }
-      return {
-        id: (f.id || '').trim(),
-        name: (f.name || '').trim(),
-        description: (f.description || '').trim(),
-        sourceType: f.sourceType || 'local',
-        sourceUrl: (f.sourceUrl || '').trim(),
-        localPath: (f.localPath || '').trim(),
-        packageName: (f.packageName || '').trim(),
-        transport: f.transport || 'stdio',
-        command: (f.command || '').trim(),
-        args: (f.argsRaw || '').split('\n').map(s => s.trim()).filter(Boolean),
-        cwd: (f.cwd || '').trim(),
-        url: (f.url || '').trim(),
-        env,
-        httpHeaders,
-        bearerTokenEnvVar: (f.bearerTokenEnvVar || '').trim(),
-        startupTimeoutSec: Number(f.startupTimeoutSec || 0),
-        toolTimeoutSec: Number(f.toolTimeoutSec || 0),
-        tags: (f.tagsRaw || '').split(',').map(s => s.trim()).filter(Boolean),
-      };
-    },
-
-    addMCPEnvRow() {
-      if (!this.mcpForm) return;
-      this.mcpForm.envRows = [...(this.mcpForm.envRows || []), { key: '', value: '' }];
-    },
-
-    removeMCPEnvRow(idx) {
-      if (!this.mcpForm) return;
-      this.mcpForm.envRows = (this.mcpForm.envRows || []).filter((_, i) => i !== idx);
-    },
-
-    addMCPHeaderRow() {
-      if (!this.mcpForm) return;
-      this.mcpForm.headerRows = [...(this.mcpForm.headerRows || []), { key: '', value: '' }];
-    },
-
-    removeMCPHeaderRow(idx) {
-      if (!this.mcpForm) return;
-      this.mcpForm.headerRows = (this.mcpForm.headerRows || []).filter((_, i) => i !== idx);
-    },
-
-    async saveMCPForm() {
-      if (!this.mcpForm) return;
-      try {
-        const server = this.mcpServerFromForm();
-        const existing = this.mcpServers.find(s => s.id === server.id);
-        await SaveMCPServer(server);
-        const resynced = [];
-        if (existing?.enabledInClaude) {
-          await SetMCPEnabled(server.id, 'claude', true);
-          resynced.push('Claude Code');
-        }
-        if (existing?.enabledInCodex) {
-          await SetMCPEnabled(server.id, 'codex', true);
-          resynced.push('Codex');
-        }
-        await this.loadMCP();
-        this.closeMCPEditor();
-        const syncNote = resynced.length ? `，已同步到 ${resynced.join(' / ')}` : '';
-        this.showSuccess(`MCP「${server.name || server.id}」已保存${syncNote}`);
-      } catch (e) {
-        this.showError(`保存 MCP 失败: ${e}`);
-      }
-    },
-
     // Wails' macOS WebView does not implement the JS confirm panel, so
     // window.confirm() silently returns false. Every destructive action awaits
     // this in-app dialog instead.
@@ -1921,205 +1722,416 @@ window.hatchApp = function () {
       if (resolve) resolve(ok);
     },
 
-    openMCPDeleteModal(s) {
-      const canCleanDisk = (s.sourceType === 'git' || s.sourceType === 'local') && !!s.localPath;
-      this.mcpDeleteModal = { open: true, id: s.id, name: s.name || s.id, canCleanDisk, localPath: s.localPath || '' };
-    },
-
-    closeMCPDeleteModal() {
-      this.mcpDeleteModal = { open: false, id: '', name: '', canCleanDisk: false, localPath: '' };
-    },
-
-    async confirmDeleteMCP(cleanupDisk) {
-      const { id } = this.mcpDeleteModal;
-      this.closeMCPDeleteModal();
+    // ── MCP ───────────────────────────────────────────────────────────
+    // Claude Code / Codex config files are the source of truth; the page shows
+    // GetMCPInventory rows (one per server name, one entry per location) and
+    // every write goes through preview → apply.
+    async loadMCP(includeCLI = false) {
+      if (includeCLI) this.mcpCLILoading = true; else this.mcpLoading = true;
       try {
-        if (cleanupDisk) {
-          await UninstallMCPFromDisk(id);
-          this.showSuccess(`MCP「${id}」已从 Hatch 删除并清理本地文件`);
-        } else {
-          await DeleteMCPServer(id);
-          this.showSuccess(`MCP「${id}」已从 Hatch 删除`);
+        const [inv, catalog] = await Promise.all([
+          GetMCPInventory(includeCLI),
+          this.mcpCatalog.length ? Promise.resolve(this.mcpCatalog) : GetMCPCatalog(),
+        ]);
+        this.mcpInventory = inv || { rows: [], projects: [], sources: [] };
+        this.mcpCatalog = catalog || [];
+      } catch (e) {
+        this.showError(`读取 MCP 配置失败: ${e}`);
+      } finally {
+        this.mcpLoading = false;
+        this.mcpCLILoading = false;
+      }
+    },
+
+    mcpBusyKey(name, key, op) { return `${name}|${key}|${op}`; },
+    mcpIsBusy(name, key, op) { return !!this.mcpBusy[this.mcpBusyKey(name, key, op)]; },
+    async mcpRun(name, key, op, fn) {
+      const k = this.mcpBusyKey(name, key, op);
+      if (this.mcpBusy[k]) return;
+      this.mcpBusy = { ...this.mcpBusy, [k]: true };
+      try { return await fn(); }
+      finally { const b = { ...this.mcpBusy }; delete b[k]; this.mcpBusy = b; }
+    },
+
+    toggleMCPRow(name) {
+      this.mcpExpanded = { ...this.mcpExpanded, [name]: !this.mcpExpanded[name] };
+    },
+
+    mcpSummary(spec) {
+      if (!spec) return '';
+      if (spec.transport === 'stdio') return [spec.command, ...(spec.args || [])].join(' ');
+      return spec.url || '';
+    },
+
+    mcpEntryState(e) {
+      if (e.stale) return { cls: 'mcp-chip-stale', text: '目录已不存在' };
+      if (e.readOnly) return { cls: 'mcp-chip-ro', text: '只读' };
+      if (e.parked) return { cls: 'mcp-chip-off', text: '已停用' };
+      return e.enabled ? { cls: 'mcp-chip-on', text: '启用' } : { cls: 'mcp-chip-off', text: '已停用' };
+    },
+
+    mcpProbeClass(p) {
+      if (!p) return 'mcp-probe-none';
+      return { ok: 'mcp-probe-ok', failed: 'mcp-probe-fail', timeout: 'mcp-probe-fail', auth_required: 'mcp-probe-auth' }[p.status] || 'mcp-probe-none';
+    },
+
+    mcpProbeLabel(p) {
+      if (!p) return '未测试';
+      return { ok: `✓ ${(p.tools || []).length} 个工具`, failed: '✕ 失败', timeout: '✕ 超时', auth_required: '需授权', unsupported: '不支持探测' }[p.status] || p.status;
+    },
+
+    async setMCPEntryEnabled(row, e, enabled) {
+      await this.mcpRun(row.name, e.locationKey, 'toggle', async () => {
+        try {
+          await SetMCPEnabled(row.name, e.locationKey, enabled);
+          this.showSuccess(`「${row.name}」已在 ${e.label} ${enabled ? '启用' : '停用（配置已保留，可随时恢复）'}`);
+        } catch (err) {
+          this.showError(`切换失败: ${err}`);
         }
-        if (this.mcpEditTarget === id) this.closeMCPEditor();
         await this.loadMCP();
-      } catch (e) {
-        this.showError(`删除 MCP 失败: ${e}`);
-      }
+      });
     },
 
-    openMCPAddModal(tab) {
-      this.mcpAddTab = tab || 'git';
-      this.mcpAddModalOpen = true;
-    },
-
-    closeMCPAddModal() {
-      this.mcpAddModalOpen = false;
-    },
-
-    async updateMCPFromGit(id) {
-      this.mcpUpdateBusy = { ...this.mcpUpdateBusy, [id]: true };
-      try {
-        await UpdateMCPFromGit(id);
-        await this.loadMCP();
-        this.showSuccess(`MCP「${id}」已从 Git 更新`);
-      } catch (e) {
-        this.showError(`更新 MCP 失败: ${e}`);
-      } finally {
-        const b = { ...this.mcpUpdateBusy };
-        delete b[id];
-        this.mcpUpdateBusy = b;
-      }
-    },
-
-    openMCPTemplateGallery() {
-      this.mcpTemplateGalleryOpen = true;
-    },
-
-    closeMCPTemplateGallery() {
-      this.mcpTemplateGalleryOpen = false;
-    },
-
-    async deleteMCP(id) {
-      try {
-        await DeleteMCPServer(id);
-        if (this.mcpEditTarget === id) this.closeMCPEditor();
-        await this.loadMCP();
-        this.showSuccess(`MCP「${id}」已从 Hatch 删除`);
-      } catch (e) {
-        this.showError(`删除 MCP 失败: ${e}`);
-      }
-    },
-
-    async importMCPLocal() {
-      const path = (this.mcpLocalPath || '').trim();
-      if (!path) { this.showError('请先填写本地 MCP 目录'); return; }
-      this.mcpImportBusy = 'local';
-      try {
-        const server = await ImportMCPFromLocalDir(path);
-        this.mcpLocalPath = '';
-        this.closeMCPAddModal();
-        await this.loadMCP();
-        this.showSuccess(`已导入 MCP「${server.name || server.id}」`);
-      } catch (e) {
-        this.showError(`导入本地 MCP 失败: ${e}`);
-      } finally {
-        this.mcpImportBusy = '';
-      }
-    },
-
-    async installMCPGit() {
-      const url = (this.mcpGitURL || '').trim();
-      if (!url) { this.showError('请先填写 Git URL'); return; }
-      this.mcpImportBusy = 'git';
-      try {
-        const server = await InstallMCPFromGit(url, (this.mcpGitName || '').trim());
-        this.mcpGitURL = '';
-        this.mcpGitName = '';
-        this.closeMCPAddModal();
-        await this.loadMCP();
-        this.showSuccess(`已安装 MCP「${server.name || server.id}」`);
-      } catch (e) {
-        this.showError(`Git 安装 MCP 失败: ${e}`);
-      } finally {
-        this.mcpImportBusy = '';
-      }
-    },
-
-    async addNpmMCP() {
-      const pkg = (this.mcpNpmPackage || '').trim();
-      if (!pkg) { this.showError('请先填写 npm 包名'); return; }
-      this.mcpImportBusy = 'npm';
-      try {
-        const server = await SaveNpmMCPServer(pkg, (this.mcpNpmName || '').trim());
-        this.mcpNpmPackage = '';
-        this.mcpNpmName = '';
-        this.closeMCPAddModal();
-        await this.loadMCP();
-        this.showSuccess(`已添加 npm MCP「${server.name || server.id}」`);
-      } catch (e) {
-        this.showError(`添加 npm MCP 失败: ${e}`);
-      } finally {
-        this.mcpImportBusy = '';
-      }
-    },
-
-    async toggleMCPEnabled(id, target, enabled) {
-      const key = id + ':' + target;
-      this.mcpSyncBusy = { ...this.mcpSyncBusy, [key]: true };
-      try {
-        await SetMCPEnabled(id, target, enabled);
-        const idx = this.mcpServers.findIndex(s => s.id === id);
-        if (idx >= 0) {
-          const s = { ...this.mcpServers[idx] };
-          if (target === 'claude') s.enabledInClaude = enabled;
-          else s.enabledInCodex = enabled;
-          this.mcpServers = [...this.mcpServers.slice(0, idx), s, ...this.mcpServers.slice(idx + 1)];
+    async probeMCPEntry(row, e, quiet = false) {
+      return this.mcpRun(row.name, e.locationKey, 'probe', async () => {
+        try {
+          const res = await ProbeMCP(row.name, e.locationKey);
+          if (!quiet) {
+            if (res.status === 'ok') this.showSuccess(`「${row.name}」${res.summary}`);
+            else this.showError(`「${row.name}」@${e.label}：${res.summary}`);
+          }
+          this.patchMCPProbe(row.name, e.locationKey, res);
+          return res;
+        } catch (err) {
+          if (!quiet) this.showError(`测试失败: ${err}`);
         }
-        this.showSuccess(enabled ? `MCP「${id}」已写入 ${this.mcpTargetLabel(target)} 全局配置` : `MCP「${id}」已从 ${this.mcpTargetLabel(target)} 全局配置移除`);
-      } catch (e) {
-        await this.loadMCP();
-        this.showError(`同步 MCP 失败: ${e}`);
-      } finally {
-        const b = { ...this.mcpSyncBusy };
-        delete b[key];
-        this.mcpSyncBusy = b;
-      }
+      });
     },
 
-    async testMCP(id, target) {
-      const key = id + ':' + target;
-      this.mcpTestBusy = { ...this.mcpTestBusy, [key]: true };
+    patchMCPProbe(name, key, res) {
+      const inv = this.mcpInventory;
+      if (!inv) return;
+      const rows = inv.rows.map(r => r.name !== name ? r : {
+        ...r, entries: r.entries.map(x => x.locationKey === key ? { ...x, probe: res } : x),
+      });
+      this.mcpInventory = { ...inv, rows };
+    },
+
+    async probeAllMCP() {
+      const targets = [];
+      for (const r of this.filteredMCPRows) {
+        for (const e of r.entries) if (!e.readOnly && !e.stale && e.enabled) targets.push([r, e]);
+      }
+      if (!targets.length) { this.showError('没有可测试的已启用 MCP'); return; }
+      this.mcpProbingAll = true;
+      let ok = 0;
       try {
-        const result = await TestMCPConnection(id, target);
-        const idx = this.mcpServers.findIndex(s => s.id === id);
-        if (idx >= 0) {
-          const s = { ...this.mcpServers[idx] };
-          s.lastTestResults = { ...(s.lastTestResults || {}), [target]: result };
-          this.mcpServers = [...this.mcpServers.slice(0, idx), s, ...this.mcpServers.slice(idx + 1)];
+        for (const [r, e] of targets) {
+          const res = await this.probeMCPEntry(r, e, true);
+          if (res && res.status === 'ok') ok++;
         }
-        if (result.status === 'success') this.showSuccess(result.summary || 'MCP 连接成功');
-        else this.showError(result.summary || 'MCP 连接测试失败');
-      } catch (e) {
-        this.showError(`MCP 测试失败: ${e}`);
-      } finally {
-        const b = { ...this.mcpTestBusy };
-        delete b[key];
-        this.mcpTestBusy = b;
-      }
+      } finally { this.mcpProbingAll = false; }
+      const bad = targets.length - ok;
+      bad ? this.showError(`已测试 ${targets.length} 项，${bad} 项未通过`) : this.showSuccess(`已测试 ${targets.length} 项，全部连接成功`);
     },
 
-    mcpTargetLabel(target) {
-      return target === 'claude' ? 'Claude Code' : 'Codex';
-    },
-
-    mcpStatusClass(result) {
-      if (!result) return 'mcp-test-none';
-      if (result.status === 'success') return 'mcp-test-ok';
-      if (result.status === 'failed') return 'mcp-test-fail';
-      return 'mcp-test-unknown';
-    },
-
-    mcpConfigLines(server) {
-      if (!server) return [];
-      const lines = [];
-      if (server.transport === 'http') {
-        if (server.url) lines.push({ label: 'URL', value: server.url });
-        if (server.bearerTokenEnvVar) lines.push({ label: 'Bearer Env', value: server.bearerTokenEnvVar });
-        for (const [key, value] of Object.entries(server.httpHeaders || {}).sort()) {
-          lines.push({ label: `Header ${key}`, value });
+    async removeMCPEntry(row, e) {
+      const extra = e.location.scope === 'project' ? '\n这会修改项目内共享的 .mcp.json。' : '';
+      if (!(await this.askConfirm(`从 ${e.label} 删除 MCP「${row.name}」？\n文件：${e.file || ''}${extra}`))) return;
+      await this.mcpRun(row.name, e.locationKey, 'remove', async () => {
+        try {
+          await RemoveMCPEntry(row.name, e.locationKey);
+          this.showSuccess(`已从 ${e.label} 删除「${row.name}」`);
+        } catch (err) {
+          this.showError(`删除失败: ${err}`);
         }
+        await this.loadMCP();
+      });
+    },
+
+    // Drift fix: copy one location's version over every other writable one.
+    async syncMCPFrom(row, e) {
+      const targets = row.entries.filter(x => !x.readOnly && !x.stale && x.locationKey !== e.locationKey);
+      if (!targets.length) return;
+      const labels = targets.map(x => x.label).join('、');
+      if (!(await this.askConfirm(`以 ${e.label} 的配置为准，覆盖 ${labels} 中的「${row.name}」？\n各位置独有的扩展字段（如 Codex 工具审批）会保留。`, { title: '同步配置', confirmText: '同步', danger: false }))) return;
+      await this.mcpRun(row.name, e.locationKey, 'sync', async () => {
+        try {
+          await CopyMCPEntry(row.name, e.locationKey, targets.map(x => x.locationKey));
+          this.showSuccess(`已用 ${e.label} 的配置同步「${row.name}」`);
+        } catch (err) {
+          this.showError(`同步失败: ${err}`);
+        }
+        await this.loadMCP();
+      });
+    },
+
+    mcpDisabledTools(e) {
+      return (e?.spec?.extra?.disabled_tools || []).map(String);
+    },
+
+    async toggleMCPTool(row, e, tool, on) {
+      const set = new Set(this.mcpDisabledTools(e));
+      on ? set.delete(tool) : set.add(tool);
+      await this.mcpRun(row.name, e.locationKey, 'tools', async () => {
+        try {
+          await SetMCPDisabledTools(row.name, e.locationKey, [...set]);
+          this.showSuccess(`Codex 已${on ? '启用' : '禁用'}工具 ${tool}`);
+        } catch (err) {
+          this.showError(`保存失败: ${err}`);
+        }
+        await this.loadMCP();
+      });
+    },
+
+    async discardLegacyMCP(d) {
+      if (!(await this.askConfirm(`丢弃旧版 Hatch 注册表中的「${d.name}」？它从未写入 Claude / Codex，丢弃后不可恢复。`, { title: '丢弃旧条目', confirmText: '丢弃' }))) return;
+      try {
+        await DiscardLegacyMCP(d.name);
+        await this.loadMCP();
+      } catch (err) { this.showError(`丢弃失败: ${err}`); }
+    },
+
+    // ── MCP add / edit drawer ─────────────────────────────────────────
+    blankMCPForm() {
+      return { name: '', title: '', description: '', transport: 'stdio', command: '', argsRaw: '', cwd: '', url: '', envRows: [], headerRows: [], bearerTokenEnvVar: '', startupTimeoutSec: 0, toolTimeoutSec: 0, extra: null, sourceClient: '', origin: 'manual', notes: [], homepage: '', variant: '' };
+    },
+
+    openMCPAdd(tab = 'paste') {
+      if (!this.mcpInventory) this.loadMCP();
+      this.mcpAdd = {
+        open: true, mode: 'add', tab, editKey: '',
+        pasteText: '', parsing: false, parseNotes: [],
+        registryQuery: '', registryHits: [], registryBusy: false, registryLooked: false,
+        drafts: [], draftIdx: 0,
+        form: this.blankMCPForm(),
+        targets: { 'claude:user': true, 'codex:user': false },
+        project: '', projectLocal: false, projectShared: false, projectCodex: false,
+        plan: null, previewing: false, applying: false, reveal: {},
+      };
+    },
+
+    openMCPEdit(row, e) {
+      this.openMCPAdd('form');
+      this.mcpAdd.mode = 'edit';
+      this.mcpAdd.editKey = e.locationKey;
+      this.mcpAdd.editLabel = e.label;
+      this.mcpAdd.form = this.mcpFormFromDraft({ name: row.name, spec: e.spec, sourceClient: e.location.client === 'desktop' ? 'claude' : e.location.client, origin: 'edit' });
+    },
+
+    openMCPCopy(row, e) {
+      this.openMCPAdd('form');
+      this.mcpAdd.form = this.mcpFormFromDraft({ name: row.name, spec: e.spec, sourceClient: e.location.client === 'desktop' ? 'claude' : e.location.client, origin: 'copy:' + e.locationKey });
+      this.mcpAdd.targets = { 'claude:user': false, 'codex:user': false };
+      this.mcpAdd.copyFrom = e.label;
+    },
+
+    openMCPLegacy(d) {
+      this.openMCPAdd('form');
+      this.loadMCPDrafts([d]);
+      this.mcpAdd.form.origin = 'legacy';
+    },
+
+    closeMCPAdd() { this.mcpAdd = null; },
+
+    mcpFormFromDraft(d) {
+      const spec = d.spec || {};
+      const inputs = {};
+      for (const i of d.inputs || []) inputs[i.kind + ':' + i.key] = i;
+      const rows = (map, kind) => Object.keys(map || {}).sort().map(k => {
+        const i = inputs[kind + ':' + k] || {};
+        let value = map[k] ?? '';
+        // README placeholders ("YOUR_API_KEY", "<token>") must not count as filled.
+        const bare = String(value).replace(/^Bearer\s*/, '');
+        if (i.key && /^(<.*>|your[-_ ].*|xxx+|\.\.\.|changeme|todo|replace[-_ ]?me)$/i.test(bare)) value = String(value).startsWith('Bearer ') ? 'Bearer ' : '';
+        return { key: k, value, secret: !!i.secret, required: !!i.required, desc: i.description || (bare && value !== map[k] ? bare : '') };
+      });
+      return {
+        ...this.blankMCPForm(),
+        name: d.name || '', title: d.title || '', description: d.description || '', variant: d.variant || '',
+        transport: spec.transport || 'stdio', command: spec.command || '', argsRaw: (spec.args || []).join('\n'),
+        cwd: spec.cwd || '', url: spec.url || '', envRows: rows(spec.env, 'env'), headerRows: rows(spec.headers, 'header'),
+        bearerTokenEnvVar: spec.bearerTokenEnvVar || '', startupTimeoutSec: spec.startupTimeoutSec || 0, toolTimeoutSec: spec.toolTimeoutSec || 0,
+        extra: spec.extra || null, sourceClient: d.sourceClient || '', origin: d.origin || 'manual', notes: d.notes || [], homepage: d.homepage || '',
+      };
+    },
+
+    loadMCPDrafts(drafts, scope = '') {
+      if (!this.mcpAdd || !drafts?.length) return;
+      this.mcpAdd.drafts = drafts;
+      this.selectMCPDraft(0);
+      const hint = scope || drafts[0].scope;
+      if (hint === 'user') this.mcpAdd.targets = { 'claude:user': true, 'codex:user': false };
+    },
+
+    selectMCPDraft(i) {
+      const d = this.mcpAdd.drafts[i];
+      if (!d) return;
+      this.mcpAdd.draftIdx = i;
+      this.mcpAdd.form = this.mcpFormFromDraft(d);
+      this.mcpAdd.plan = null;
+      if (d.spec?.transport === 'sse' || d.spec?.transport === 'ws') this.mcpAdd.targets['codex:user'] = false;
+    },
+
+    async parseMCPPaste() {
+      const a = this.mcpAdd;
+      if (!a || !a.pasteText.trim()) { this.showError('请先粘贴内容'); return; }
+      a.parsing = true;
+      try {
+        const res = await ParseMCPInput(a.pasteText);
+        a.parseNotes = res.notes || [];
+        this.loadMCPDrafts(res.drafts || []);
+        a.tab = 'form';
+      } catch (err) {
+        this.showError(`${err}`);
+      } finally { a.parsing = false; }
+    },
+
+    pickMCPCatalog(item) {
+      const d = { name: item.id, title: item.title, description: item.description, spec: item.spec, inputs: item.inputs, origin: 'catalog:' + item.id, notes: item.notes, homepage: item.homepage };
+      this.loadMCPDrafts([d]);
+      this.mcpAdd.tab = 'form';
+      if (item.registryName) this.mcpAdd.form.notes = [...(this.mcpAdd.form.notes || []), `Registry 名称：${item.registryName}（可在 Registry 页签获取最新版本信息）`];
+    },
+
+    async searchMCPRegistry() {
+      const a = this.mcpAdd;
+      const q = (a?.registryQuery || '').trim();
+      if (!q) return;
+      a.registryBusy = true;
+      try {
+        if (/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+\/[a-zA-Z0-9._-]+$/.test(q)) {
+          await this.lookupMCPRegistry(q);
+          return;
+        }
+        a.registryHits = (await SearchMCPRegistry(q)) || [];
+        a.registryLooked = true;
+      } catch (err) {
+        this.showError(`${err}`);
+      } finally { a.registryBusy = false; }
+    },
+
+    async lookupMCPRegistry(name) {
+      const a = this.mcpAdd;
+      a.registryBusy = true;
+      try {
+        const drafts = await LookupMCPRegistry(name);
+        this.loadMCPDrafts(drafts || []);
+        a.tab = 'form';
+      } catch (err) {
+        this.showError(`${err}`);
+      } finally { a.registryBusy = false; }
+    },
+
+    addMCPFormRow(kind) {
+      const f = this.mcpAdd?.form;
+      if (!f) return;
+      f[kind] = [...(f[kind] || []), { key: '', value: '', secret: false, required: false, desc: '' }];
+    },
+
+    removeMCPFormRow(kind, idx) {
+      const f = this.mcpAdd?.form;
+      if (!f) return;
+      f[kind] = f[kind].filter((_, i) => i !== idx);
+    },
+
+    mcpSpecFromForm() {
+      const f = this.mcpAdd.form;
+      const toMap = rows => {
+        const out = {};
+        for (const r of rows || []) { const k = (r.key || '').trim(); if (k) out[k] = r.value ?? ''; }
+        return out;
+      };
+      const spec = { transport: f.transport };
+      if (f.transport === 'stdio') {
+        spec.command = (f.command || '').trim();
+        spec.args = (f.argsRaw || '').split('\n').map(s => s.trim()).filter(Boolean);
+        spec.cwd = (f.cwd || '').trim();
+        spec.env = toMap(f.envRows);
       } else {
-        if (server.command) lines.push({ label: 'Command', value: server.command });
-        if ((server.args || []).length) lines.push({ label: 'Args', value: (server.args || []).join(' ') });
-        if (server.cwd) lines.push({ label: 'CWD', value: server.cwd });
-        for (const [key, value] of Object.entries(server.env || {}).sort()) {
-          lines.push({ label: `Env ${key}`, value });
-        }
+        spec.url = (f.url || '').trim();
+        spec.headers = toMap(f.headerRows);
+        spec.bearerTokenEnvVar = (f.bearerTokenEnvVar || '').trim();
       }
-      if (server.startupTimeoutSec) lines.push({ label: '启动超时', value: `${server.startupTimeoutSec}s` });
-      if (server.toolTimeoutSec) lines.push({ label: '工具超时', value: `${server.toolTimeoutSec}s` });
-      return lines;
+      spec.startupTimeoutSec = Number(f.startupTimeoutSec || 0);
+      spec.toolTimeoutSec = Number(f.toolTimeoutSec || 0);
+      if (f.extra && Object.keys(f.extra).length) spec.extra = f.extra;
+      return spec;
+    },
+
+    mcpTargetsFromForm() {
+      const a = this.mcpAdd;
+      if (a.mode === 'edit') return [this.mcpLocFromKey(a.editKey)];
+      const out = [];
+      if (a.targets['claude:user']) out.push({ client: 'claude', scope: 'user' });
+      if (a.targets['codex:user']) out.push({ client: 'codex', scope: 'user' });
+      if (a.project) {
+        if (a.projectLocal) out.push({ client: 'claude', scope: 'local', project: a.project });
+        if (a.projectShared) out.push({ client: 'claude', scope: 'project', project: a.project });
+        if (a.projectCodex) out.push({ client: 'codex', scope: 'project', project: a.project });
+      }
+      return out;
+    },
+
+    mcpLocFromKey(key) {
+      const [client, scope, ...rest] = key.split(':');
+      const project = rest.join(':');
+      return project ? { client, scope, project } : { client, scope };
+    },
+
+    mcpApplyRequest() {
+      const f = this.mcpAdd.form;
+      return { name: (f.name || '').trim(), spec: this.mcpSpecFromForm(), targets: this.mcpTargetsFromForm(), sourceClient: f.sourceClient || '', origin: f.origin || 'manual' };
+    },
+
+    get mcpMissingInputs() {
+      const f = this.mcpAdd?.form;
+      if (!f) return [];
+      const rows = f.transport === 'stdio' ? f.envRows : f.headerRows;
+      return (rows || []).filter(r => r.required && !String(r.value || '').replace(/^Bearer\s*/, '').trim()).map(r => r.key);
+    },
+
+    get mcpSelectedProject() {
+      const p = this.mcpAdd?.project;
+      return (this.mcpInventory?.projects || []).find(x => x.path === p) || null;
+    },
+
+    async previewMCPApply() {
+      const a = this.mcpAdd;
+      const req = this.mcpApplyRequest();
+      if (!req.targets.length) { this.showError('请至少选择一个写入位置'); return; }
+      a.previewing = true;
+      try {
+        a.plan = await PreviewMCPApply(req);
+      } catch (err) {
+        this.showError(`预览失败: ${err}`);
+      } finally { a.previewing = false; }
+    },
+
+    async applyMCPForm() {
+      const a = this.mcpAdd;
+      if (!a?.plan?.canApply) return;
+      const req = this.mcpApplyRequest();
+      a.applying = true;
+      try {
+        await ApplyMCP(req);
+        this.showSuccess(`「${req.name}」已写入 ${a.plan.items.map(i => i.label).join('、')}`);
+        this.closeMCPAdd();
+        await this.loadMCP();
+        // Probe right away so the user sees whether it actually starts.
+        const row = (this.mcpInventory?.rows || []).find(r => r.name === req.name);
+        if (row) {
+          this.mcpExpanded = { ...this.mcpExpanded, [row.name]: true };
+          const keys = new Set(req.targets.map(t => this.mcpLocKey(t)));
+          for (const e of row.entries) if (keys.has(e.locationKey) && e.enabled) this.probeMCPEntry(row, e, true);
+        }
+      } catch (err) {
+        this.showError(`写入失败: ${err}`);
+      } finally { if (this.mcpAdd) this.mcpAdd.applying = false; }
+    },
+
+    mcpLocKey(loc) {
+      return loc.client + ':' + loc.scope + (loc.project ? ':' + loc.project : '');
     },
 
     // ── Hooks management ──────────────────────────────────────────────
@@ -2533,14 +2545,13 @@ window.hatchApp = function () {
         const [profiles, snapshots, health, skills, mcps, hooks] = await Promise.all([
           ListAIWorkspaceProfiles(), ListAIWorkspaceSnapshots(), GetAIEnvironmentHealth(),
           this.skills.length ? Promise.resolve(this.skills) : GetSkills(),
-          this.mcpServers.length ? Promise.resolve(this.mcpServers) : ListMCPServers(),
+          this.mcpInventory ? Promise.resolve(null) : this.loadMCP(),
           this.hooks.length ? Promise.resolve(this.hooks) : ListHooks(),
         ]);
         this.workspaceProfiles = profiles || [];
         this.workspaceSnapshots = snapshots || [];
         this.workspaceHealth = health;
         this.skills = skills || [];
-        this.mcpServers = mcps || [];
         this.hooks = hooks || [];
       } catch (e) { this.showError(`加载工作区失败: ${e}`); }
       finally { this.workspaceLoading = false; }
@@ -3058,54 +3069,11 @@ window.hatchApp = function () {
       }
     },
 
-    // Render a copy-paste config snippet for one MCP, mirroring the backend
-    // renderClaudeMCPServer / renderCodexMCPServer output.
-    renderMCPSnippet(server, target) {
-      if (!server) return '';
-      const id = server.id || 'server';
-      if (target === 'claude') {
-        const body = {};
-        if (server.transport === 'http') {
-          body.type = 'http';
-          body.url = server.url || '';
-          if (server.httpHeaders && Object.keys(server.httpHeaders).length) body.headers = server.httpHeaders;
-        } else {
-          body.type = 'stdio';
-          body.command = server.command || '';
-          body.args = server.args || [];
-          body.env = server.env || {};
-          if (server.cwd) body.cwd = server.cwd;
-        }
-        return JSON.stringify({ [id]: body }, null, 2);
-      }
-      const q = (s) => JSON.stringify(s ?? '');
-      const lines = [`[mcp_servers.${id}]`];
-      if (server.transport === 'http') {
-        lines.push(`url = ${q(server.url || '')}`);
-        if (server.bearerTokenEnvVar) lines.push(`bearer_token_env_var = ${q(server.bearerTokenEnvVar)}`);
-        const hk = Object.keys(server.httpHeaders || {}).sort();
-        if (hk.length) lines.push(`http_headers = { ${hk.map(k => `${q(k)} = ${q(server.httpHeaders[k])}`).join(', ')} }`);
-      } else {
-        lines.push(`command = ${q(server.command || '')}`);
-        if ((server.args || []).length) lines.push(`args = [${server.args.map(q).join(', ')}]`);
-        if (server.cwd) lines.push(`cwd = ${q(server.cwd)}`);
-      }
-      if (server.startupTimeoutSec) lines.push(`startup_timeout_sec = ${server.startupTimeoutSec}`);
-      if (server.toolTimeoutSec) lines.push(`tool_timeout_sec = ${server.toolTimeoutSec}`);
-      lines.push('enabled = true');
-      const ek = server.transport !== 'http' ? Object.keys(server.env || {}).sort() : [];
-      if (ek.length) {
-        lines.push('', `[mcp_servers.${id}.env]`);
-        ek.forEach(k => lines.push(`${k} = ${q(server.env[k])}`));
-      }
-      return lines.join('\n');
-    },
-
     async loadOverview() {
       try { await this.loadAIUsageStatuses(); } catch (_) {}
       try { if (!this.aiProviders.length) await this.loadAIProviders(); } catch (_) {}
       try { this.skillsStats = await GetSkillsStats(); } catch (_) {}
-      try { if (!this.mcpServers.length) this.mcpServers = (await ListMCPServers()) || []; } catch (_) {}
+      try { if (!this.mcpInventory) await this.loadMCP(); } catch (_) {}
       try { this.hooksStats = await GetHooksStats(); } catch (_) {}
       try { if (!this.docLinks.length) await this.loadDocLinks(); } catch (_) {}
       try { if (!this.aiTraces.length) await this.loadAITraces(); } catch (_) {}
@@ -3141,41 +3109,6 @@ window.hatchApp = function () {
       }
       await this.loadSkills();
       this.showSuccess(`已取消 ${n} 项同步`);
-    },
-
-    async bulkMCPEnable(target, enabled) {
-      const list = this.filteredMCPServers || [];
-      if (!list.length) { this.showError('没有可操作的 MCP'); return; }
-      let ok = 0, fail = 0;
-      for (const s of list) {
-        const already = target === 'claude' ? s.enabledInClaude : s.enabledInCodex;
-        if (already === enabled) continue;
-        try { await SetMCPEnabled(s.id, target, enabled); ok++; } catch (_) { fail++; }
-      }
-      await this.loadMCP();
-      const label = this.mcpTargetLabel(target);
-      let msg = enabled ? `已启用 ${ok} 个到 ${label}` : `已从 ${label} 移除 ${ok} 个`;
-      if (fail) msg += `，${fail} 个跳过（冲突或失败）`;
-      this.showSuccess(msg);
-    },
-
-    async bulkTestMCP() {
-      const list = this.filteredMCPServers || [];
-      let tested = 0, failed = 0;
-      for (const s of list) {
-        for (const target of ['claude', 'codex']) {
-          const enabled = target === 'claude' ? s.enabledInClaude : s.enabledInCodex;
-          if (!enabled) continue;
-          try {
-            const r = await TestMCPConnection(s.id, target);
-            tested++;
-            if (r && r.status === 'failed') failed++;
-          } catch (_) { tested++; failed++; }
-        }
-      }
-      await this.loadMCP();
-      if (!tested) { this.showError('没有已启用的 MCP 可测试'); return; }
-      this.showSuccess(`已测试 ${tested} 项${failed ? `，${failed} 项失败` : '，全部通过'}`);
     },
 
     langIcon(lang) {
@@ -3868,36 +3801,111 @@ window.hatchApp = function () {
       return list;
     },
 
+    // Rows Claude-global / Codex can switch (overview counts + workspace profiles).
+    get mcpServers() {
+      return (this.mcpInventory?.rows || []).map(r => {
+        const at = key => r.entries.find(e => e.locationKey === key);
+        const c = at('claude:user'), x = at('codex:user');
+        return { id: r.name, name: r.name, enabledInClaude: !!c?.enabled, enabledInCodex: !!x?.enabled, global: !!(c || x) };
+      }).filter(s => s.global);
+    },
+
     get mcpEnabledCount() {
-      return (this.mcpServers || []).filter(s => s.enabledInClaude || s.enabledInCodex).length;
+      return (this.mcpInventory?.rows || []).filter(r => r.entries.some(e => e.enabled && !e.readOnly)).length;
     },
 
     get mcpFailedCount() {
-      return (this.mcpServers || []).filter(s => Object.values(s.lastTestResults || {}).some(r => r.status === 'failed')).length;
+      return (this.mcpInventory?.rows || []).filter(r => r.entries.some(e => ['failed', 'timeout'].includes(e.probe?.status))).length;
+    },
+
+    get mcpRowCount() {
+      return (this.mcpInventory?.rows || []).filter(r => r.entries.some(e => e.location.client !== 'desktop')).length;
     },
 
     get recentTraceErrors() {
       return (this.aiTraces || []).filter(t => t.error).slice(0, 3);
     },
 
-    get filteredMCPServers() {
-      let list = this.mcpServers || [];
-      if (this.mcpFilter === 'claude') list = list.filter(s => s.enabledInClaude);
-      else if (this.mcpFilter === 'codex') list = list.filter(s => s.enabledInCodex);
-      else if (this.mcpFilter === 'failed') {
-        list = list.filter(s => Object.values(s.lastTestResults || {}).some(r => r.status === 'failed'));
-      }
+    get filteredMCPRows() {
+      let rows = this.mcpInventory?.rows || [];
+      const f = this.mcpFilter;
+      if (f === 'claude') rows = rows.filter(r => r.entries.some(e => e.location.client === 'claude'));
+      else if (f === 'codex') rows = rows.filter(r => r.entries.some(e => e.location.client === 'codex'));
+      else if (f === 'drift') rows = rows.filter(r => r.drift);
+      else if (f === 'off') rows = rows.filter(r => r.entries.some(e => !e.readOnly && !e.enabled));
+      else if (f === 'readonly') rows = rows.filter(r => r.entries.every(e => e.readOnly));
       const q = (this.mcpSearch || '').trim().toLowerCase();
-      if (q) {
-        list = list.filter(s =>
-          (s.id || '').toLowerCase().includes(q) ||
-          (s.name || '').toLowerCase().includes(q) ||
-          (s.description || '').toLowerCase().includes(q)
-        );
-      }
-      return list;
+      if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q) || r.entries.some(e => this.mcpSummary(e.spec).toLowerCase().includes(q)));
+      return rows;
     },
 
+    async openHost() {
+      this.hostPrevious = null;
+      this.hostRates = [];
+      this.refreshHost();
+      this.hostDiskTest();
+      this.hostNetworkTest();
+      try { this.hostHardware = await window['go']['app']['App']['GetHostHardware'](); }
+      catch (error) { this.hostError = '硬件信息获取失败：' + error; }
+    },
+    async refreshHost() {
+      if (this.hostLoading) return;
+      this.hostLoading = true;
+      try {
+        const snapshot = await window['go']['app']['App']['GetHostSnapshot']();
+        const previous = this.hostPrevious;
+        const seconds = previous ? (snapshot.timestamp - previous.timestamp) / 1000 : 0;
+        this.hostRates = (snapshot.networks || []).map(network => {
+          const old = (previous?.networks || []).find(item => item.name === network.name);
+          return { name: network.name, receive: old && seconds > 0 && network.received >= old.received ? (network.received - old.received) / seconds : null, send: old && seconds > 0 && network.sent >= old.sent ? (network.sent - old.sent) / seconds : null };
+        }).sort((left, right) => ((right.receive || 0) + (right.send || 0)) - ((left.receive || 0) + (left.send || 0)));
+        this.hostPrevious = snapshot;
+        this.hostSnapshot = snapshot;
+        this.hostError = (snapshot.errors || []).join('；');
+      } catch (error) { this.hostError = '采集失败：' + error; }
+      finally {
+        this.hostLoading = false;
+        if (this.hostTimer) clearTimeout(this.hostTimer);
+        if (this.tab === 'host') this.hostTimer = setTimeout(() => this.refreshHost(), 3000);
+      }
+    },
+    hostBytes(value) {
+      if (value == null || !Number.isFinite(Number(value))) return '—';
+      const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+      let amount = Number(value), unit = 0;
+      while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit++; }
+      return amount.toFixed(unit ? 1 : 0) + ' ' + units[unit];
+    },
+    async hostDiskTest() {
+      if (this.hostDiskBusy) return;
+      this.hostDiskBusy = true;
+      this.hostDiskResult = null;
+      try { this.hostDiskResult = await window['go']['app']['App']['RunHostDiskBenchmark'](); }
+      catch (error) { this.showError('磁盘测速失败：' + error); }
+      finally { this.hostDiskBusy = false; }
+    },
+    async hostAnalyzeStorage() {
+      if (this.hostStorageBusy) return;
+      this.hostStorageBusy = true;
+      try { this.hostStorage = await window['go']['app']['App']['AnalyzeHostStorage'](); }
+      catch (error) { this.showError('磁盘分析失败：' + error); }
+      finally { this.hostStorageBusy = false; }
+    },
+    async hostLoadPorts() {
+      if (this.hostPortsBusy) return;
+      this.hostPortsBusy = true;
+      try { this.hostPorts = await window['go']['app']['App']['GetHostPorts'](); }
+      catch (error) { this.showError('端口读取失败：' + error); }
+      finally { this.hostPortsBusy = false; }
+    },
+    async hostNetworkTest() {
+      if (this.hostNetworkBusy) return;
+      this.hostNetworkBusy = true;
+      this.hostNetworkResult = null;
+      try { this.hostNetworkResult = await window['go']['app']['App']['RunHostNetworkBenchmark'](); }
+      catch (error) { this.showError('网络测速失败：' + error); }
+      finally { this.hostNetworkBusy = false; }
+    },
     // ── Header ────────────────────────────────────────────────────────────
     headerRefresh() {
       this.loadModules();
@@ -3909,6 +3917,8 @@ window.hatchApp = function () {
         else if (this.vpnSubTab === 'rules') this.loadVPNRules();
       } else if (this.tab === 'memo') {
         this.loadMemoModule();
+      } else if (this.tab === 'host') {
+        this.refreshHost();
       } else if (this.tab === 'ai') {
         this.loadAIUsageStatuses();
         this.loadAITraces();

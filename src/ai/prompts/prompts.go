@@ -18,7 +18,6 @@ const (
 	OpSuggestZshrcOrganization   = "SuggestZshrcOrganization"
 	OpSuggestHookFromDescription = "SuggestHookFromDescription"
 	OpSuggestHookEdit            = "SuggestHookEdit"
-	OpSuggestMCPRecommendations  = "SuggestMCPRecommendations"
 	OpSuggestSkillContent        = "SuggestSkillContent"
 	OpSuggestVocabEntry          = "SuggestVocabEntry"
 )
@@ -56,12 +55,6 @@ content: 完整的新 ~/.zshrc 文件内容。
 4. 函数体内部内容和行序必须保持原样。
 5. 如果不确定某行用途，放到“其他/未分类”分组，保留原文。
 6. 输出 content 必须是可直接写回的完整文件。`
-
-const MCPRecommendations = `你是 Hatch 的 MCP 选型助手。根据用户需求和候选 MCP，给出适配 Claude Code 与 Codex 的推荐排序。
-只输出 JSON 对象，不要 Markdown。字段：
-summary: 80 字以内中文总结；
-candidates: 数组，每项包含 id, recommendation, fit, risk。不要新增候选，不要改 id。
-排序原则：官方/维护活跃/Claude Code 与 Codex stdio 兼容优先；弃用方案必须说明风险。`
 
 const SkillContent = `你是 Hatch 的 Skill 优化助手。Skill 是给 Claude Code / Codex 等 agent 使用的指令文档（SKILL.md）。
 请根据用户指令改进或重写 SKILL.md。要求：
@@ -108,7 +101,6 @@ func Defaults() map[string]string {
 		OpSuggestZshrcOrganization:   ZshrcOrganization,
 		OpSuggestHookFromDescription: HookDraft(),
 		OpSuggestHookEdit:            HookEdit(),
-		OpSuggestMCPRecommendations:  MCPRecommendations,
 		OpSuggestVPNRuleChange:       VPNRuleChange,
 		OpSuggestVPNEnhanceEdit:      VPNEnhanceEdit,
 	}
