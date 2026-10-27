@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+// TestMain points HOME at a temp dir so run-history archives written by the
+// oneshot tests never land in the user's real Hatch data directory.
+func TestMain(m *testing.M) {
+	home, err := os.MkdirTemp("", "hatch-executor-test-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("HOME", home)
+	code := m.Run()
+	os.RemoveAll(home)
+	os.Exit(code)
+}
+
 // --- shellQuote ---
 
 func TestShellQuote(t *testing.T) {

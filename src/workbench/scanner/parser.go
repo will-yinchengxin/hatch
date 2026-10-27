@@ -2,12 +2,9 @@ package scanner
 
 import (
 	"bufio"
-	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"hatch/core/config"
 )
@@ -91,10 +88,47 @@ func parseHatchAnnotations(path string) (config.ScriptMeta, bool) {
 			}
 		case "@hatch.health":
 			meta.HealthURL = val
+		case "@hatch.arg":
+			if arg, ok := parseArgAnnotation(val); ok {
+				meta.Args = append(meta.Args, arg)
+			}
+		case "@hatch.preset":
+			name, args, _ := strings.Cut(val, "|")
+			name, args = strings.TrimSpace(name), strings.TrimSpace(args)
+			if name != "" || args != "" {
+				if name == "" {
+					name = args
+				}
+				meta.Presets = append(meta.Presets, config.CommandPreset{Name: name, Args: args})
+			}
 		}
 	}
 
 	return meta, found
+}
+
+// parseArgAnnotation parses "@hatch.arg: name | --flag | default | required".
+// Only name is mandatory; flag empty means a positional argument. Default is
+// shown as a hint only: the UI omits empty args so the script applies it.
+func parseArgAnnotation(val string) (config.ArgDef, bool) {
+	parts := strings.Split(val, "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	if parts[0] == "" {
+		return config.ArgDef{}, false
+	}
+	arg := config.ArgDef{Name: parts[0]}
+	if len(parts) > 1 {
+		arg.Flag = parts[1]
+	}
+	if len(parts) > 2 {
+		arg.Default = parts[2]
+	}
+	if len(parts) > 3 {
+		arg.Required = strings.EqualFold(parts[3], "required")
+	}
+	return arg, true
 }
 
 // detectServicePattern scans the first 200 lines for start/stop/restart/reload
@@ -158,14 +192,50 @@ func containsStr(ss []string, s string) bool {
 	return false
 }
 
-// probeHelp runs `script --help` with a 2-second timeout and returns stdout+stderr.
-func probeHelp(path string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+// headerComment returns the first descriptive comment near the top of a
+// script (after the shebang, skipping @hatch lines, separators and encoding
+// pragmas), or a one-line Python docstring. Stops at the first code line.
+func headerComment(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
 
-	cmd := exec.CommandContext(ctx, path, "--help")
-	out, _ := cmd.CombinedOutput()
-	return strings.TrimSpace(string(out))
+	sc := bufio.NewScanner(f)
+	for n := 0; sc.Scan() && n < 20; n++ {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#!") {
+			continue
+		}
+		text, isComment := "", false
+		for _, prefix := range []string{"#", "//", "--"} {
+			if strings.HasPrefix(line, prefix) {
+				text, isComment = strings.TrimSpace(strings.TrimLeft(line, prefix)), true
+				break
+			}
+		}
+		if !isComment {
+			for _, q := range []string{`"""`, "'''"} {
+				if strings.HasPrefix(line, q) {
+					text, isComment = strings.TrimSpace(strings.Trim(line, q)), true
+				}
+			}
+		}
+		if !isComment {
+			return ""
+		}
+		lower := strings.ToLower(text)
+		if text == "" || strings.HasPrefix(text, "@") || strings.Trim(text, "-=*#~ ") == "" ||
+			strings.Contains(lower, "coding") || strings.HasPrefix(lower, "shellcheck") || strings.HasPrefix(lower, "vim:") {
+			continue
+		}
+		if r := []rune(text); len(r) > 120 {
+			text = string(r[:120]) + "…"
+		}
+		return text
+	}
+	return ""
 }
 
 // detectLanguage infers the scripting language from shebang or file extension.

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // FindCLI locates a user-installed command. Finder/Dock launches do not inherit
@@ -51,6 +53,31 @@ func SourceZshrcAsync() {
 // Open opens a file, directory or URL with the default macOS handler.
 func Open(target string) error {
 	return exec.Command("open", target).Start()
+}
+
+// Reveal selects target in a Finder window.
+func Reveal(target string) error {
+	return exec.Command("open", "-R", target).Start()
+}
+
+// MoveToTrash moves path into ~/.Trash (renaming on collision) so the user can
+// still restore it from Finder. Returns the new location.
+func MoveToTrash(path string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	trash := filepath.Join(home, ".Trash")
+	base := filepath.Base(path)
+	dst := filepath.Join(trash, base)
+	if _, err := os.Stat(dst); err == nil {
+		ext := filepath.Ext(base)
+		dst = filepath.Join(trash, fmt.Sprintf("%s %s%s", strings.TrimSuffix(base, ext), time.Now().Format("150405"), ext))
+	}
+	if err := os.Rename(path, dst); err != nil {
+		return "", err
+	}
+	return dst, nil
 }
 
 // Notify triggers a macOS notification banner via osascript. Best-effort:

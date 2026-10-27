@@ -32,6 +32,7 @@ type: "oneshot" 或 "service"；
 commands: service 子命令数组，没有则 []；
 pidFile: service 的 pid 文件建议，没有则 ""；
 needsArgs: oneshot 运行时是否需要参数输入；
+args: 脚本读取的参数定义数组，元素为 {"name":"中文参数名","flag":"--xx 或空字符串(位置参数)","default":"默认值或空","required":true/false}，按脚本实际读取顺序，无法确定则 []；
 tags: 1-5 个短标签；
 presets: 常用命令预设数组，元素为 {"name":"", "args":""}，没有可靠建议则 []。`
 
@@ -39,7 +40,13 @@ const ScriptContent = "你是 macOS shell 脚本编写助手。根据用户指�
 	"要求：\n" +
 	"1. 只输出脚本文本，不要任何解释，不要 Markdown 代码块（不要用三个反引号包裹输出）。\n" +
 	"2. 脚本必须以合适的 shebang 开头（如 #!/bin/zsh 或 #!/usr/bin/env python3）。\n" +
-	"3. 保留已有内容中有价值的逻辑，除非指令要求完全重写。"
+	"3. 保留已有内容中有价值的逻辑，除非指令要求完全重写。\n" +
+	"4. 新脚本在 shebang 后用注释写 Hatch 元信息（已有则保持并按需更新）：\n" +
+	"   # @hatch.name: 简短中文名\n" +
+	"   # @hatch.desc: 一句话说明\n" +
+	"   # @hatch.arg: 参数名 | --flag(位置参数留空) | 默认值说明 | required 或 optional（每个参数一行，没有参数就不写；不传的参数由脚本自己取默认值）\n" +
+	"   # @hatch.tags: 标签1, 标签2\n" +
+	"5. 脚本要能在 macOS 上直接执行：出错时以非零码退出，关键步骤输出简短日志。"
 
 const ZshrcAnnotation = `你是 shell 配置解释助手。请为一条 zshrc 配置生成简短中文备注，说明它的作用、影响或风险。
 只输出备注正文，不要 Markdown，不要加引号，控制在 60 个中文字符以内。`

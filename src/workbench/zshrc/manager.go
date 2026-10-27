@@ -66,16 +66,34 @@ func ReadBlock(zshrcPath string) ([]string, error) {
 	return lines, nil
 }
 
+// Var is one export in the managed block. InPath appends $Name to PATH.
+type Var struct {
+	Name   string
+	Value  string
+	InPath bool
+}
+
 // WriteBlock replaces (or creates) the Hatch managed block with the given
-// export lines. Lines outside the block are never touched.
+// export lines, adding every variable to PATH. Lines outside the block are
+// never touched.
 func WriteBlock(zshrcPath string, exports map[string]string) error {
+	vars := make([]Var, 0, len(exports))
+	for name, value := range exports {
+		vars = append(vars, Var{Name: name, Value: value, InPath: true})
+	}
+	return WriteVars(zshrcPath, vars)
+}
+
+// WriteVars replaces (or creates) the Hatch managed block. Only variables
+// with InPath set are appended to PATH; the rest are plain exports.
+func WriteVars(zshrcPath string, vars []Var) error {
 	data, err := os.ReadFile(zshrcPath)
 	if err != nil {
 		return err
 	}
 	content := string(data)
 
-	block := buildBlock(exports)
+	block := buildBlock(vars)
 
 	if blockRe.MatchString(content) {
 		content = blockRe.ReplaceAllString(content, strings.ReplaceAll(block, "$", "$$"))
@@ -112,22 +130,23 @@ func WriteContent(zshrcPath, content string) error {
 	return os.WriteFile(zshrcPath, []byte(content), 0o644)
 }
 
-func buildBlock(exports map[string]string) string {
-	keys := make([]string, 0, len(exports))
-	for k := range exports {
-		keys = append(keys, k)
+func buildBlock(vars []Var) string {
+	sorted := make([]Var, 0, len(vars))
+	for _, v := range vars {
+		if v.Name != "" {
+			sorted = append(sorted, v)
+		}
 	}
-	sort.Strings(keys)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
 	var sb strings.Builder
 	sb.WriteString(blockBegin + "\n")
-	pathVars := make([]string, 0, len(keys))
-	for _, name := range keys {
-		if name == "" {
-			continue
+	pathVars := make([]string, 0, len(sorted))
+	for _, v := range sorted {
+		sb.WriteString(fmt.Sprintf("export %s=%s\n", v.Name, shellValue(v.Value)))
+		if v.InPath {
+			pathVars = append(pathVars, "$"+v.Name)
 		}
-		sb.WriteString(fmt.Sprintf("export %s=%s\n", name, shellValue(exports[name])))
-		pathVars = append(pathVars, "$"+name)
 	}
 	if len(pathVars) > 0 {
 		sb.WriteString(fmt.Sprintf("export PATH=%s:$PATH\n", strings.Join(pathVars, ":")))

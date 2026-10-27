@@ -62,7 +62,7 @@ func ScanDir(dir string, overrides map[string]config.ScriptMeta) ([]config.Scrip
 
 // buildMeta constructs ScriptMeta using the three-tier fallback:
 //  1. @hatch.* annotations in the file header
-//  2. --help probe output (sets Desc if still empty)
+//  2. service pattern + first header comment (sets Desc if still empty)
 //  3. sensible defaults
 func buildMeta(path, name string, info os.FileInfo) config.ScriptMeta {
 	meta, hasAnnotations := parseHatchAnnotations(path)
@@ -87,18 +87,10 @@ func buildMeta(path, name string, info os.FileInfo) config.ScriptMeta {
 		}
 	}
 
-	if !hasAnnotations && meta.Desc == "" {
-		if help := probeHelp(path); help != "" {
-			for _, line := range strings.Split(help, "\n") {
-				if line = strings.TrimSpace(line); line != "" {
-					if len(line) > 120 {
-						line = line[:120] + "…"
-					}
-					meta.Desc = line
-					break
-				}
-			}
-		}
+	// Tier 2b: first header comment as description. Scripts are never executed
+	// during a scan (a `--help` probe would run scripts that ignore the flag).
+	if meta.Desc == "" {
+		meta.Desc = headerComment(path)
 	}
 
 	if meta.Type == config.TypeService && meta.PidFile == "" {
@@ -157,6 +149,25 @@ func mergeOverride(base, ov config.ScriptMeta) config.ScriptMeta {
 	if len(ov.Tags) > 0 {
 		base.Tags = ov.Tags
 	}
+	if len(ov.Env) > 0 {
+		base.Env = ov.Env
+	}
+	if ov.NotifyOnDone {
+		base.NotifyOnDone = true
+	}
+	if ov.Schedule != "" {
+		base.Schedule = ov.Schedule
+	}
+	if len(ov.Requires) > 0 {
+		base.Requires = ov.Requires
+	}
+	if ov.HealthURL != "" {
+		base.HealthURL = ov.HealthURL
+	}
+	if len(ov.PreScripts) > 0 {
+		base.PreScripts = ov.PreScripts
+	}
+	base.Favorite = ov.Favorite
 	// Preserve runtime fields from base
 	base.LastRunAt = ov.LastRunAt
 	return base

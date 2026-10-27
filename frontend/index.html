@@ -11,20 +11,13 @@
   <!-- ── Header ─────────────────────────────────────────────────────── -->
   <header class="app-header">
     <div class="header-brand">
-      <button x-show="selectedDir" @click="exitDir()" class="btn-back">← 返回</button>
-      <span class="logo" x-show="!selectedDir">
+      <span class="logo">
         <img src="/src/assets/images/logo.png" alt="Hatch" class="logo-img" />
         <span class="logo-text">Hatch</span>
       </span>
-      <template x-if="selectedDir">
-        <div class="breadcrumb">
-          <span class="dir-name" x-text="selectedDir?.exportName || baseName(selectedDir?.path)"></span>
-          <span class="dir-path" x-text="selectedDir?.path"></span>
-        </div>
-      </template>
     </div>
 
-    <nav class="tab-nav" x-show="!selectedDir">
+    <nav class="tab-nav">
       <!-- Visibility comes from config.json "modules" (see loadModules) -->
       <button class="tab" x-show="moduleOn('scripts')" :class="tab==='scripts' ? 'active' : ''" @click="openTab('scripts')">▦ 工作台</button>
       <button class="tab" x-show="moduleOn('ai')"      :class="tab==='ai'      ? 'active' : ''" @click="openTab('ai')">✦ AI</button>
@@ -34,14 +27,6 @@
     </nav>
 
     <div class="header-right">
-      <input
-        x-show="selectedDir"
-        type="search"
-        x-model="query"
-        @input="page = 1"
-        placeholder="搜索脚本…"
-        class="search-input"
-      />
       <button
         class="btn-refresh"
         @click="headerRefresh()"
@@ -80,7 +65,7 @@
               <option x-show="!aiProviders.length" disabled selected>未配置 provider — 请去 ✦ AI → 🔌 连接 添加</option>
             </select>
             <div class="quick-ai-manage-row">
-              <button class="btn-edit" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; selectedDir=null">⚙ 管理 provider</button>
+              <button class="btn-edit" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false">⚙ 管理 provider</button>
             </div>
           </div>
 
@@ -90,7 +75,7 @@
               <strong class="quick-ai-section-title">最近 AI 调用</strong>
               <span class="quick-ai-actions">
                 <button class="icon-btn" @click="loadAITraces(); loadTraceStorage()" title="刷新">↻</button>
-                <button class="icon-btn" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; selectedDir=null; setTimeout(()=>{aiTraceCollapsed=false}, 50)" title="去完整日志页">↗</button>
+                <button class="icon-btn" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; setTimeout(()=>{aiTraceCollapsed=false}, 50)" title="去完整日志页">↗</button>
               </span>
             </div>
             <template x-if="!(aiTraces || []).length">
@@ -178,7 +163,7 @@
   <!-- ══════════════════════════════════════════════════════════════════
        HOST — macOS host monitoring
   ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='host' && !selectedDir" class="host-page">
+  <main x-show="tab==='host'" class="host-page">
     <section class="page-hero ai-hero host-hero">
       <div class="host-hero-top">
         <div>
@@ -306,438 +291,552 @@
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       SCRIPTS — Directory list
+       WORKBENCH — scripts · env · directories · runs
   ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='scripts' && !selectedDir">
-    <section class="page-hero ai-hero scripts-hero">
+  <main x-show="tab==='scripts'" class="ai-main wb-main">
+    <section class="page-hero ai-hero hero-compact scripts-hero">
       <div>
-        <p class="eyebrow">Script Dashboard</p>
+        <p class="eyebrow">Script Workbench</p>
         <h1>脚本工作台</h1>
-        <p class="page-subtitle">按目录管理一次性脚本和常驻服务，运行、查看日志和维护环境变量都在这里完成。</p>
+        <p class="page-subtitle">维护本地脚本与环境变量；按 <kbd>⌘K</kbd> 搜索即可运行，AI 起草的修改需确认后才会写入。</p>
       </div>
-      <div class="hero-stats" x-show="scriptDirs.length>0">
-        <div class="hero-stat-card">
-          <div class="hero-stat-label">脚本目录</div>
-          <div class="hero-stat-body"><span class="hero-stat-total" x-text="scriptDirs.length"></span></div>
-        </div>
+      <div class="hero-stats">
         <div class="hero-stat-card">
           <div class="hero-stat-label">脚本</div>
           <div class="hero-stat-body"><span class="hero-stat-total" x-text="totalScriptCount"></span></div>
         </div>
         <div class="hero-stat-card">
-          <div class="hero-stat-label">服务</div>
-          <div class="hero-stat-body"><span class="hero-stat-total" x-text="serviceScriptCount"></span></div>
+          <div class="hero-stat-label">运行中</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="wbRunningCount"></span></div>
+        </div>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">环境变量</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="exportCount"></span></div>
         </div>
       </div>
     </section>
 
-    <div class="loading-wrap" x-show="loading">
-      <progress></progress><p class="muted" style="margin-top:10px">扫描目录…</p>
-    </div>
+    <div class="ai-layout">
+      <nav class="ai-sidenav">
+        <button class="ai-sidenav-item" :class="wbSubTab==='scripts' ? 'active' : ''" @click="wbGo('scripts')">
+          <span class="ai-sidenav-icon">📜</span><span>脚本</span>
+          <span class="ai-sidenav-count" x-show="totalScriptCount > 0" x-text="totalScriptCount"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="wbSubTab==='env' ? 'active' : ''" @click="wbGo('env')">
+          <span class="ai-sidenav-icon">🔑</span><span>环境变量</span>
+          <span class="ai-sidenav-badge badge-warn" x-show="envDirty">●</span>
+        </button>
+        <button class="ai-sidenav-item" :class="wbSubTab==='dirs' ? 'active' : ''" @click="wbGo('dirs')">
+          <span class="ai-sidenav-icon">📁</span><span>目录</span>
+          <span class="ai-sidenav-count" x-show="scriptDirs.length > 0" x-text="scriptDirs.length"></span>
+        </button>
+        <button class="ai-sidenav-item" :class="wbSubTab==='runs' ? 'active' : ''" @click="wbGo('runs')">
+          <span class="ai-sidenav-icon">🕘</span><span>运行记录</span>
+        </button>
+      </nav>
 
-    <div class="empty-state" x-show="!loading && scriptDirs.length===0">
-      <p>还没有配置脚本目录，在下方「目录管理」中添加。</p>
-    </div>
+      <div class="ai-content">
 
-    <div class="dir-card-list" x-show="!loading && scriptDirs.length>0">
-      <template x-for="d in scriptDirs" :key="d.path">
-        <div class="dir-card" @click="enterDir(d)" role="button" tabindex="0" @keyup.enter="enterDir(d)">
-          <div class="dir-card-icon">📁</div>
-          <div class="dir-card-body">
-            <div class="dir-card-title">
-              <strong x-text="d.exportName || baseName(d.path)"></strong>
-              <span class="badge badge-export" x-show="d.exportName" x-text="'$'+d.exportName"></span>
-            </div>
-            <div class="dir-card-path" x-text="d.path"></div>
-            <div class="dir-card-meta">
-              <span x-text="(dirScriptCount[d.path]||0)+' 个脚本'"></span>
-              <span x-text="dirTypeSummary(d.path)"></span>
+        <!-- ══ 脚本 ════════════════════════════════════════════════════ -->
+        <div x-show="wbSubTab==='scripts'">
+          <div class="empty-state wb-empty" x-show="!loading && scriptDirs.length===0">
+            <p><strong>还没有脚本目录</strong></p>
+            <p class="muted">添加一个存放脚本的目录，Hatch 会扫描其中的可执行文件。</p>
+            <div class="add-dir-form wb-add-dir">
+              <input type="text" x-model="newDir.path" placeholder="/Users/you/tools" class="path-input" @keyup.enter="addDirectory()" />
+              <button class="btn-sm active" @click="addDirectory()" :disabled="!newDir.path.trim()">添加目录</button>
             </div>
           </div>
-          <div class="dir-enter-btn">进入 →</div>
-        </div>
-      </template>
-    </div>
 
-    <!-- ══ 工作台设置区 ═══════════════════════════════════════════════ -->
-    <div class="workspace-settings">
-
-      <!-- ── Shell 状态信息条（始终显示） ──────────────────────────── -->
-      <div class="ws-shell-bar" x-show="zshrcInfo">
-        <span class="ws-shell-chip">
-          <span class="ws-shell-label">Shell</span>
-          <code x-text="zshrcInfo?.shell||'-'"></code>
-          <span class="badge badge-sm" :class="zshrcInfo?.isZsh?'badge-ok':'badge-warn'"
-            x-text="zshrcInfo?.isZsh?'✓':'⚠'"></span>
-        </span>
-        <span class="ws-shell-chip" x-show="zshrcInfo?.zshrcPath">
-          <span class="ws-shell-label">zshrc</span>
-          <code x-text="zshrcInfo?.zshrcPath||'-'"></code>
-        </span>
-        <span class="ws-shell-chip" x-show="(zshrcInfo?.hatchLines||[]).length>0">
-          <span class="ws-shell-label">managed</span>
-          <code x-text="(zshrcInfo?.hatchLines?.length||0)+' 行'"></code>
-        </span>
-      </div>
-
-      <!-- ── 数据目录配置 ───────────────────────────────────────────── -->
-      <section class="settings-section ws-section">
-        <div class="ws-section-header" @click="wsShellOpen=!wsShellOpen">
-          <h3>⚙ 数据目录</h3>
-          <span class="ws-chevron" x-text="wsShellOpen ? '▲' : '▼'"></span>
-        </div>
-        <div x-show="wsShellOpen" x-transition>
-          <div class="data-paths-grid">
-            <div class="data-path-row">
-              <div class="data-path-info">
-                <span class="data-path-label">AI 调试日志</span>
-                <code class="data-path-val" x-text="dataPaths.traceLogDir || dataPaths.defaultTraceDir"></code>
-                <span class="badge badge-ok text-xs" x-show="dataPaths.traceLogDirIsSet">自定义</span>
-                <span class="muted text-xs" x-show="!dataPaths.traceLogDirIsSet">默认</span>
+          <div class="wb-split" x-show="scriptDirs.length > 0">
+            <!-- ── Master list ── -->
+            <aside class="wb-list">
+              <div class="wb-list-head">
+                <input type="search" class="search-input wb-search" x-model="wbQuery" placeholder="搜索名称、描述、标签…" @keydown.down.prevent="wbMoveSelection(1)" @keydown.up.prevent="wbMoveSelection(-1)" @keydown.enter.prevent="wbCurrent && wbOpenPane('run')" />
+                <button class="btn-sm active wb-new-btn" @click="openNewScriptDialog()" title="新建脚本">＋</button>
               </div>
-              <input type="text" class="data-path-input field-input"
-                x-model="dataPathsForm.traceLogDir"
-                :placeholder="dataPaths.defaultTraceDir" />
-            </div>
-            <div class="data-path-row">
-              <div class="data-path-info">
-                <span class="data-path-label">Skills 主目录</span>
-                <code class="data-path-val" x-text="dataPaths.skillsDir || dataPaths.defaultSkillsDir"></code>
-                <span class="badge badge-ok text-xs" x-show="dataPaths.skillsDirIsSet">自定义</span>
-                <span class="muted text-xs" x-show="!dataPaths.skillsDirIsSet">默认</span>
-              </div>
-              <input type="text" class="data-path-input field-input"
-                x-model="dataPathsForm.skillsDir"
-                :placeholder="dataPaths.defaultSkillsDir" />
-            </div>
-          </div>
-          <div class="export-actions" style="margin-top:10px">
-            <button @click="saveDataPaths()" :aria-busy="dataPathsSaving">💾 保存</button>
-            <button class="secondary" @click="resetDataPaths()">恢复默认</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── 目录管理 ────────────────────────────────────────────────── -->
-      <section class="settings-section ws-section">
-        <div class="ws-section-header" @click="wsDirsOpen=!wsDirsOpen">
-          <h3>📁 目录管理</h3>
-          <div class="ws-section-meta">
-            <span class="badge" x-text="(cfg.directories||[]).length + ' 个目录'"></span>
-            <span class="ws-chevron" x-text="wsDirsOpen ? '▲' : '▼'"></span>
-          </div>
-        </div>
-        <div x-show="wsDirsOpen" x-transition>
-
-          <div class="dir-setting-list" x-show="(cfg.directories||[]).length>0">
-            <template x-for="d in (cfg.directories||[])" :key="d.path">
-              <div class="dir-setting-row">
-                <div class="dir-setting-info">
-                  <code x-text="d.path" class="dir-setting-path"></code>
-                </div>
-
-                <!-- Inline export name editor -->
-                <div class="dir-export-cell">
-                  <!-- Viewing state: has export name -->
-                  <template x-if="inlineExportDir !== d.path && d.exportName">
-                    <div class="dir-export-active">
-                      <span class="badge badge-export" x-text="'$'+d.exportName"
-                        @click="startInlineExport(d)" style="cursor:pointer" title="点击编辑变量名"></span>
-                      <button class="icon-btn-xs danger-text" @click="clearExport(d)" title="取消路径导出">✕</button>
-                    </div>
-                  </template>
-                  <!-- Viewing state: no export name -->
-                  <template x-if="inlineExportDir !== d.path && !d.exportName">
-                    <button class="btn-add-export" @click="startInlineExport(d)" title="将此目录路径导出为环境变量">
-                      + 导出路径
-                    </button>
-                  </template>
-                  <!-- Editing state -->
-                  <template x-if="inlineExportDir === d.path">
-                    <div class="dir-export-edit">
-                      <span class="mono-eq">$</span>
-                      <input
-                        type="text"
-                        x-model="inlineExportName"
-                        class="inline-export-input"
-                        placeholder="MY_SCRIPTS"
-                        @keyup.enter="confirmInlineExport()"
-                        @keyup.escape="cancelInlineExport()"
-                        x-init="$el.focus(); $el.select()"
-                      />
-                      <button class="btn-sm" @click="confirmInlineExport()" :disabled="!inlineExportName.trim()">✓</button>
-                      <button class="btn-sm secondary" @click="cancelInlineExport()">✕</button>
-                    </div>
-                  </template>
-                </div>
-
-                <button class="icon-btn danger" @click="removeDirectory(d.path)" title="移除目录">✕</button>
-              </div>
-            </template>
-          </div>
-
-          <!-- Add directory -->
-          <div class="add-dir-form">
-            <input
-              type="text"
-              x-model="newDir.path"
-              placeholder="粘贴或输入目录路径，回车添加"
-              class="path-input"
-              @keyup.enter="addDirectory()"
-            />
-            <button @click="addDirectory()" :disabled="!newDir.path.trim()">+ 添加</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ── 环境变量 ────────────────────────────────────────────────── -->
-      <section class="settings-section ws-section">
-        <div class="ws-section-header" @click="wsEnvOpen=!wsEnvOpen">
-          <h3>🔑 环境变量</h3>
-          <div class="ws-section-meta">
-            <span class="badge" x-text="exportCount + ' 个'"></span>
-            <span class="badge badge-dirty" x-show="exportsDirty">● 未保存</span>
-            <span class="ws-chevron" x-text="wsEnvOpen ? '▲' : '▼'"></span>
-          </div>
-        </div>
-        <div x-show="wsEnvOpen" x-transition>
-          <p class="hint">写入 <code>~/.zshrc</code> Hatch managed block，保存后新终端生效。</p>
-
-          <div class="export-list">
-            <template x-for="(e,i) in (cfg.exports||[])" :key="i">
-              <div class="export-row">
-                <input type="text" x-model="e.name"  @input="exportsDirty=true" placeholder="VARIABLE_NAME" class="var-name"  />
-                <span class="eq">=</span>
-                <input type="text" x-model="e.value" @input="exportsDirty=true" placeholder="/path/or/value" class="var-value" />
-                <button class="icon-btn danger" @click="removeExportRow(i)" title="删除此变量">✕</button>
-              </div>
-            </template>
-            <div x-show="(cfg.exports||[]).length===0" class="muted text-sm empty-exports">
-              暂无变量。点击「+ 添加」后写入 <code>~/.zshrc</code>，新终端中生效。
-            </div>
-          </div>
-
-          <div class="export-actions">
-            <button class="secondary" @click="addExportRow()">+ 添加</button>
-            <button
-              @click="saveExports()"
-              :aria-busy="savingExports"
-              :class="exportsDirty ? 'btn-save-dirty' : ''"
-            >💾 保存到 zshrc</button>
-          </div>
-
-          <!-- zshrc preview (collapsible) -->
-          <details class="export-preview-details" x-show="(cfg.exports||[]).some(e=>e.name)">
-            <summary class="export-preview-toggle muted text-sm">预览写入内容</summary>
-            <pre class="preview-pre export-preview-pre" x-text="exportsPreview()"></pre>
-          </details>
-        </div>
-      </section>
-
-    </div><!-- /workspace-settings -->
-  </main>
-
-  <!-- ══════════════════════════════════════════════════════════════════
-       SCRIPTS — Script list (inside a directory)
-  ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='scripts' && selectedDir">
-    <section class="directory-toolbar">
-      <div>
-        <p class="eyebrow">Directory</p>
-        <h1 x-text="selectedDir?.exportName || baseName(selectedDir?.path)"></h1>
-        <p class="page-subtitle" x-text="selectedDir?.path"></p>
-      </div>
-      <div class="toolbar-summary">
-        <span x-text="filteredScripts.length + ' / ' + currentScripts.length + ' 个脚本'"></span>
-        <span x-text="currentScripts.filter(s=>s.type==='service').length + ' service'"></span>
-        <template x-if="!sortMode">
-          <button class="btn-sm" @click="enterSortMode()" title="拖拽调整脚本顺序">⇅ 排序</button>
-        </template>
-        <template x-if="sortMode">
-          <button class="btn-sm btn-sort-done" @click="exitSortMode()">✓ 完成排序</button>
-        </template>
-        <button class="btn-sm btn-new-script" x-show="!sortMode" @click="openNewScript()">＋ 新建脚本</button>
-      </div>
-    </section>
-
-    <div class="loading-wrap" x-show="loading">
-      <progress></progress><p class="muted" style="margin-top:10px">扫描脚本…</p>
-    </div>
-    <div class="empty-state" x-show="!loading && currentScripts.length===0">
-      <p>此目录下没有找到脚本。</p>
-    </div>
-    <div class="empty-state" x-show="!loading && currentScripts.length>0 && filteredScripts.length===0">
-      <p>没有匹配「<span x-text="query"></span>」的脚本。</p>
-    </div>
-
-    <div class="script-list">
-      <template x-for="s in pagedScripts" :key="s.path">
-        <article
-          class="script-card"
-          :data-type="s.type"
-          :draggable="sortMode"
-          @dragstart="sortMode && scriptDragStart($event, s.path)"
-          @dragover="sortMode && scriptDragOver($event, s.path)"
-          @dragleave="sortMode && scriptDragLeave($event)"
-          @drop="sortMode && scriptDrop($event, s.path)"
-          @dragend="scriptDragEnd()"
-          :class="{'is-dragging': dragSrcPath===s.path, 'drag-over-top': dragOverPath===s.path, 'sort-mode-card': sortMode}"
-        >
-
-          <div class="card-header">
-            <div class="card-title">
-              <span class="drag-handle" x-show="sortMode" title="拖拽调整顺序">⠿</span>
-              <span x-text="langIcon(s.language)" class="lang-icon"></span>
-              <strong x-text="s.name"></strong>
-              <span class="badge" :class="'lang-'+s.language" x-text="s.language"></span>
-              <span class="badge" :class="'type-'+s.type" x-text="s.type"></span>
-            </div>
-            <div class="card-actions">
-              <button
-                class="btn-edit"
-                @click.stop="fillScriptWithAI(s)"
-                :aria-busy="aiBusyScript===s.path"
-                title="使用 AI 分析脚本并填充编辑表单"
-              >✦ 智能填写</button>
-              <button class="btn-edit" @click.stop="openEdit(s)" title="编辑元信息">✏ 编辑</button>
-              <button class="btn-edit" @click.stop="openScriptEditor(s)" title="查看/编辑脚本内容">📄 内容</button>
-              <button class="btn-edit" @click.stop="openHistory(s)" title="查看历史运行记录">📜 历史</button>
-              <button
-                class="log-toggle"
-                @click="logTarget = logTarget===s.path ? null : s.path"
-                :class="logTarget===s.path ? 'active' : ''"
-                x-show="runningSet[s.path] || logLines(s.path).length > 0"
-              >
-                <span x-show="runningSet[s.path]">⏳</span>
-                <span x-show="!runningSet[s.path] && scriptExitCodes[s.path] === 0">✓</span>
-                <span x-show="!runningSet[s.path] && scriptExitCodes[s.path] !== undefined && scriptExitCodes[s.path] !== 0">✗</span>
-                <span x-show="!runningSet[s.path] && scriptExitCodes[s.path] === undefined">📋</span>
-                日志
-              </button>
-            </div>
-          </div>
-
-          <p class="card-desc" x-text="s.desc||'暂无描述'" :class="!s.desc?'muted':''"></p>
-
-          <div class="cmd-tags meta-tags" x-show="s.tags && s.tags.length>0">
-            <template x-for="t in s.tags" :key="t">
-              <span class="cmd-tag tag-chip" x-text="t"></span>
-            </template>
-          </div>
-
-          <!-- Detected service sub-commands -->
-          <div class="cmd-tags" x-show="s.commands && s.commands.length>0">
-            <template x-for="c in s.commands" :key="c">
-              <span class="cmd-tag" x-text="c"></span>
-            </template>
-          </div>
-
-          <!-- Preset quick-run buttons -->
-          <div class="preset-row" x-show="normalizedPresets(s).length > 0">
-            <template x-for="p in normalizedPresets(s)" :key="p.name + ':' + p.args">
-              <button
-                class="preset-btn"
-                @click.stop="runPreset(s, p)"
-                :disabled="isPresetDisabled(s, p)"
-                :class="presetClass(p)"
-                :title="'参数: ' + p.args"
-                x-text="presetButtonLabel(p)"
-              ></button>
-            </template>
-          </div>
-
-          <!-- Oneshot controls -->
-          <div class="card-footer" x-show="s.type==='oneshot'">
-            <template x-if="!Array.isArray(s.args) || s.args.length > 0 || s.args === null">
-              <input
-                type="text"
-                x-model="scriptArgs[s.path]"
-                placeholder="运行参数（可选）"
-                class="args-input"
-                @keyup.enter="runScript(s)"
-              />
-            </template>
-            <button
-              @click="runScript(s)"
-              :disabled="!!runningSet[s.path]"
-              :aria-busy="runningSet[s.path] ? true : null"
-              class="run-btn"
-            >▶ 运行</button>
-          </div>
-
-          <!-- Service controls -->
-          <div class="card-footer service-footer" x-show="s.type==='service'">
-            <div class="status-info">
-              <span class="status-dot" :class="statuses[s.path]==='running'?'dot-running':'dot-stopped'"></span>
-              <span class="status-label" x-text="statuses[s.path]==='running'?'运行中':'已停止'"></span>
-            </div>
-            <div class="service-actions">
-              <template x-if="s.commands && s.commands.length>0">
-                <span>
-                  <template x-for="cmd in s.commands" :key="cmd">
-                    <button
-                      @click="serviceAction(s, cmd)"
-                      :disabled="(cmd==='start'&&statuses[s.path]==='running')||(cmd==='stop'&&statuses[s.path]!=='running')"
-                      :class="cmd==='start'?'btn-start':cmd==='stop'?'btn-stop':'btn-restart'"
-                      x-text="cmdLabel(cmd)"
-                    ></button>
-                  </template>
-                </span>
-              </template>
-              <template x-if="!s.commands || s.commands.length===0">
-                <span>
-                  <button @click="serviceAction(s,'start')"   :disabled="statuses[s.path]==='running'" class="btn-start">▶ start</button>
-                  <button @click="serviceAction(s,'stop')"    :disabled="statuses[s.path]!=='running'" class="btn-stop">■ stop</button>
-                  <button @click="serviceAction(s,'restart')" class="btn-restart">↺</button>
-                </span>
-              </template>
-            </div>
-          </div>
-
-          <!-- Inline log panel (auto-shown when running or has output) -->
-          <div class="log-panel" x-show="logTarget===s.path" x-transition>
-            <div class="log-toolbar">
-              <div class="log-status">
-                <span x-show="runningSet[s.path]" class="log-status-running">● 运行中</span>
-                <template x-if="!runningSet[s.path] && scriptExitCodes[s.path] !== undefined">
-                  <span>
-                    <span x-show="scriptExitCodes[s.path] === 0" class="log-status-ok">✓ exit 0</span>
-                    <span x-show="scriptExitCodes[s.path] !== 0" class="log-status-err" x-text="'✗ exit ' + scriptExitCodes[s.path]"></span>
-                  </span>
+              <div class="wb-filters">
+                <template x-for="f in wbFilterOptions" :key="f.id">
+                  <button class="wb-filter" :class="wbFilter===f.id ? 'active' : ''" @click="wbFilter=f.id" x-text="f.label + (f.count ? ' ' + f.count : '')"></button>
                 </template>
-                <span
-                  x-show="!runningSet[s.path] && scriptExitCodes[s.path] === undefined"
-                  class="log-status-default"
-                  x-text="logLines(s.path).length + ' 行'"
-                ></span>
               </div>
-              <button class="icon-btn" @click="clearLog(s.path)" title="清空日志">🗑</button>
-            </div>
-            <pre class="log-pre" :id="'log-'+safeId(s.path)">
-              <template x-if="logLines(s.path).length === 0 && runningSet[s.path]">
-                <span class="log-empty">等待输出…</span>
+              <div class="wb-list-body">
+                <div class="loading-wrap wb-list-loading" x-show="loading && !allScripts.length"><progress></progress></div>
+                <p class="muted wb-list-empty" x-show="!loading && wbGroups.length===0">没有匹配的脚本</p>
+                <template x-for="g in wbGroups" :key="g.key">
+                  <div class="wb-group">
+                    <div class="wb-group-label">
+                      <span x-text="g.label"></span>
+                      <span class="wb-group-count" x-text="g.items.length"></span>
+                    </div>
+                    <template x-for="s in g.items" :key="g.key + s.path">
+                      <button class="wb-item" :class="{ active: wbSelected===s.path }" @click="wbSelect(s)" :title="s.path">
+                        <span class="wb-item-dot" :class="wbStatusClass(s)"></span>
+                        <span class="wb-item-main">
+                          <span class="wb-item-name" x-text="s.name"></span>
+                          <span class="wb-item-desc" x-text="s.desc || baseName(s.path)"></span>
+                        </span>
+                        <span class="wb-item-meta">
+                          <span class="wb-item-star" x-show="s.favorite">★</span>
+                          <span class="wb-item-type" x-show="s.type==='service'">服务</span>
+                          <span class="wb-item-type" x-show="s.schedule">⏱</span>
+                        </span>
+                      </button>
+                    </template>
+                  </div>
+                </template>
+              </div>
+              <div class="wb-list-foot muted">
+                <span><kbd>⌘K</kbd> 快速运行</span>
+                <span><kbd>↑</kbd><kbd>↓</kbd> 切换</span>
+              </div>
+            </aside>
+
+            <!-- ── Detail ── -->
+            <section class="wb-detail">
+              <template x-if="!wbCurrent">
+                <div class="empty-state wb-detail-empty">
+                  <p><strong>选择左侧的脚本</strong></p>
+                  <p class="muted">或按 <kbd>⌘K</kbd> 搜索后直接运行。</p>
+                  <button class="btn-sm" @click="openNewScriptDialog()">＋ 新建脚本</button>
+                </div>
               </template>
-              <template x-for="(l,i) in logLines(s.path)" :key="i">
-                <span :class="l.stream==='stderr'?'log-stderr':'log-stdout'" x-text="l.line+'\n'"></span>
+
+              <template x-if="wbCurrent">
+                <div class="wb-detail-inner">
+                  <header class="wb-detail-head">
+                    <div class="wb-detail-title">
+                      <span class="wb-lang" x-text="langIcon(wbCurrent.language)"></span>
+                      <div class="wb-detail-title-text">
+                        <h2 x-text="wbCurrent.name"></h2>
+                        <button class="wb-path" @click="copyToClipboard(wbCurrent.path, '路径')" :title="'复制路径 ' + wbCurrent.path" x-text="wbDisplayPath(wbCurrent)"></button>
+                      </div>
+                    </div>
+                    <div class="wb-detail-actions">
+                      <button class="icon-btn wb-star" :class="{ on: wbCurrent.favorite }" @click="toggleFavorite(wbCurrent)" :title="wbCurrent.favorite ? '取消收藏' : '收藏（置顶）'" x-text="wbCurrent.favorite ? '★' : '☆'"></button>
+                      <button class="btn-sm" @click="copyToClipboard(wbShellCommand(wbCurrent), '终端命令')" title="复制可在终端执行的命令">⧉ 命令</button>
+                      <button class="btn-sm" @click="revealFile(wbCurrent.path)" title="在 Finder 中显示">Finder</button>
+                      <button class="icon-btn danger" @click="trashScript(wbCurrent)" title="移到废纸篓">🗑</button>
+                    </div>
+                  </header>
+                  <p class="wb-desc" :class="!wbCurrent.desc ? 'muted' : ''" x-text="wbCurrent.desc || '暂无描述 — 在「配置」里补充，或用 ✦ AI 补全'"></p>
+                  <div class="wb-chips">
+                    <span class="badge" :class="'lang-' + wbCurrent.language" x-text="wbCurrent.language"></span>
+                    <span class="badge" :class="'type-' + wbCurrent.type" x-text="wbCurrent.type === 'service' ? '服务' : '一次性'"></span>
+                    <span class="badge" x-show="wbCurrent.schedule" x-text="'⏱ ' + wbCurrent.schedule"></span>
+                    <span class="badge" x-show="Object.keys(wbCurrent.env || {}).length" x-text="'env ' + Object.keys(wbCurrent.env || {}).length"></span>
+                    <template x-for="t in (wbCurrent.tags || [])" :key="t"><span class="cmd-tag tag-chip" x-text="t"></span></template>
+                  </div>
+
+                  <nav class="wb-tabs">
+                    <button :class="wbPane==='run' ? 'active' : ''" @click="wbOpenPane('run')">▶ 运行</button>
+                    <button :class="wbPane==='code' ? 'active' : ''" @click="wbOpenPane('code')">代码<span class="wb-dirty-dot" x-show="wbCodeDirty">●</span></button>
+                    <button :class="wbPane==='config' ? 'active' : ''" @click="wbOpenPane('config')">配置<span class="wb-dirty-dot" x-show="wbFormDirty">●</span></button>
+                    <button :class="wbPane==='history' ? 'active' : ''" @click="wbOpenPane('history')">历史</button>
+                  </nav>
+
+                  <!-- ── 运行 ── -->
+                  <div class="wb-pane" x-show="wbPane==='run'">
+                    <template x-if="wbCurrent.type==='service'">
+                      <div class="wb-service">
+                        <div class="status-info">
+                          <span class="status-dot" :class="statuses[wbCurrent.path]==='running' ? 'dot-running' : 'dot-stopped'"></span>
+                          <span class="status-label" x-text="statuses[wbCurrent.path]==='running' ? '运行中' : '已停止'"></span>
+                        </div>
+                        <div class="service-actions">
+                          <template x-for="cmd in wbServiceCommands(wbCurrent)" :key="cmd">
+                            <button @click="serviceAction(wbCurrent, cmd)"
+                              :disabled="(cmd==='start' && statuses[wbCurrent.path]==='running') || (cmd==='stop' && statuses[wbCurrent.path]!=='running')"
+                              :class="cmd==='start' ? 'btn-start' : cmd==='stop' ? 'btn-stop' : 'btn-restart'"
+                              x-text="cmdLabel(cmd)"></button>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+
+                    <template x-if="wbCurrent.type!=='service'">
+                      <div class="wb-run-form">
+                        <template x-if="(wbCurrent.args || []).length > 0">
+                          <div class="wb-arg-grid">
+                            <template x-for="(a, i) in wbCurrent.args" :key="i">
+                              <label class="wb-arg">
+                                <span class="wb-arg-label">
+                                  <span x-text="a.name"></span>
+                                  <code x-show="a.flag" x-text="a.flag"></code>
+                                  <span class="wb-req" x-show="a.required">必填</span>
+                                </span>
+                                <input type="text" class="field-input" :placeholder="a.default ? '默认 ' + a.default : (a.required ? '必填' : '可选，留空用脚本默认')"
+                                  :value="wbArgValue(wbCurrent.path, i)" @input="wbSetArgValue(wbCurrent.path, i, $event.target.value)"
+                                  @keydown.meta.enter.prevent="wbRun(wbCurrent)" @keydown.enter.prevent="wbRun(wbCurrent)" />
+                              </label>
+                            </template>
+                          </div>
+                        </template>
+                        <template x-if="wbCurrent.args === null || wbCurrent.args === undefined">
+                          <input type="text" class="field-input wb-raw-args" x-model="scriptArgs[wbCurrent.path]"
+                            placeholder="运行参数（可选，支持引号）" @keydown.enter.prevent="wbRun(wbCurrent)" />
+                        </template>
+                        <div class="wb-run-row">
+                          <button class="run-btn" @click="wbRun(wbCurrent)" :disabled="!!runningSet[wbCurrent.path]" :aria-busy="runningSet[wbCurrent.path] ? true : null">▶ 运行</button>
+                          <span class="wb-run-preview" :title="wbShellCommand(wbCurrent, true)" x-text="'$ ' + wbShellCommand(wbCurrent, true)"></span>
+                        </div>
+                      </div>
+                    </template>
+
+                    <div class="wb-presets" x-show="normalizedPresets(wbCurrent).length > 0">
+                      <span class="wb-presets-label">预设</span>
+                      <template x-for="p in normalizedPresets(wbCurrent)" :key="p.name + ':' + p.args">
+                        <button class="preset-btn" :class="presetClass(p)" @click="wbRunPreset(wbCurrent, p)" :disabled="isPresetDisabled(wbCurrent, p)" :title="'参数: ' + p.args" x-text="presetButtonLabel(p)"></button>
+                      </template>
+                    </div>
+
+                    <p class="wb-env-note muted" x-show="Object.keys(wbCurrent.env || {}).length || exportCount">
+                      运行环境：登录 shell + <code>~/.zshrc</code>（含 <span x-text="exportCount"></span> 个全局变量）<template x-if="Object.keys(wbCurrent.env || {}).length"><span>，再叠加脚本变量 <code x-text="Object.keys(wbCurrent.env || {}).join(', ')"></code></span></template>
+                    </p>
+
+                    <div class="wb-console">
+                      <div class="wb-console-bar">
+                        <span x-show="runningSet[wbCurrent.path]" class="log-status-running">● 运行中</span>
+                        <template x-if="!runningSet[wbCurrent.path] && scriptExitCodes[wbCurrent.path] !== undefined">
+                          <span :class="scriptExitCodes[wbCurrent.path]===0 ? 'log-status-ok' : 'log-status-err'" x-text="scriptExitCodes[wbCurrent.path]===0 ? '✓ 成功 · exit 0' : '✗ 失败 · exit ' + scriptExitCodes[wbCurrent.path]"></span>
+                        </template>
+                        <span class="log-status-default" x-show="!runningSet[wbCurrent.path] && scriptExitCodes[wbCurrent.path] === undefined" x-text="logLines(wbCurrent.path).length ? logLines(wbCurrent.path).length + ' 行输出' : '输出'"></span>
+                        <span class="wb-console-actions">
+                          <button class="icon-btn" @click="copyToClipboard(logLines(wbCurrent.path).map(l => l.line).join('\n'), '输出')" :disabled="!logLines(wbCurrent.path).length" title="复制输出">⧉</button>
+                          <button class="icon-btn" @click="clearLog(wbCurrent.path)" :disabled="!logLines(wbCurrent.path).length" title="清空">✕</button>
+                        </span>
+                      </div>
+                      <pre class="log-pre wb-console-pre" :id="'log-' + safeId(wbCurrent.path)"><template x-if="!logLines(wbCurrent.path).length"><span class="log-empty" x-text="runningSet[wbCurrent.path] ? '等待输出…' : '运行后输出显示在这里'"></span></template><template x-for="(l, i) in logLines(wbCurrent.path)" :key="i"><span :class="l.stream==='stderr' ? 'log-stderr' : 'log-stdout'" x-text="l.line + '\n'"></span></template></pre>
+                    </div>
+                  </div>
+
+                  <!-- ── 代码 ── -->
+                  <div class="wb-pane" x-show="wbPane==='code'">
+                    <div class="wb-ai-bar">
+                      <span class="wb-ai-label">✦ AI</span>
+                      <input type="text" class="field-input" x-model="wbAI.instruction" placeholder="让 AI 修改：如「加参数校验」「失败时发通知」「改写成 python3」" @keydown.enter.prevent="wbAIGenerate()" :disabled="wbAI.busy" />
+                      <button class="btn-sm active" @click="wbAIGenerate()" :aria-busy="wbAI.busy" :disabled="wbAI.busy || !wbAI.instruction.trim()">生成修改</button>
+                    </div>
+                    <p class="field-hint" x-show="!aiReady">AI 未启用：请先在 ✦ AI → 连接 中配置。</p>
+
+                    <template x-if="wbAI.result !== null">
+                      <div class="wb-diff">
+                        <div class="wb-diff-head">
+                          <strong>AI 建议的修改</strong>
+                          <span class="muted" x-text="'+' + wbAI.stats.add + ' / -' + wbAI.stats.del + ' 行'"></span>
+                          <span class="wb-diff-actions">
+                            <button class="btn-sm" @click="wbAIDiscard()">放弃</button>
+                            <button class="btn-sm active" @click="wbAIAccept()">采用到编辑器</button>
+                          </span>
+                        </div>
+                        <pre class="wb-diff-body"><template x-for="(d, i) in wbAI.diff" :key="i"><span :class="'wb-diff-' + d.type" x-text="(d.type==='add' ? '+ ' : d.type==='del' ? '- ' : d.type==='gap' ? '  ' : '  ') + d.text + '\n'"></span></template></pre>
+                      </div>
+                    </template>
+
+                    <div class="wb-editor">
+                      <div class="wb-editor-bar">
+                        <span class="muted" x-text="wbCode.loading ? '读取中…' : (wbCodeDirty ? '● 未保存' : '已保存')"></span>
+                        <span class="wb-editor-actions">
+                          <button class="btn-sm" @click="wbRevertCode()" :disabled="!wbCodeDirty">还原</button>
+                          <button class="btn-sm active" @click="wbSaveCode()" :aria-busy="wbCode.saving" :disabled="!wbCodeDirty || wbCode.saving">保存 <kbd>⌘S</kbd></button>
+                        </span>
+                      </div>
+                      <textarea class="wb-code" x-model="wbCode.content" spellcheck="false" @keydown.meta.s.prevent="wbSaveCode()" @keydown.tab.prevent="wbInsertTab($event)"></textarea>
+                    </div>
+                  </div>
+
+                  <!-- ── 配置 ── -->
+                  <div class="wb-pane" x-show="wbPane==='config'">
+                    <div class="wb-form-bar">
+                      <button class="btn-sm" @click="wbAIFillConfig()" :aria-busy="aiBusyScript===wbCurrent.path" :disabled="!!aiBusyScript" title="AI 阅读脚本后填写名称、描述、参数等，保存前可修改">✦ AI 补全</button>
+                      <span class="wb-form-bar-spacer"></span>
+                      <button class="btn-sm secondary danger-text" @click="wbResetConfig()" title="清除手动配置，恢复自动检测">恢复自动检测</button>
+                      <button class="btn-sm active" @click="wbSaveConfig()" :aria-busy="editSaving" :disabled="!wbFormDirty || editSaving">保存配置</button>
+                    </div>
+
+                    <div class="wb-form-section">
+                      <h4>基本信息</h4>
+                      <div class="wb-form-grid">
+                        <label><span class="field-label">显示名称</span><input type="text" class="field-input" x-model="editForm.name" /></label>
+                        <label><span class="field-label">标签 <span class="muted text-xs">逗号分隔</span></span><input type="text" class="field-input" x-model="editForm.tagsRaw" placeholder="日报, 运维" /></label>
+                        <label class="wb-span-2"><span class="field-label">描述</span><input type="text" class="field-input" x-model="editForm.desc" placeholder="一句话说明脚本做什么" /></label>
+                      </div>
+                      <div class="wb-seg">
+                        <button :class="editForm.type==='oneshot' ? 'active' : ''" @click="editForm.type='oneshot'">一次性脚本</button>
+                        <button :class="editForm.type==='service' ? 'active' : ''" @click="editForm.type='service'">常驻服务（start / stop）</button>
+                      </div>
+                    </div>
+
+                    <div class="wb-form-section" x-show="editForm.type==='oneshot'">
+                      <div class="wb-form-section-head">
+                        <h4>参数</h4>
+                        <div class="wb-seg wb-seg-sm">
+                          <button :class="editForm.argMode==='fields' ? 'active' : ''" @click="editForm.argMode='fields'">字段</button>
+                          <button :class="editForm.argMode==='free' ? 'active' : ''" @click="editForm.argMode='free'">自由输入</button>
+                          <button :class="editForm.argMode==='none' ? 'active' : ''" @click="editForm.argMode='none'">无参数</button>
+                        </div>
+                      </div>
+                      <template x-if="editForm.argMode==='fields'">
+                        <div>
+                          <div class="wb-rows">
+                            <template x-for="(a, i) in editForm.argDefs" :key="i">
+                              <div class="wb-row wb-row-arg">
+                                <input type="text" class="field-input" x-model="a.name" placeholder="名称" />
+                                <input type="text" class="field-input" x-model="a.flag" placeholder="--flag（空=位置参数）" />
+                                <input type="text" class="field-input" x-model="a.default" placeholder="默认值（仅提示）" />
+                                <label class="wb-check"><input type="checkbox" x-model="a.required" />必填</label>
+                                <button class="icon-btn danger" @click="editForm.argDefs.splice(i, 1)">✕</button>
+                              </div>
+                            </template>
+                          </div>
+                          <button class="btn-sm" @click="editForm.argDefs.push({ name: '', flag: '', default: '', required: false })">＋ 参数</button>
+                          <p class="field-hint">运行页会按顺序生成输入框；留空的参数不会传入，由脚本使用自己的默认值。也可在脚本头部写 <code># @hatch.arg: 名称 | --flag | 默认值 | required</code>。</p>
+                        </div>
+                      </template>
+                    </div>
+
+                    <div class="wb-form-section" x-show="editForm.type==='service'">
+                      <h4>服务控制</h4>
+                      <div class="wb-form-grid">
+                        <label><span class="field-label">子命令</span><input type="text" class="field-input" x-model="editForm.commandsRaw" placeholder="start, stop, restart, status" /></label>
+                        <label><span class="field-label">PID 文件</span><input type="text" class="field-input" x-model="editForm.pidFile" :placeholder="'/tmp/hatch/' + baseName(wbCurrent.path) + '.pid'" /></label>
+                        <label class="wb-span-2"><span class="field-label">健康检查 URL</span><input type="text" class="field-input" x-model="editForm.healthUrl" placeholder="http://localhost:8080/healthz" /></label>
+                      </div>
+                    </div>
+
+                    <div class="wb-form-section">
+                      <h4>预设 <span class="muted text-xs">一键运行的固定参数</span></h4>
+                      <div class="wb-rows">
+                        <template x-for="(p, i) in editForm.presets" :key="i">
+                          <div class="wb-row wb-row-pair">
+                            <input type="text" class="field-input" x-model="p.name" placeholder="名称，如：本月报表" />
+                            <input type="text" class="field-input" x-model="p.args" placeholder="参数，如：--month 2026-10" />
+                            <button class="icon-btn danger" @click="removePreset(i)">✕</button>
+                          </div>
+                        </template>
+                      </div>
+                      <button class="btn-sm" @click="editForm.presets.push({ name: '', args: '' })">＋ 预设</button>
+                    </div>
+
+                    <div class="wb-form-section">
+                      <h4>脚本环境变量 <span class="muted text-xs">只对这个脚本生效，覆盖同名全局变量</span></h4>
+                      <div class="wb-rows">
+                        <template x-for="(p, i) in editForm.envPairs" :key="i">
+                          <div class="wb-row wb-row-pair">
+                            <input type="text" class="field-input mono" x-model="p.key" placeholder="KEY" />
+                            <input type="text" class="field-input mono" x-model="p.value" placeholder="value" />
+                            <button class="icon-btn danger" @click="removeEnvPair(i)">✕</button>
+                          </div>
+                        </template>
+                      </div>
+                      <button class="btn-sm" @click="addEnvPair()">＋ 变量</button>
+                    </div>
+
+                    <details class="wb-form-section wb-advanced">
+                      <summary><h4>自动化与高级</h4></summary>
+                      <div class="wb-form-grid">
+                        <label><span class="field-label">定时执行</span><input type="text" class="field-input" x-model="editForm.schedule" placeholder="@every 30m / @daily 09:00 / @hourly :15" /></label>
+                        <label><span class="field-label">依赖命令</span><input type="text" class="field-input" x-model="editForm.requiresRaw" placeholder="jq, curl" /></label>
+                        <label class="wb-span-2"><span class="field-label">前置脚本 <span class="muted text-xs">每行一个路径，失败则中止</span></span><textarea class="field-textarea" rows="2" x-model="editForm.preScriptsRaw"></textarea></label>
+                      </div>
+                      <label class="form-checkbox"><input type="checkbox" x-model="editForm.notifyOnDone" /><span>运行结束后发送 macOS 通知</span></label>
+                    </details>
+                  </div>
+
+                  <!-- ── 历史 ── -->
+                  <div class="wb-pane" x-show="wbPane==='history'">
+                    <p class="muted" x-show="historyLoading">加载中…</p>
+                    <p class="muted" x-show="!historyLoading && !historyRecords.length">还没有运行记录。</p>
+                    <div class="wb-history">
+                      <template x-for="r in historyRecords" :key="r.id">
+                        <div class="wb-history-item" :class="{ open: historyOpenId===r.id }">
+                          <div class="wb-history-row" @click="viewHistoryLog(r)">
+                            <span :class="r.exitCode===0 ? 'ok-mark' : 'err-mark'" x-text="r.exitCode===0 ? '✓' : '✗'"></span>
+                            <span class="wb-history-time" x-text="wbRelTime(r.startedAt)"></span>
+                            <code class="wb-history-args" x-text="(r.args || []).join(' ') || '无参数'"></code>
+                            <span class="muted" x-text="wbDuration(r.durationMs)"></span>
+                            <span class="wb-history-actions" @click.stop>
+                              <button class="btn-sm" @click="rerunFromHistory(r)">重跑</button>
+                              <button class="icon-btn danger" @click="deleteHistory(r)">✕</button>
+                            </span>
+                          </div>
+                          <pre class="history-record-log" x-show="historyOpenId===r.id" x-text="historyLogText"></pre>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
               </template>
-            </pre>
+            </section>
           </div>
+        </div>
 
-        </article>
-      </template>
+        <!-- ══ 环境变量 ═════════════════════════════════════════════════ -->
+        <div x-show="wbSubTab==='env'">
+          <section class="settings-section">
+            <div class="section-header-row">
+              <h3>全局环境变量</h3>
+              <div class="wb-head-actions">
+                <input type="search" class="search-input wb-env-search" x-model="envQuery" placeholder="筛选变量…" />
+                <button class="btn-sm" @click="envImportOpen = !envImportOpen">粘贴 .env</button>
+                <button class="btn-sm active" @click="envAdd()">＋ 变量</button>
+              </div>
+            </div>
+            <p class="ai-section-desc">写入 <code>~/.zshrc</code> 的 Hatch 区块：新开的终端和 Hatch 运行的脚本都会读取。<b>PATH</b> 类型会把值追加到 <code>$PATH</code>，用于存放可执行文件的目录。</p>
+
+            <div class="wb-env-import" x-show="envImportOpen" x-transition>
+              <textarea class="field-textarea mono" rows="4" x-model="envImportText" placeholder="KEY=value&#10;export OTHER=&quot;value&quot;&#10;# 注释行会被忽略"></textarea>
+              <div class="wb-env-import-actions">
+                <span class="muted" x-text="envImportPreview.length ? '识别到 ' + envImportPreview.length + ' 个变量（同名会覆盖）' : '每行一个 KEY=value'"></span>
+                <button class="btn-sm" @click="envImportOpen=false; envImportText=''">取消</button>
+                <button class="btn-sm active" @click="envImport()" :disabled="!envImportPreview.length">导入</button>
+              </div>
+            </div>
+
+            <div class="wb-env-table">
+              <div class="wb-env-row wb-env-header">
+                <span>名称</span><span>值</span><span>类型</span><span>备注</span><span></span>
+              </div>
+              <template x-for="(e, i) in envRows" :key="e._id">
+                <div class="wb-env-row" x-show="envMatches(e)" :class="{ 'has-issue': envIssue(e) }">
+                  <span class="wb-env-name">
+                    <input type="text" class="field-input mono" x-model="e.name" @input="envDirty=true" placeholder="VAR_NAME" :disabled="!!e._dir" />
+                    <small class="wb-env-issue" x-show="envIssue(e)" x-text="envIssue(e)"></small>
+                    <small class="muted" x-show="e._dir" x-text="'来自目录 ' + baseName(e._dir)"></small>
+                  </span>
+                  <span class="wb-env-value">
+                    <input :type="e.secret && !envReveal[e._id] ? 'password' : 'text'" class="field-input mono" x-model="e.value" @input="envDirty=true" placeholder="value" :disabled="!!e._dir" />
+                    <button class="icon-btn" x-show="e.secret" @click="envReveal[e._id] = !envReveal[e._id]" :title="envReveal[e._id] ? '隐藏' : '显示'" x-text="envReveal[e._id] ? '🙈' : '👁'"></button>
+                  </span>
+                  <span class="wb-env-kind">
+                    <select class="field-input" x-model="e.kind" @change="envDirty=true" :disabled="!!e._dir">
+                      <option value="var">变量</option>
+                      <option value="path">PATH</option>
+                    </select>
+                    <label class="wb-check" title="界面中隐藏值（仍以明文写入 ~/.zshrc）"><input type="checkbox" x-model="e.secret" @change="envDirty=true" />敏感</label>
+                  </span>
+                  <input type="text" class="field-input wb-env-note-input" x-model="e.note" @input="envDirty=true" placeholder="用途说明" />
+                  <span class="wb-env-ops">
+                    <button class="icon-btn" @click="copyToClipboard('$' + e.name, e.name)" :disabled="!e.name" title="复制 $变量名">⧉</button>
+                    <button class="icon-btn danger" @click="envRemove(i)" :disabled="!!e._dir" :title="e._dir ? '在「目录」中取消导出' : '删除'">✕</button>
+                  </span>
+                </div>
+              </template>
+              <p class="muted wb-env-empty" x-show="!envRows.length">还没有变量。点「＋ 变量」，或粘贴已有的 .env 内容。</p>
+            </div>
+
+            <details class="export-preview-details">
+              <summary class="export-preview-toggle muted text-sm">预览写入 ~/.zshrc 的内容</summary>
+              <pre class="preview-pre export-preview-pre" x-text="envPreview()"></pre>
+            </details>
+
+            <div class="wb-save-bar" x-show="envDirty" x-transition>
+              <span>有未保存的修改<span class="wb-env-issue" x-show="envHasIssues"> · 请先修正标红的变量</span></span>
+              <button class="btn-sm" @click="envLoad()">放弃</button>
+              <button class="btn-sm active" @click="envSave()" :aria-busy="savingExports" :disabled="envHasIssues || savingExports">保存到 ~/.zshrc</button>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>脚本级变量</h3>
+            <p class="ai-section-desc">只在运行对应脚本时注入，优先级高于全局变量。在脚本的「配置」里编辑。</p>
+            <p class="muted" x-show="!wbScriptEnvList.length">暂无脚本单独设置变量。</p>
+            <div class="wb-script-env-list">
+              <template x-for="s in wbScriptEnvList" :key="s.path">
+                <button class="wb-script-env" @click="wbSelect(s, 'config'); wbGo('scripts')">
+                  <strong x-text="s.name"></strong>
+                  <code x-text="Object.keys(s.env).join('  ')"></code>
+                </button>
+              </template>
+            </div>
+          </section>
+
+          <section class="settings-section" x-show="zshrcInfo">
+            <h3>Shell</h3>
+            <div class="ws-shell-bar wb-shell-bar">
+              <span class="ws-shell-chip"><span class="ws-shell-label">Shell</span><code x-text="zshrcInfo?.shell || '-'"></code>
+                <span class="badge badge-sm" :class="zshrcInfo?.isZsh ? 'badge-ok' : 'badge-warn'" x-text="zshrcInfo?.isZsh ? '✓ zsh' : '⚠ 非 zsh'"></span></span>
+              <span class="ws-shell-chip" x-show="zshrcInfo?.zshrcPath"><span class="ws-shell-label">zshrc</span><code x-text="zshrcInfo?.zshrcPath || '-'"></code></span>
+              <span class="ws-shell-chip"><span class="ws-shell-label">Hatch 区块</span><code x-text="(zshrcInfo?.hatchLines?.length || 0) + ' 行'"></code></span>
+              <button class="btn-sm" @click="zshrcInfo?.zshrcPath && revealFile(zshrcInfo.zshrcPath)">Finder</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ 目录 ════════════════════════════════════════════════════ -->
+        <div x-show="wbSubTab==='dirs'">
+          <section class="settings-section">
+            <h3>脚本目录</h3>
+            <p class="ai-section-desc">Hatch 扫描这些目录中的可执行文件（不递归子目录）。给目录设置变量名后，它会作为 PATH 变量写入 <code>~/.zshrc</code>，终端里可以直接输入脚本名运行。</p>
+            <div class="dir-setting-list">
+              <template x-for="d in (cfg.directories || [])" :key="d.path">
+                <div class="dir-setting-row wb-dir-row">
+                  <div class="dir-setting-info">
+                    <strong x-text="d.exportName || baseName(d.path)"></strong>
+                    <code x-text="d.path" class="dir-setting-path"></code>
+                    <span class="muted text-xs" x-text="(dirScriptCount[d.path] || 0) + ' 个脚本'"></span>
+                  </div>
+                  <div class="dir-export-cell">
+                    <template x-if="inlineExportDir !== d.path && d.exportName">
+                      <div class="dir-export-active">
+                        <button class="badge badge-export wb-badge-btn" @click="startInlineExport(d)" title="修改变量名" x-text="'$' + d.exportName"></button>
+                        <button class="icon-btn-xs danger-text" @click="clearExport(d)" title="取消 PATH 导出">✕</button>
+                      </div>
+                    </template>
+                    <template x-if="inlineExportDir !== d.path && !d.exportName">
+                      <button class="btn-add-export" @click="startInlineExport(d)">＋ 加入 PATH</button>
+                    </template>
+                    <template x-if="inlineExportDir === d.path">
+                      <div class="dir-export-edit">
+                        <span class="mono-eq">$</span>
+                        <input type="text" x-model="inlineExportName" class="inline-export-input" placeholder="MY_SCRIPTS" @keyup.enter="confirmInlineExport()" @keyup.escape="cancelInlineExport()" />
+                        <button class="btn-sm" @click="confirmInlineExport()" :disabled="!inlineExportName.trim()">✓</button>
+                        <button class="btn-sm secondary" @click="cancelInlineExport()">✕</button>
+                      </div>
+                    </template>
+                  </div>
+                  <button class="btn-sm" @click="revealFile(d.path)">Finder</button>
+                  <button class="icon-btn danger" @click="removeDirectory(d.path)" title="移除目录（不删除文件）">✕</button>
+                </div>
+              </template>
+            </div>
+            <div class="add-dir-form">
+              <input type="text" x-model="newDir.path" placeholder="粘贴目录路径，回车添加" class="path-input" @keyup.enter="addDirectory()" />
+              <button class="btn-sm active" @click="addDirectory()" :disabled="!newDir.path.trim()">＋ 添加</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- ══ 运行记录 ═════════════════════════════════════════════════ -->
+        <div x-show="wbSubTab==='runs'">
+          <section class="settings-section">
+            <div class="section-header-row">
+              <h3>最近运行</h3>
+              <button class="btn-sm" @click="loadRecentRuns()">↻ 刷新</button>
+            </div>
+            <p class="muted" x-show="!wbRecentRuns.length">还没有运行记录。</p>
+            <div class="wb-history">
+              <template x-for="r in wbRecentRuns" :key="r.id">
+                <div class="wb-history-row wb-run-row-item" @click="wbOpenRun(r)">
+                  <span :class="r.exitCode===0 ? 'ok-mark' : 'err-mark'" x-text="r.exitCode===0 ? '✓' : '✗'"></span>
+                  <strong class="wb-history-name" x-text="wbScriptName(r.script)"></strong>
+                  <code class="wb-history-args" x-text="(r.args || []).join(' ') || '无参数'"></code>
+                  <span class="muted" x-text="wbDuration(r.durationMs)"></span>
+                  <span class="wb-history-time" x-text="wbRelTime(r.startedAt)"></span>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
+
+      </div>
     </div>
-
-    <nav class="pagination" x-show="totalPages>1 && !sortMode">
-      <button @click="page--" :disabled="page<=1">←</button>
-      <span x-text="`${page} / ${totalPages}`"></span>
-      <button @click="page++" :disabled="page>=totalPages">→</button>
-    </nav>
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
        AI — Left-sidebar sub-navigation layout
   ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='ai' && !selectedDir" class="ai-main">
+  <main x-show="tab==='ai'" class="ai-main">
 
     <!-- ── Hero ──────────────────────────────────────────────────────── -->
     <section class="page-hero ai-hero">
@@ -2568,6 +2667,32 @@
 
         <!-- ══ 数据目录 / 清理 ══════════════════════════════════════════ -->
         <div x-show="aiSubTab==='data'">
+          <section class="settings-section">
+            <h3>存储位置</h3>
+            <p class="ai-section-desc">AI 调用日志与 Skills 主目录的位置，留空使用默认路径。</p>
+            <div class="data-paths-grid">
+              <div class="data-path-row">
+                <div class="data-path-info">
+                  <span class="data-path-label">AI 调试日志</span>
+                  <code class="data-path-val" x-text="dataPaths.traceLogDir || dataPaths.defaultTraceDir"></code>
+                  <span class="badge badge-ok text-xs" x-show="dataPaths.traceLogDirIsSet">自定义</span>
+                </div>
+                <input type="text" class="data-path-input field-input" x-model="dataPathsForm.traceLogDir" :placeholder="dataPaths.defaultTraceDir" />
+              </div>
+              <div class="data-path-row">
+                <div class="data-path-info">
+                  <span class="data-path-label">Skills 主目录</span>
+                  <code class="data-path-val" x-text="dataPaths.skillsDir || dataPaths.defaultSkillsDir"></code>
+                  <span class="badge badge-ok text-xs" x-show="dataPaths.skillsDirIsSet">自定义</span>
+                </div>
+                <input type="text" class="data-path-input field-input" x-model="dataPathsForm.skillsDir" :placeholder="dataPaths.defaultSkillsDir" />
+              </div>
+            </div>
+            <div class="export-actions data-paths-actions">
+              <button class="btn-sm active" @click="saveDataPaths()" :aria-busy="dataPathsSaving">保存</button>
+              <button class="btn-sm" @click="resetDataPaths()">恢复默认</button>
+            </div>
+          </section>
           <section class="settings-section ai-section">
             <h3 class="ai-section-title">📦 Hatch 数据目录</h3>
             <p class="ai-section-desc">
@@ -2635,283 +2760,90 @@
   </main>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       EDIT SCRIPT META — side drawer
+       NEW SCRIPT — template or AI draft, previewed before the file is created
   ══════════════════════════════════════════════════════════════════ -->
-  <div class="overlay" x-show="editTarget" x-transition @click.self="cancelEdit()">
-    <div class="edit-drawer" x-show="editTarget">
-      <div class="drawer-header">
-        <strong>✏ 编辑脚本元信息</strong>
-        <button class="icon-btn" @click="cancelEdit()">✕</button>
-      </div>
-      <div class="drawer-path" x-text="editTarget?.path"></div>
-
-      <div class="drawer-body">
-
-        <label class="field-label">显示名称</label>
-        <input type="text" x-model="editForm.name" placeholder="脚本名称" class="field-input" />
-
-        <label class="field-label">描述</label>
-        <textarea x-model="editForm.desc" placeholder="简单描述这个脚本做什么" class="field-textarea" rows="2"></textarea>
-
-        <label class="field-label">标签 <span class="muted text-xs">（逗号分隔）</span></label>
-        <input type="text" x-model="editForm.tagsRaw" placeholder="日报, 数据处理, 运维" class="field-input" />
-
-        <label class="field-label">类型</label>
-        <div class="radio-group">
-          <label class="radio-label">
-            <input type="radio" x-model="editForm.type" value="oneshot" />
-            <span>oneshot</span><span class="muted text-xs"> — 运行一次，输出结果</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" x-model="editForm.type" value="service" />
-            <span>service</span><span class="muted text-xs"> — 可 start / stop / restart</span>
-          </label>
+  <template x-if="newScript.open">
+    <div class="modal-backdrop" @click.self="closeNewScriptDialog()" @keydown.escape.window="closeNewScriptDialog()">
+      <div class="modal-panel wb-new-modal" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <h3>新建脚本</h3>
+          <button class="icon-btn" @click="closeNewScriptDialog()">✕</button>
         </div>
-
-        <!-- Service-specific fields -->
-        <template x-if="editForm.type==='service'">
-          <div>
-            <label class="field-label">子命令 <span class="muted text-xs">（逗号分隔）</span></label>
-            <input type="text" x-model="editForm.commandsRaw"
-              placeholder="start, stop, restart, reload, status"
-              class="field-input" />
-
-            <label class="field-label">PID 文件路径 <span class="muted text-xs">（可选）</span></label>
-            <input type="text" x-model="editForm.pidFile"
-              :placeholder="'/tmp/hatch/' + baseName(editTarget?.path||'') + '.pid'"
-              class="field-input" />
-          </div>
-        </template>
-
-        <!-- Oneshot: args toggle -->
-        <template x-if="editForm.type==='oneshot'">
-          <div>
-            <label class="field-label">运行参数</label>
-            <label class="checkbox-label">
-              <input type="checkbox" x-model="editForm.needsArgs" />
-              运行时显示参数输入框
+        <div class="wb-new-body">
+          <div class="wb-form-grid">
+            <label><span class="field-label">目录</span>
+              <select class="field-input" x-model="newScript.dir">
+                <template x-for="d in scriptDirs" :key="d.path"><option :value="d.path" :selected="d.path === newScript.dir" x-text="(d.exportName ? '$' + d.exportName + '  ' : '') + d.path"></option></template>
+              </select>
+            </label>
+            <label><span class="field-label">文件名</span>
+              <input type="text" class="field-input mono" x-model="newScript.filename" :placeholder="'my-script' + scriptTemplateExt()" x-init="$nextTick(() => $el.focus())" @keydown.enter.prevent="createNewScript()" />
             </label>
           </div>
-        </template>
 
-        <!-- Command presets (both types) -->
-        <label class="field-label" style="margin-top:18px">命令预设</label>
-        <div class="preset-section">
-          <div class="preset-section-header">
-            <span>固定参数快捷方式</span>
-            <button class="btn-sm" @click="addPreset()">+ 添加预设</button>
+          <div class="wb-seg wb-new-mode">
+            <button :class="newScript.mode==='template' ? 'active' : ''" @click="newScript.mode='template'">从模板开始</button>
+            <button :class="newScript.mode==='ai' ? 'active' : ''" @click="newScript.mode='ai'">✦ 让 AI 起草</button>
           </div>
-          <template x-if="(editForm.presets||[]).length === 0">
-            <div class="preset-empty">暂无预设。添加后，脚本卡片上会显示一键运行按钮。</div>
+
+          <template x-if="newScript.mode==='template'">
+            <div class="wb-templates">
+              <template x-for="t in scriptTemplates" :key="t.id">
+                <button class="wb-template" :class="newScript.template===t.id ? 'active' : ''" @click="applyScriptTemplate(t)">
+                  <strong x-text="t.label"></strong>
+                  <span class="muted" x-text="t.hint"></span>
+                </button>
+              </template>
+            </div>
           </template>
-          <div class="preset-edit-list" x-show="(editForm.presets||[]).length > 0">
-            <template x-for="(p,i) in editForm.presets" :key="i">
-              <div class="preset-edit-row">
-                <input
-                  type="text"
-                  x-model="p.name"
-                  placeholder="名称（如：本月报表）"
-                  class="preset-name-input"
-                />
-                <input
-                  type="text"
-                  x-model="p.args"
-                  placeholder="参数（如：file.txt 2026-04-01 2026-04-30）"
-                  class="preset-args-input"
-                />
-                <button class="icon-btn danger" @click="removePreset(i)">✕</button>
-              </div>
-            </template>
-          </div>
-        </div>
 
-        <!-- v1.1: per-script Env -->
-        <div class="form-field">
-          <label class="field-label">
-            环境变量
-            <button class="icon-btn" @click="addEnvPair()" title="新增 env">+ 新增</button>
-          </label>
-          <template x-if="(editForm.envPairs||[]).length === 0">
-            <div class="empty-presets-tip">未配置脚本级 env。这些变量会在执行时叠加到子进程，优先级高于全局 export。</div>
+          <template x-if="newScript.mode==='ai'">
+            <div class="wb-ai-bar wb-new-ai">
+              <textarea class="field-textarea" rows="2" x-model="newScript.instruction" placeholder="描述脚本要做什么，如：把 ~/Downloads 里超过 30 天的文件移到废纸篓，参数是天数，默认 30"></textarea>
+              <button class="btn-sm active" @click="newScriptAIGenerateDraft()" :aria-busy="newScript.busy" :disabled="newScript.busy || !newScript.instruction.trim() || !aiReady">生成草稿</button>
+            </div>
           </template>
-          <div class="preset-edit-list" x-show="(editForm.envPairs||[]).length > 0">
-            <template x-for="(p,i) in editForm.envPairs" :key="i">
-              <div class="preset-edit-row">
-                <input type="text" x-model="p.key" placeholder="KEY" class="preset-name-input" />
-                <input type="text" x-model="p.value" placeholder="value" class="preset-args-input" />
-                <button class="icon-btn danger" @click="removeEnvPair(i)">✕</button>
-              </div>
-            </template>
-          </div>
+          <p class="field-hint" x-show="newScript.mode==='ai' && !aiReady">AI 未启用：请先在 ✦ AI → 连接 中配置。</p>
+
+          <div class="wb-new-content-label"><span class="field-label">内容</span><span class="muted text-xs">创建前可直接修改；头部的 <code>@hatch</code> 注释会被识别为名称、描述和参数</span></div>
+          <textarea class="wb-code wb-new-code" x-model="newScript.content" spellcheck="false" @keydown.tab.prevent="wbInsertTab($event)"></textarea>
         </div>
-
-
-        <!-- v1.1: notify on done -->
-        <div class="form-field">
-          <label class="form-checkbox">
-            <input type="checkbox" x-model="editForm.notifyOnDone" />
-            <span>脚本运行完成后弹出 macOS 通知（成功 / 失败 + 耗时）</span>
-          </label>
+        <div class="wb-new-foot">
+          <span class="muted text-xs">创建后自动 chmod +x</span>
+          <button class="btn-sm" @click="closeNewScriptDialog()">取消</button>
+          <button class="btn-sm active" @click="createNewScript()" :aria-busy="newScript.saving" :disabled="newScript.saving || !newScript.filename.trim() || !newScript.dir">创建脚本</button>
         </div>
-
-        <!-- v1.2: schedule -->
-        <div class="form-field">
-          <label class="field-label">定时执行 schedule</label>
-          <input type="text" x-model="editForm.schedule" placeholder="@every 30m / @daily 09:00 / @hourly :15" class="field-input" />
-          <div class="field-hint">留空 = 不自动执行。仅 oneshot 类型生效。</div>
-        </div>
-
-        <!-- v1.2: requires + health -->
-        <div class="form-field">
-          <label class="field-label">依赖命令 requires</label>
-          <input type="text" x-model="editForm.requiresRaw" placeholder="kubectl, jq, curl" class="field-input" />
-        </div>
-        <div class="form-field">
-          <label class="field-label">健康检查 URL</label>
-          <input type="text" x-model="editForm.healthUrl" placeholder="http://localhost:8080/healthz" class="field-input" />
-        </div>
-
-        <!-- v1.3: pre-script chain -->
-        <div class="form-field">
-          <label class="field-label">前置脚本 (每行一个绝对路径)</label>
-          <textarea x-model="editForm.preScriptsRaw" placeholder="/Users/you/tools/check_env.sh&#10;/Users/you/tools/warmup.sh" class="field-textarea" rows="3"></textarea>
-          <div class="field-hint">按顺序执行；任一失败则中止主脚本（exit 99）。</div>
-        </div>
-
-      </div>
-
-      <div class="drawer-footer">
-        <button @click="saveEdit()" :aria-busy="editSaving">💾 保存</button>
-        <button class="secondary" @click="cancelEdit()">取消</button>
-        <button class="secondary danger-text" @click="resetEdit()" title="清除手动覆盖，恢复自动检测">↺ 重置</button>
       </div>
     </div>
-  </div>
+  </template>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       SCRIPT CONTENT EDITOR — centred modal
+       COMMAND PALETTE (⌘K) — search scripts / presets, Enter runs
   ══════════════════════════════════════════════════════════════════ -->
-  <div class="se-backdrop" x-show="scriptEditorTarget" x-transition.opacity @click.self="closeScriptEditor()">
-    <div class="se-modal" x-show="scriptEditorTarget" x-transition>
-
-      <!-- header -->
-      <div class="se-header">
-        <div class="se-header-left">
-          <span class="se-icon">📄</span>
-          <div>
-            <div class="se-title">脚本内容</div>
-            <div class="se-path" x-text="scriptEditorTarget?.path"></div>
-          </div>
+  <template x-if="palette.open">
+    <div class="modal-backdrop wb-palette-backdrop" @click.self="closePalette()">
+      <div class="wb-palette" role="dialog" aria-modal="true" @keydown.escape.prevent="closePalette()">
+        <input type="text" class="wb-palette-input" x-model="palette.query" placeholder="搜索脚本或预设，回车运行…"
+          x-init="$nextTick(() => $el.focus())" @input="palette.index = 0"
+          @keydown.down.prevent="paletteMove(1)" @keydown.up.prevent="paletteMove(-1)"
+          @keydown.enter.prevent="paletteExec(paletteItems[palette.index], $event.metaKey)" />
+        <div class="wb-palette-list">
+          <template x-for="(it, i) in paletteItems" :key="it.key">
+            <button class="wb-palette-item" :class="{ active: i===palette.index }" @mouseenter="palette.index = i" @click="paletteExec(it, $event.metaKey)">
+              <span class="wb-palette-icon" x-text="it.icon"></span>
+              <span class="wb-palette-main">
+                <span class="wb-palette-title" x-text="it.title"></span>
+                <span class="wb-palette-sub" x-text="it.sub"></span>
+              </span>
+              <span class="wb-palette-hint" x-text="it.hint"></span>
+            </button>
+          </template>
+          <p class="muted wb-palette-empty" x-show="!paletteItems.length">没有匹配项</p>
         </div>
-        <button class="se-close" @click="closeScriptEditor()">✕</button>
-      </div>
-
-      <!-- AI bar -->
-      <div class="se-ai-bar">
-        <span class="se-ai-label">✦ AI</span>
-        <textarea
-          x-model="scriptEditorInstruction"
-          placeholder="指令：如「加错误处理」「重写为 python3」「加日志输出」…（支持换行，Enter = 换行，点击生成按钮执行）"
-          class="se-ai-input se-ai-textarea"
-          rows="2"
-        ></textarea>
-        <button
-          class="se-ai-btn"
-          @click="scriptAIGenerate()"
-          :aria-busy="scriptEditorAIBusy"
-          :disabled="!aiReady || scriptEditorAIBusy"
-          :title="aiReady ? 'AI 按指令生成/修改脚本内容' : '请先在 AI 标签页配置并启用 AI'"
-        >生成</button>
-      </div>
-
-      <!-- code area -->
-      <textarea
-        class="se-textarea"
-        x-model="scriptEditorContent"
-        spellcheck="false"
-        placeholder="脚本内容…"
-      ></textarea>
-
-      <!-- footer -->
-      <div class="se-footer">
-        <button class="se-btn-primary" @click="saveScriptContent()" :aria-busy="scriptEditorSaving">
-          💾 保存
-        </button>
-        <button class="se-btn-secondary" @click="closeScriptEditor()">取消</button>
-        <span class="se-footer-hint">保存后自动 chmod +x 并 source ~/.zshrc</span>
+        <div class="wb-palette-foot muted"><span><kbd>↵</kbd> 执行</span><span><kbd>⌘↵</kbd> 打开详情</span><span><kbd>esc</kbd> 关闭</span></div>
       </div>
     </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════════════════
-       NEW SCRIPT — centred modal
-  ══════════════════════════════════════════════════════════════════ -->
-  <div class="se-backdrop" x-show="newScriptOpen" x-transition.opacity @click.self="closeNewScript()">
-    <div class="se-modal" x-show="newScriptOpen" x-transition>
-
-      <!-- header -->
-      <div class="se-header">
-        <div class="se-header-left">
-          <span class="se-icon">＋</span>
-          <div>
-            <div class="se-title">新建脚本</div>
-            <div class="se-path" x-text="selectedDir?.path"></div>
-          </div>
-        </div>
-        <button class="se-close" @click="closeNewScript()">✕</button>
-      </div>
-
-      <!-- filename row -->
-      <div class="se-filename-row">
-        <span class="se-filename-prefix" x-text="baseName(selectedDir?.path || '') + '/'"></span>
-        <input
-          type="text"
-          x-model="newScriptForm.filename"
-          placeholder="my-script.sh"
-          class="se-filename-input"
-          @keyup.enter="$refs.newScriptTextarea.focus()"
-        />
-      </div>
-
-      <!-- AI bar -->
-      <div class="se-ai-bar">
-        <span class="se-ai-label">✦ AI</span>
-        <textarea
-          x-model="scriptEditorInstruction"
-          placeholder="指令：如「写一个备份 ~/Documents 的脚本」…（支持换行，点击生成按钮执行）"
-          class="se-ai-input se-ai-textarea"
-          rows="2"
-        ></textarea>
-        <button
-          class="se-ai-btn"
-          @click="newScriptAIGenerate()"
-          :aria-busy="newScriptAIBusy"
-          :disabled="!aiReady || newScriptAIBusy"
-        >生成</button>
-      </div>
-
-      <!-- code area -->
-      <textarea
-        class="se-textarea"
-        x-model="newScriptForm.content"
-        x-ref="newScriptTextarea"
-        spellcheck="false"
-        placeholder="#!/bin/zsh"
-      ></textarea>
-
-      <!-- footer -->
-      <div class="se-footer">
-        <button
-          class="se-btn-primary"
-          @click="saveNewScript()"
-          :aria-busy="newScriptSaving"
-          :disabled="!newScriptForm.filename.trim() || newScriptSaving"
-        >💾 创建文件</button>
-        <button class="se-btn-secondary" @click="closeNewScript()">取消</button>
-        <span class="se-footer-hint">创建后自动 chmod +x 并 source ~/.zshrc</span>
-      </div>
-    </div>
-  </div>
+  </template>
 
   <!-- ══════════════════════════════════════════════════════════════════
        GLOBAL SEARCH / REPLACE OVERLAY  (Cmd+F / Cmd+R)
@@ -2956,410 +2888,318 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       RUN HISTORY MODAL (v1.1)
-  ══════════════════════════════════════════════════════════════════ -->
-  <div class="se-backdrop" x-show="historyTarget" x-transition.opacity @click.self="closeHistory()">
-    <div class="se-modal history-modal-wide" x-show="historyTarget" x-transition>
-      <div class="se-header">
-        <div class="se-header-left">
-          <span class="se-icon">📜</span>
-          <div>
-            <div class="se-title">运行历史</div>
-            <div class="se-path" x-text="historyTarget?.path"></div>
-          </div>
-        </div>
-        <button class="se-close" @click="closeHistory()">✕</button>
-      </div>
-      <div class="se-body history-modal-body">
-        <template x-if="historyRecords.length === 0">
-          <div class="history-empty">
-            <div x-show="!historyLoading">暂无历史记录。执行脚本后会自动归档到 ~/Library/Application Support/Hatch/runs/</div>
-            <div x-show="historyLoading">加载中…</div>
-          </div>
-        </template>
-        <template x-for="r in historyRecords" :key="r.id">
-          <div class="history-record">
-            <div class="history-record-row">
-              <span>
-                <span :class="r.exitCode===0 ? 'ok-mark' : 'err-mark'" x-text="r.exitCode === 0 ? '✓' : '✗'"></span>
-                <span x-text="new Date(r.startedAt).toLocaleString()"></span>
-                <span class="muted" x-text="' · ' + r.durationMs + 'ms · exit ' + r.exitCode"></span>
-              </span>
-              <span class="history-record-actions">
-                <button class="btn-edit" @click="rerunFromHistory(r)" title="使用相同参数重跑">▶ 重跑</button>
-                <button class="btn-edit" @click="viewHistoryLog(r)" title="查看完整日志">📋 日志</button>
-                <button class="icon-btn danger" @click="deleteHistory(r)">✕</button>
-              </span>
-            </div>
-            <div class="history-record-args" x-show="r.args && r.args.length" x-text="'参数: ' + (r.args||[]).join(' ')"></div>
-            <pre class="history-record-log" x-show="historyOpenId===r.id" x-text="historyLogText"></pre>
-          </div>
-        </template>
-      </div>
-    </div>
-  </div>
-
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <!-- 备忘录                                                           -->
   <!-- ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='memo' && !selectedDir" class="ai-main memo-main">
-    <section class="page-hero ai-hero memo-hero">
+  <main x-show="tab==='memo'" class="ai-main memo-main">
+    <section class="page-hero ai-hero hero-compact memo-hero">
       <div>
-        <p class="eyebrow">每日待办与单词复盘</p>
+        <p class="eyebrow">Todos &amp; Words</p>
         <h1>备忘录</h1>
-        <p class="page-subtitle">记录今日事项、提醒、附件和英文单词，复盘工作中反复出现的信息。</p>
+        <p class="page-subtitle">一句话记下待办（如「明天 9:30 交周报 #工作」），到点提醒；生词查词后入库，按间隔复习。</p>
       </div>
       <div class="hero-stats">
         <div class="hero-stat-card">
-          <div class="hero-stat-label">今日待办</div>
-          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.today || 0"></span></div>
+          <div class="hero-stat-label">今天待办</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoTodayCount"></span></div>
+        </div>
+        <div class="hero-stat-card" :class="memoOverdue.length ? 'hero-stat-warn' : ''">
+          <div class="hero-stat-label">已过期</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoOverdue.length"></span></div>
         </div>
         <div class="hero-stat-card">
-          <div class="hero-stat-label">过期提醒</div>
-          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.overdue || 0"></span></div>
+          <div class="hero-stat-label">待复习</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="reviewDueEntries.length"></span></div>
         </div>
         <div class="hero-stat-card">
-          <div class="hero-stat-label">待提醒</div>
-          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.reminders || 0"></span></div>
-        </div>
-        <div class="hero-stat-card">
-          <div class="hero-stat-label">待复盘</div>
-          <div class="hero-stat-body"><span class="hero-stat-total" x-text="memoDashboard.reviewDue || 0"></span></div>
+          <div class="hero-stat-label">单词</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="vocabEntries.length"></span></div>
         </div>
       </div>
     </section>
 
     <div class="ai-layout">
       <nav class="ai-sidenav">
-        <button class="ai-sidenav-item" :class="memoSubTab==='today' ? 'active' : ''" @click="memoSubTab='today'; loadMemoModule()">
-          <span class="ai-sidenav-icon">☑</span><span>今日</span>
-          <span class="ai-sidenav-count" x-show="memoDashboard.today > 0" x-text="memoDashboard.today"></span>
+        <span class="ai-sidenav-group">待办</span>
+        <button class="ai-sidenav-item" :class="memoSubTab==='today' ? 'active' : ''" @click="memoGo('today')">
+          <span class="ai-sidenav-icon">☀</span><span>今天</span>
+          <span class="ai-sidenav-count" :class="memoOverdue.length ? 'is-warn' : ''" x-show="memoTodayCount > 0" x-text="memoTodayCount"></span>
         </button>
-        <button class="ai-sidenav-item" :class="memoSubTab==='all' ? 'active' : ''" @click="memoSubTab='all'; loadMemoModule()">
-          <span class="ai-sidenav-icon">📋</span><span>全部</span>
-          <span class="ai-sidenav-count" x-show="memoDashboard.totalMemos > 0" x-text="memoDashboard.totalMemos"></span>
+        <button class="ai-sidenav-item" :class="memoSubTab==='upcoming' ? 'active' : ''" @click="memoGo('upcoming')">
+          <span class="ai-sidenav-icon">📅</span><span>计划</span>
+          <span class="ai-sidenav-count" x-show="memoUpcoming.length > 0" x-text="memoUpcoming.length"></span>
         </button>
-        <button class="ai-sidenav-item" :class="memoSubTab==='words' ? 'active' : ''" @click="memoSubTab='words'; loadMemoModule()">
-          <span class="ai-sidenav-icon">Aa</span><span>单词</span>
-          <span class="ai-sidenav-count" x-show="memoDashboard.totalVocab > 0" x-text="memoDashboard.totalVocab"></span>
+        <button class="ai-sidenav-item" :class="memoSubTab==='done' ? 'active' : ''" @click="memoGo('done')">
+          <span class="ai-sidenav-icon">✓</span><span>已完成</span>
         </button>
-        <button class="ai-sidenav-item" :class="memoSubTab==='review' ? 'active' : ''" @click="memoSubTab='review'; loadMemoModule()">
-          <span class="ai-sidenav-icon">↻</span><span>复盘</span>
-          <span class="ai-sidenav-count" x-show="memoDashboard.reviewDue > 0" x-text="memoDashboard.reviewDue"></span>
+        <span class="ai-sidenav-group">单词</span>
+        <button class="ai-sidenav-item" :class="memoSubTab==='words' ? 'active' : ''" @click="memoGo('words')">
+          <span class="ai-sidenav-icon">Aa</span><span>单词本</span>
+          <span class="ai-sidenav-count" x-show="vocabEntries.length > 0" x-text="vocabEntries.length"></span>
         </button>
-        <button class="ai-sidenav-item" :class="memoSubTab==='storage' ? 'active' : ''" @click="memoSubTab='storage'; loadMemoModule()">
-          <span class="ai-sidenav-icon">📦</span><span>存储</span>
+        <button class="ai-sidenav-item" :class="memoSubTab==='review' ? 'active' : ''" @click="memoGo('review')">
+          <span class="ai-sidenav-icon">↻</span><span>复习</span>
+          <span class="ai-sidenav-count" x-show="reviewDueEntries.length > 0" x-text="reviewDueEntries.length"></span>
+        </button>
+        <span class="ai-sidenav-group">设置</span>
+        <button class="ai-sidenav-item" :class="memoSubTab==='storage' ? 'active' : ''" @click="memoGo('storage')">
+          <span class="ai-sidenav-icon">📦</span><span>附件存储</span>
         </button>
       </nav>
 
       <div class="ai-content">
-        <section class="settings-section memo-editor" x-show="memoFormOpen">
-          <div class="section-header-row">
-            <h3 x-text="memoEditingID ? '编辑待办' : '新增待办'"></h3>
-            <button class="icon-btn" @click="memoFormOpen=false">✕</button>
-          </div>
-          <div class="memo-form-grid">
-            <div class="memo-form-main">
-              <label class="field-label">标题</label>
-              <input class="field-input" x-model="memoForm.title" placeholder="今天要完成什么？" />
-              <label class="field-label">内容</label>
-              <textarea class="field-input" rows="4" x-model="memoForm.body" placeholder="补充细节、上下文、检查点"></textarea>
-              <label class="field-label">标签</label>
-              <input class="field-input" x-model="memoForm.tagsRaw" placeholder="work, review, urgent" />
-            </div>
-            <div class="memo-form-side">
-              <label class="field-label">日期</label>
-              <input class="field-input" type="date" x-model="memoForm.date" />
-              <label class="field-label">优先级</label>
-              <select class="field-input" x-model="memoForm.priority">
-                <option value="low">低</option>
-                <option value="normal">普通</option>
-                <option value="high">高</option>
-              </select>
-              <label class="field-label">提醒时间</label>
-              <input class="field-input" type="datetime-local" x-model="memoForm.reminderLocal" />
-              <label class="field-label">提醒方式</label>
-              <select class="field-input" x-model="memoForm.reminderMode">
-                <option value="both">横幅 + 声音</option>
-                <option value="banner">仅横幅</option>
-                <option value="sound">仅声音</option>
-              </select>
-            </div>
-          </div>
 
-          <div class="memo-attachment-editor">
-            <div class="section-header-row">
-              <h4>附件</h4>
-              <span class="muted text-sm">URL 保存链接；本地图片和文件会复制到托管目录</span>
+        <!-- ══ 待办：今天 / 计划 / 已完成 ══════════════════════════════ -->
+        <div class="memo-split" :class="{ 'has-detail': !!memoDraft }" x-show="['today','upcoming','done'].includes(memoSubTab)">
+          <section class="memo-panel">
+            <div class="memo-quick" x-show="memoSubTab !== 'done'">
+              <span class="memo-quick-plus">＋</span>
+              <input type="text" class="memo-quick-input" x-model="memoQuick" x-ref="memoQuickInput"
+                :placeholder="memoSubTab==='today' ? '添加今天的待办…  例：15:00 回复客户 #工作 !高' : '添加待办…  例：周五 10点 复盘会 #团队'"
+                @keydown.enter.prevent="addQuickMemo()" @keydown.escape="memoQuick=''" />
             </div>
-            <div class="memo-attachment-list" x-show="memoForm.attachments.length">
-              <template x-for="att in memoForm.attachments" :key="att.id">
-                <div class="memo-attachment-row">
-                  <span class="memo-attachment-icon" x-text="attachmentIcon(att)"></span>
-                  <div class="memo-attachment-info">
-                    <span class="memo-attachment-label" x-text="att.label || att.url || att.managedPath"></span>
-                    <span class="memo-attachment-path muted text-xs" x-text="att.url || att.managedPath || att.sourcePath"></span>
-                  </div>
-                  <button class="icon-btn" @click="openMemoAttachment(att)" title="打开">↗</button>
-                  <button class="icon-btn danger" @click="removeMemoAttachment(att)" title="移除">✕</button>
-                </div>
-              </template>
+            <div class="memo-quick-preview" x-show="memoQuick.trim()">
+              <span class="memo-chip" x-text="'📅 ' + memoDateLabel(memoQuickParsed.date)"></span>
+              <span class="memo-chip" x-show="memoQuickParsed.time" x-text="'⏰ ' + memoQuickParsed.time"></span>
+              <span class="memo-chip" x-show="memoQuickParsed.priority !== 'normal'" :class="'prio-' + memoQuickParsed.priority" x-text="memoQuickParsed.priority === 'high' ? '! 高优先级' : '低优先级'"></span>
+              <template x-for="t in memoQuickParsed.tags" :key="t"><span class="memo-chip" x-text="'#' + t"></span></template>
+              <span class="muted">回车添加</span>
             </div>
-            <div class="memo-attachment-add">
-              <select class="field-input memo-kind-input" x-model="memoAttachmentForm.kind">
-                <option value="file">文件</option>
-                <option value="image">图片</option>
-                <option value="link">链接</option>
-              </select>
-              <input class="field-input memo-path-input" x-model="memoAttachmentForm.path" placeholder="/path/to/file 或 https://..." />
-              <input class="field-input memo-label-input" x-model="memoAttachmentForm.label" placeholder="显示名称（可选）" />
-              <button class="btn-sm btn-primary" @click="addMemoAttachment()" :disabled="!memoAttachmentForm.path.trim()">+ 添加</button>
-            </div>
-          </div>
 
-          <div class="prompt-actions-row">
-            <button class="btn-primary" @click="saveMemoForm()" :aria-busy="memoSaving">保存</button>
-            <button class="secondary" @click="memoFormOpen=false">取消</button>
-          </div>
-        </section>
+            <div class="memo-toolbar-row">
+              <input type="search" class="search-input memo-search" x-model="memoSearch" placeholder="搜索全部待办…" />
+            </div>
 
-        <div x-show="memoSubTab==='today'">
-          <section class="settings-section">
-            <div class="section-header-row">
-              <h3>今日待办</h3>
-              <button class="btn-sm btn-primary" @click="openNewMemo()">+ 新增</button>
-            </div>
-            <div class="memo-list" x-show="todayMemos.length">
-              <template x-for="item in todayMemos" :key="item.id">
-                <div class="memo-item" :class="item.status === 'done' ? 'is-done' : ''">
-                  <button class="memo-check" @click="toggleMemoDone(item)" x-text="item.status === 'done' ? '✓' : ''"></button>
-                  <div class="memo-item-body">
-                    <div class="memo-item-title" x-text="item.title"></div>
-                    <div class="memo-item-text" x-show="item.body" x-text="item.body"></div>
-                    <div class="memo-tags" x-show="item.tags && item.tags.length">
-                      <template x-for="tag in item.tags" :key="tag"><span class="memo-tag" x-text="tag"></span></template>
-                    </div>
-                    <div class="memo-attachment-strip" x-show="item.attachments && item.attachments.length">
-                      <template x-for="att in item.attachments" :key="att.id">
-                        <button class="memo-attachment-chip" @click="openMemoAttachment(att)">
-                          <span x-text="attachmentIcon(att)"></span>
-                          <span x-text="att.label || att.url || '附件'"></span>
-                        </button>
-                      </template>
-                    </div>
+            <div class="memo-groups">
+              <template x-for="g in memoGroups" :key="g.key">
+                <div class="memo-group" :class="g.tone ? 'tone-' + g.tone : ''">
+                  <div class="memo-group-label">
+                    <span x-text="g.label"></span>
+                    <span x-text="g.items.length"></span>
                   </div>
-                  <div class="memo-item-meta">
-                    <span class="memo-priority" :class="'priority-' + (item.priority || 'normal')" x-text="item.priority || 'normal'"></span>
-                    <span class="memo-reminder" x-show="item.reminderAt" x-text="reminderLabel(item)"></span>
-                    <button class="icon-btn" @click="editMemo(item)">✎</button>
-                    <button class="icon-btn danger" @click="deleteMemoItem(item)">✕</button>
-                  </div>
-                </div>
-              </template>
-            </div>
-            <div class="data-empty" x-show="!todayMemos.length">今天暂无待办。</div>
-          </section>
-        </div>
-
-        <div x-show="memoSubTab==='all'">
-          <section class="settings-section">
-            <div class="section-header-row">
-              <h3>全部备忘</h3>
-              <button class="btn-sm btn-primary" @click="openNewMemo()">+ 新增</button>
-            </div>
-            <div class="memo-toolbar">
-              <input class="field-input" type="search" x-model="memoSearch" placeholder="搜索标题、正文、标签" />
-              <select class="field-input memo-filter-select" x-model="memoFilter">
-                <option value="open">未完成</option>
-                <option value="done">已完成</option>
-                <option value="all">全部</option>
-              </select>
-            </div>
-            <div class="memo-list">
-              <template x-for="item in filteredMemos" :key="item.id">
-                <div class="memo-item" :class="item.status === 'done' ? 'is-done' : ''">
-                  <button class="memo-check" @click="toggleMemoDone(item)" x-text="item.status === 'done' ? '✓' : ''"></button>
-                  <div class="memo-item-body">
-                    <div class="memo-item-title" x-text="item.title"></div>
-                    <div class="memo-item-text" x-show="item.body" x-text="item.body"></div>
-                    <div class="memo-tags">
-                      <span class="memo-tag" x-text="item.date"></span>
-                      <template x-for="tag in item.tags || []" :key="tag"><span class="memo-tag" x-text="tag"></span></template>
-                    </div>
-                    <div class="memo-image-grid" x-show="item.attachments && item.attachments.some(a => a.kind === 'image')">
-                      <template x-for="att in (item.attachments || []).filter(a => a.kind === 'image')" :key="att.id">
-                        <button class="memo-image-thumb" @click="openMemoAttachment(att)" :title="att.label">
-                          <img x-show="memoPreviewCache[att.id]" :src="memoPreviewCache[att.id]" :alt="att.label || 'image'" />
-                          <span x-show="!memoPreviewCache[att.id]">图片</span>
-                        </button>
-                      </template>
-                    </div>
-                  </div>
-                  <div class="memo-item-meta">
-                    <span class="memo-reminder" x-show="item.reminderAt" x-text="reminderLabel(item)"></span>
-                    <button class="icon-btn" @click="editMemo(item)">✎</button>
-                    <button class="icon-btn danger" @click="deleteMemoItem(item)">✕</button>
-                  </div>
-                </div>
-              </template>
-            </div>
-            <div class="data-empty" x-show="!filteredMemos.length">没有匹配的备忘录。</div>
-          </section>
-        </div>
-
-        <div x-show="memoSubTab==='words'">
-          <section class="settings-section" x-show="vocabFormOpen">
-            <div class="section-header-row">
-              <h3 x-text="vocabEditingID ? '编辑单词' : '新增单词'"></h3>
-              <button class="icon-btn" @click="vocabFormOpen=false">✕</button>
-            </div>
-            <div class="vocab-form-grid">
-              <div>
-                <label class="field-label">英文</label>
-                <input class="field-input" x-model="vocabForm.word" placeholder="resilient" />
-              </div>
-              <div>
-                <label class="field-label">中文</label>
-                <input class="field-input" x-model="vocabForm.chinese" placeholder="有韧性的" />
-              </div>
-              <div>
-                <label class="field-label">音标</label>
-                <input class="field-input" x-model="vocabForm.phonetic" placeholder="/rɪˈzɪliənt/" />
-              </div>
-              <div>
-                <label class="field-label">词性</label>
-                <input class="field-input" x-model="vocabForm.partOfSpeech" placeholder="adjective" />
-              </div>
-            </div>
-            <label class="field-label">常用语法组合</label>
-            <textarea class="field-input" rows="4" x-model="vocabForm.collocationsRaw" placeholder="be resilient in | 在...方面有韧性 | Teams need to be resilient in outages."></textarea>
-            <label class="field-label">例句</label>
-            <textarea class="field-input" rows="2" x-model="vocabForm.example"></textarea>
-            <div class="vocab-form-grid">
-              <div>
-                <label class="field-label">音频 URL</label>
-                <input class="field-input" x-model="vocabForm.audioUrl" placeholder="https://..." />
-              </div>
-              <div>
-                <label class="field-label">标签</label>
-                <input class="field-input" x-model="vocabForm.tagsRaw" placeholder="work, reading" />
-              </div>
-            </div>
-            <div class="prompt-actions-row">
-              <button class="btn-sm" @click="lookupVocab()" :aria-busy="vocabLookupBusy">🔎 在线词典</button>
-              <button class="btn-sm" @click="suggestVocab()" :aria-busy="vocabAIBusy">✦ AI 补全</button>
-              <button class="btn-primary" @click="saveVocabForm()" :aria-busy="vocabSaving">保存</button>
-              <button class="secondary" @click="vocabFormOpen=false">取消</button>
-            </div>
-          </section>
-
-          <section class="settings-section">
-            <div class="section-header-row">
-              <h3>单词库</h3>
-              <button class="btn-sm btn-primary" @click="openNewVocab()">+ 新增</button>
-            </div>
-            <div class="memo-toolbar vocab-toolbar">
-              <input class="field-input vocab-toolbar-search" type="search" :value="vocabSearch" @input="setVocabSearch($event.target.value)" placeholder="搜索英文、中文、标签" />
-              <select class="field-input vocab-toolbar-control" :value="vocabSort" @change="setVocabSort($event.target.value)">
-                <option value="alpha">按首字母</option>
-                <option value="created">按添加时间</option>
-              </select>
-              <input class="field-input vocab-toolbar-control" type="date" :value="vocabDateFilter" @input="setVocabDateFilter($event.target.value)" />
-              <button class="btn-sm secondary vocab-toolbar-clear" x-show="vocabDateFilter" @click="setVocabDateFilter('')">清除日期</button>
-            </div>
-            <div class="vocab-list">
-              <template x-for="group in groupedVocabEntries" :key="group.key">
-                <div class="vocab-day-group">
-                  <div class="vocab-day-header">
-                    <span x-text="group.label"></span>
-                    <small x-text="group.items.length + ' 个单词'"></small>
-                  </div>
-                  <template x-for="entry in group.items" :key="entry.id">
-                    <div class="vocab-card">
-                      <div class="vocab-head">
-                        <div>
-                          <strong class="vocab-word" x-text="entry.word"></strong>
-                          <span class="muted" x-text="entry.phonetic"></span>
-                        </div>
-                        <div class="vocab-actions">
-                          <template x-if="vocabDeleteConfirmID !== entry.id">
-                            <div class="vocab-action-row">
-                              <button class="icon-btn" @click="playVocabAudio(entry)" title="发音">▶</button>
-                              <button class="icon-btn" @click="editVocab(entry)" title="编辑">✎</button>
-                              <button class="icon-btn danger" @click="requestDeleteVocab(entry)" title="删除">✕</button>
-                            </div>
-                          </template>
-                          <template x-if="vocabDeleteConfirmID === entry.id">
-                            <div class="vocab-confirm-row">
-                              <button class="btn-sm btn-danger" @click="confirmDeleteVocab(entry)">确认删除</button>
-                              <button class="btn-sm secondary" @click="cancelDeleteVocab()">取消</button>
-                            </div>
-                          </template>
-                        </div>
-                      </div>
-                      <div class="vocab-meaning" x-text="entry.chinese || '未填写中文释义'"></div>
-                      <div class="vocab-meta">
-                        <span x-show="entry.partOfSpeech" x-text="entry.partOfSpeech"></span>
-                        <span x-text="'记录: ' + formatTime(entry.createdAt)"></span>
-                      </div>
-                      <div class="vocab-collocations" x-show="entry.collocations && entry.collocations.length">
-                        <template x-for="c in entry.collocations" :key="c.pattern + c.example">
-                          <div class="vocab-collocation">
-                            <strong x-text="c.pattern"></strong>
-                            <span x-text="c.meaning"></span>
-                            <span class="muted" x-text="c.example"></span>
-                          </div>
-                        </template>
+                  <template x-for="item in g.items" :key="item.id">
+                    <div class="memo-row" :class="{ active: memoDraft && memoDraft.id === item.id, done: item.status === 'done' }" @click="selectMemo(item)">
+                      <button class="memo-check" :class="{ checked: item.status === 'done', ['prio-' + (item.priority || 'normal')]: true }" @click.stop="toggleMemoDone(item)" :title="item.status === 'done' ? '标记为未完成' : '完成'"><span x-show="item.status === 'done'">✓</span></button>
+                      <div class="memo-row-main">
+                        <span class="memo-row-title" x-text="item.title"></span>
+                        <span class="memo-row-meta">
+                          <span x-show="g.showDate" :class="{ 'is-overdue': memoIsOverdue(item) }" x-text="memoDateLabel(item.date)"></span>
+                          <span x-show="item.reminderAt" :class="{ 'is-overdue': memoReminderPast(item) }" x-text="'⏰ ' + memoTimeLabel(item.reminderAt, item.date)"></span>
+                          <template x-for="t in (item.tags || [])" :key="t"><span class="memo-tag" x-text="'#' + t"></span></template>
+                          <span x-show="(item.attachments || []).length" x-text="'📎 ' + (item.attachments || []).length"></span>
+                          <span x-show="item.body" class="memo-row-note">📝</span>
+                        </span>
                       </div>
                     </div>
                   </template>
                 </div>
               </template>
-            </div>
-            <div class="vocab-pagination" x-show="filteredVocabEntries.length">
-              <span class="muted" x-text="`第 ${vocabPageStart}-${vocabPageEnd} 个，共 ${filteredVocabEntries.length} 个`"></span>
-              <div class="vocab-page-actions">
-                <button class="btn-sm secondary" @click="gotoVocabPage(vocabPage - 1)" :disabled="vocabPage <= 1">上一页</button>
-                <span class="vocab-page-indicator" x-text="`${vocabPage} / ${vocabTotalPages}`"></span>
-                <button class="btn-sm secondary" @click="gotoVocabPage(vocabPage + 1)" :disabled="vocabPage >= vocabTotalPages">下一页</button>
+              <div class="memo-empty" x-show="!memoSearch.trim() && !memoGroups.length">
+                <template x-if="memoSubTab==='today'"><p>今天没有待办 🎉<br><span class="muted">在上方输入框写一句话就能添加。</span></p></template>
+                <template x-if="memoSubTab==='upcoming'"><p>没有安排在未来的待办。<br><span class="muted">输入「明天 / 周五 / 11月3日」等日期词即可排期。</span></p></template>
+                <template x-if="memoSubTab==='done'"><p class="muted">还没有完成的待办。</p></template>
               </div>
             </div>
-            <div class="data-empty" x-show="!filteredVocabEntries.length">暂无单词记录。</div>
           </section>
-        </div>
 
-        <div x-show="memoSubTab==='review'">
-          <section class="settings-section">
-            <div class="section-header-row">
-              <h3>单词复盘</h3>
-              <span class="muted text-sm" x-text="reviewDueEntries.length + ' 个待复盘'"></span>
-            </div>
-            <div class="review-list">
-              <template x-for="entry in reviewDueEntries" :key="entry.id">
-                <div class="review-card">
-                  <div class="vocab-head">
-                    <strong class="vocab-word" x-text="entry.word"></strong>
-                    <button class="icon-btn" @click="playVocabAudio(entry)" title="发音">▶</button>
-                  </div>
-                  <button class="btn-sm" x-show="!reviewReveal[entry.id]" @click="reviewReveal = { ...reviewReveal, [entry.id]: true }">显示答案</button>
-                  <div x-show="reviewReveal[entry.id]" class="review-answer">
-                    <div class="vocab-meaning" x-text="entry.chinese"></div>
-                    <div class="muted" x-text="entry.phonetic"></div>
-                    <div x-text="entry.example"></div>
-                    <div class="prompt-actions-row">
-                      <button class="btn-sm" @click="reviewVocab(entry, 'hard')">困难</button>
-                      <button class="btn-sm btn-primary" @click="reviewVocab(entry, 'known')">熟悉</button>
-                      <button class="btn-sm" @click="reviewVocab(entry, 'mastered')">掌握</button>
-                    </div>
+          <!-- detail -->
+          <template x-if="memoDraft">
+            <aside class="memo-detail">
+              <div class="memo-detail-head">
+                <button class="memo-check memo-check-lg" :class="{ checked: memoDraft.status === 'done' }" @click="toggleMemoDone(memoDraft)"><span x-show="memoDraft.status === 'done'">✓</span></button>
+                <input type="text" class="memo-title-input" x-model="memoDraft.title" @change="saveMemoDraft()" @keydown.enter.prevent="$el.blur()" />
+                <button class="icon-btn" @click="closeMemoDetail()" title="关闭">✕</button>
+              </div>
+              <textarea class="field-textarea memo-notes" rows="4" x-model="memoDraft.body" @change="saveMemoDraft()" placeholder="备注、链接、检查点…"></textarea>
+
+              <div class="memo-fields">
+                <label class="memo-field"><span>日期</span>
+                  <input type="date" class="field-input" x-model="memoDraft.date" @change="saveMemoDraft()" />
+                </label>
+                <label class="memo-field memo-field-wide"><span>提醒</span>
+                  <input type="datetime-local" class="field-input" x-model="memoDraft.reminderLocal" @change="saveMemoDraft()" />
+                </label>
+                <div class="memo-field" x-show="memoDraft.reminderLocal"><span>提醒方式</span>
+                  <div class="wb-seg wb-seg-sm">
+                    <button :class="memoDraft.reminderMode==='both' ? 'active' : ''" @click="memoDraft.reminderMode='both'; saveMemoDraft()">横幅+声音</button>
+                    <button :class="memoDraft.reminderMode==='banner' ? 'active' : ''" @click="memoDraft.reminderMode='banner'; saveMemoDraft()">横幅</button>
+                    <button :class="memoDraft.reminderMode==='sound' ? 'active' : ''" @click="memoDraft.reminderMode='sound'; saveMemoDraft()">声音</button>
                   </div>
                 </div>
-              </template>
-            </div>
-            <div class="data-empty" x-show="!reviewDueEntries.length">当前没有待复盘单词。</div>
-          </section>
+                <div class="memo-field"><span>优先级</span>
+                  <div class="wb-seg wb-seg-sm">
+                    <button :class="memoDraft.priority==='low' ? 'active' : ''" @click="memoDraft.priority='low'; saveMemoDraft()">低</button>
+                    <button :class="memoDraft.priority==='normal' ? 'active' : ''" @click="memoDraft.priority='normal'; saveMemoDraft()">普通</button>
+                    <button :class="memoDraft.priority==='high' ? 'active' : ''" @click="memoDraft.priority='high'; saveMemoDraft()">高</button>
+                  </div>
+                </div>
+                <label class="memo-field"><span>标签</span>
+                  <input type="text" class="field-input" x-model="memoDraft.tagsRaw" @change="saveMemoDraft()" placeholder="工作, 复盘" />
+                </label>
+              </div>
+
+              <div class="memo-attachments">
+                <div class="memo-sub-head"><span>附件</span><span class="muted text-xs">本地文件会复制到托管目录</span></div>
+                <template x-for="att in memoDraft.attachments" :key="att.id">
+                  <div class="memo-att-row">
+                    <template x-if="att.kind === 'image' && memoPreviewCache[att.id]"><img class="memo-att-thumb" :src="memoPreviewCache[att.id]" :alt="att.label" /></template>
+                    <span x-show="!(att.kind === 'image' && memoPreviewCache[att.id])" x-text="attachmentIcon(att)"></span>
+                    <button class="memo-att-label" @click="openMemoAttachment(att)" x-text="att.label || att.url || baseName(att.managedPath || att.sourcePath || '')"></button>
+                    <button class="icon-btn danger" @click="removeMemoAttachment(att)" title="移除">✕</button>
+                  </div>
+                </template>
+                <div class="memo-att-add">
+                  <input type="text" class="field-input" x-model="memoAttachmentForm.path" placeholder="粘贴文件路径或 https:// 链接，回车添加" @keydown.enter.prevent="addMemoAttachment()" />
+                  <button class="btn-sm" @click="addMemoAttachment()" :disabled="!memoAttachmentForm.path.trim()">添加</button>
+                </div>
+              </div>
+
+              <div class="memo-detail-foot">
+                <span class="muted text-xs" x-text="memoDraftSaving ? '保存中…' : '修改自动保存 · 创建于 ' + formatTime(memoDraft.createdAt)"></span>
+                <button class="btn-sm secondary danger-text" @click="deleteMemoItem(memoDraft)">删除</button>
+              </div>
+            </aside>
+          </template>
         </div>
 
+        <!-- ══ 单词本 ═══════════════════════════════════════════════════ -->
+        <div class="memo-split" :class="{ 'has-detail': !!vocabDraft }" x-show="memoSubTab==='words'">
+          <section class="memo-panel">
+            <div class="memo-quick">
+              <span class="memo-quick-plus">Aa</span>
+              <input type="text" class="memo-quick-input" x-model="vocabQuick" placeholder="输入英文单词或短语，回车查词并加入单词本" @keydown.enter.prevent="startVocabCapture()" />
+              <button class="btn-sm" x-show="vocabQuick.trim()" @click="startVocabCapture()" :aria-busy="vocabLookupBusy">查词</button>
+            </div>
+            <div class="memo-toolbar-row">
+              <input type="search" class="search-input memo-search" x-model="vocabSearch" @input="vocabLimit = 40" placeholder="搜索英文、中文、标签…" />
+              <div class="wb-filters memo-filters">
+                <template x-for="f in vocabFilterOptions" :key="f.id">
+                  <button class="wb-filter" :class="vocabFilter===f.id ? 'active' : ''" @click="vocabFilter=f.id; vocabLimit=40" x-text="f.label + ' ' + f.count"></button>
+                </template>
+              </div>
+            </div>
+            <div class="vocab-rows">
+              <template x-for="v in visibleVocab" :key="v.id">
+                <div class="vocab-row" :class="{ active: vocabDraft && vocabDraft.id === v.id }" @click="selectVocab(v)">
+                  <div class="vocab-row-word">
+                    <strong x-text="v.word"></strong>
+                    <span class="muted" x-text="v.phonetic"></span>
+                  </div>
+                  <div class="vocab-row-meaning" x-text="v.chinese || '—'"></div>
+                  <div class="vocab-row-level" :title="vocabLevelTitle(v)">
+                    <template x-for="i in 4" :key="i"><span class="vocab-pip" :class="{ on: Math.min(v.reviewLevel || 0, 8) >= i * 2 - 1 }"></span></template>
+                  </div>
+                  <button class="icon-btn vocab-play" @click.stop="playVocabAudio(v)" title="发音">▶</button>
+                </div>
+              </template>
+              <button class="btn-sm vocab-more" x-show="filteredVocabEntries.length > visibleVocab.length" @click="vocabLimit += 40" x-text="'显示更多（还有 ' + (filteredVocabEntries.length - visibleVocab.length) + ' 个）'"></button>
+              <div class="memo-empty" x-show="!filteredVocabEntries.length"><p class="muted" x-text="vocabEntries.length ? '没有匹配的单词' : '单词本是空的，在上方输入一个单词试试。'"></p></div>
+            </div>
+          </section>
+
+          <template x-if="vocabDraft">
+            <aside class="memo-detail vocab-detail">
+              <div class="memo-detail-head">
+                <input type="text" class="memo-title-input vocab-word-input" x-model="vocabDraft.word" placeholder="word" />
+                <button class="icon-btn" @click="playVocabAudio(vocabDraft)" title="发音">▶</button>
+                <button class="icon-btn" @click="closeVocabDetail()" title="关闭">✕</button>
+              </div>
+              <p class="vocab-exists" x-show="vocabDraftDuplicate" x-text="'单词本里已有「' + vocabDraftDuplicate?.word + '」，保存会新建一条。'"></p>
+              <div class="memo-fields">
+                <label class="memo-field memo-field-wide"><span>中文释义</span>
+                  <input type="text" class="field-input" x-model="vocabDraft.chinese" placeholder="有韧性的；能迅速恢复的" />
+                </label>
+                <label class="memo-field"><span>音标</span><input type="text" class="field-input mono" x-model="vocabDraft.phonetic" placeholder="/rɪˈzɪliənt/" /></label>
+                <label class="memo-field"><span>词性</span><input type="text" class="field-input" x-model="vocabDraft.partOfSpeech" placeholder="adjective" /></label>
+                <label class="memo-field memo-field-wide"><span>例句</span><textarea class="field-textarea" rows="2" x-model="vocabDraft.example"></textarea></label>
+              </div>
+              <p class="vocab-defs muted" x-show="(vocabDraft.definitions || []).length" x-text="'词典释义：' + (vocabDraft.definitions || []).slice(0, 3).join('；')"></p>
+
+              <div class="memo-sub-head"><span>常用搭配</span><button class="btn-sm" @click="vocabDraft.collocations.push({ pattern: '', meaning: '', example: '' })">＋ 搭配</button></div>
+              <div class="vocab-colls">
+                <template x-for="(c, i) in vocabDraft.collocations" :key="i">
+                  <div class="vocab-coll">
+                    <input type="text" class="field-input" x-model="c.pattern" placeholder="be resilient to" />
+                    <input type="text" class="field-input" x-model="c.meaning" placeholder="对…有抵抗力" />
+                    <button class="icon-btn danger" @click="vocabDraft.collocations.splice(i, 1)">✕</button>
+                    <input type="text" class="field-input vocab-coll-example" x-model="c.example" placeholder="例句（可选）" />
+                  </div>
+                </template>
+              </div>
+              <label class="memo-field memo-field-wide"><span>标签</span><input type="text" class="field-input" x-model="vocabDraft.tagsRaw" placeholder="work, reading" /></label>
+
+              <div class="memo-detail-foot">
+                <button class="btn-sm" @click="lookupVocab()" :aria-busy="vocabLookupBusy" :disabled="!vocabDraft.word.trim()">词典</button>
+                <button class="btn-sm" @click="suggestVocab()" :aria-busy="vocabAIBusy" :disabled="!vocabDraft.word.trim() || !aiReady" :title="aiReady ? 'AI 补全中文释义、搭配和例句' : '先在 ✦ AI 中启用'">✦ AI 补全</button>
+                <span class="wb-form-bar-spacer"></span>
+                <button class="btn-sm secondary danger-text" x-show="vocabDraft.id" @click="deleteVocab(vocabDraft)">删除</button>
+                <button class="btn-sm active" @click="saveVocabDraft()" :aria-busy="vocabSaving" :disabled="!vocabDraft.word.trim() || (vocabDraft.id && !vocabDraftDirty)" x-text="vocabDraft.id ? '保存' : '加入单词本'"></button>
+              </div>
+              <p class="muted text-xs vocab-review-info" x-show="vocabDraft.id" x-text="vocabLevelTitle(vocabDraft)"></p>
+            </aside>
+          </template>
+        </div>
+
+        <!-- ══ 复习（闪卡）══════════════════════════════════════════════ -->
+        <div x-show="memoSubTab==='review'">
+          <section class="settings-section review-stage" @keydown.window="reviewKey($event)">
+            <template x-if="!review.queue.length">
+              <div class="memo-empty review-start">
+                <p x-show="reviewDueEntries.length"><strong x-text="reviewDueEntries.length + ' 个单词等待复习'"></strong></p>
+                <p class="muted" x-show="!reviewDueEntries.length">今天没有需要复习的单词 🎉</p>
+                <div class="review-start-actions" x-show="reviewDueEntries.length">
+                  <button class="btn-sm active" @click="startReview(20)" x-text="'开始复习 ' + Math.min(20, reviewDueEntries.length) + ' 个'"></button>
+                  <button class="btn-sm" x-show="reviewDueEntries.length > 20" @click="startReview(reviewDueEntries.length)">全部复习</button>
+                </div>
+                <p class="muted text-xs">快捷键：空格 显示答案 · 1 不认识 · 2 认识 · 3 很熟</p>
+              </div>
+            </template>
+
+            <template x-if="review.queue.length && review.index >= review.queue.length">
+              <div class="memo-empty review-start">
+                <p><strong>本轮完成 ✓</strong></p>
+                <p class="muted" x-text="`不认识 ${review.tally.hard} · 认识 ${review.tally.known} · 很熟 ${review.tally.mastered}`"></p>
+                <div class="review-start-actions">
+                  <button class="btn-sm active" x-show="reviewDueEntries.length" @click="startReview(20)">再来一轮</button>
+                  <button class="btn-sm" @click="review = { queue: [], index: 0, revealed: false, tally: { hard: 0, known: 0, mastered: 0 } }">结束</button>
+                </div>
+              </div>
+            </template>
+
+            <template x-if="reviewCard">
+              <div class="review-card-v2">
+                <div class="review-progress">
+                  <span x-text="(review.index + 1) + ' / ' + review.queue.length"></span>
+                  <progress :value="review.index" :max="review.queue.length"></progress>
+                </div>
+                <div class="review-face">
+                  <div class="review-word" x-text="reviewCard.word"></div>
+                  <div class="review-phonetic">
+                    <span x-text="reviewCard.phonetic"></span>
+                    <button class="icon-btn" @click="playVocabAudio(reviewCard)" title="发音">▶</button>
+                  </div>
+                </div>
+                <template x-if="!review.revealed">
+                  <button class="btn-sm review-reveal" @click="review.revealed = true">显示答案 <kbd>空格</kbd></button>
+                </template>
+                <template x-if="review.revealed">
+                  <div class="review-back">
+                    <div class="review-meaning"><span class="muted" x-text="reviewCard.partOfSpeech"></span> <span x-text="reviewCard.chinese || '（未填写释义）'"></span></div>
+                    <div class="review-example" x-show="reviewCard.example" x-text="reviewCard.example"></div>
+                    <div class="review-colls" x-show="(reviewCard.collocations || []).length">
+                      <template x-for="c in (reviewCard.collocations || []).slice(0, 3)" :key="c.pattern"><div><strong x-text="c.pattern"></strong> <span class="muted" x-text="c.meaning"></span></div></template>
+                    </div>
+                    <div class="review-grades">
+                      <button class="review-grade grade-hard" @click="gradeReview('hard')">不认识 <kbd>1</kbd><small>明天再见</small></button>
+                      <button class="review-grade grade-known" @click="gradeReview('known')">认识 <kbd>2</kbd><small x-text="reviewIntervalLabel(reviewCard, 'known')"></small></button>
+                      <button class="review-grade grade-mastered" @click="gradeReview('mastered')">很熟 <kbd>3</kbd><small x-text="reviewIntervalLabel(reviewCard, 'mastered')"></small></button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </section>
+        </div>
         <div x-show="memoSubTab==='storage'">
           <section class="settings-section">
             <div class="section-header-row">
@@ -3395,7 +3235,7 @@
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <!-- VPN 配置中心                                                       -->
   <!-- ══════════════════════════════════════════════════════════════════ -->
-  <main x-show="tab==='vpn' && !selectedDir" class="ai-main">
+  <main x-show="tab==='vpn'" class="ai-main">
 
     <!-- Hero -->
     <section class="page-hero ai-hero vpn-hero">

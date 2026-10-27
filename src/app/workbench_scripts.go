@@ -77,11 +77,31 @@ func (a *App) SaveScriptMeta(meta config.ScriptMeta) error {
 	return nil
 }
 
+// SetScriptFavorite pins or unpins a script without touching other overrides.
+func (a *App) SetScriptFavorite(path string, favorite bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cfg.OverrideMeta == nil {
+		a.cfg.OverrideMeta = make(map[string]config.ScriptMeta)
+	}
+	ov, ok := a.cfg.OverrideMeta[path]
+	if !ok {
+		ov = config.ScriptMeta{Path: path}
+	}
+	ov.Favorite = favorite
+	a.cfg.OverrideMeta[path] = ov
+	return a.cfg.Save()
+}
+
 // DeleteScriptMeta removes a user override so auto-detection resumes.
 func (a *App) DeleteScriptMeta(path string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	delete(a.cfg.OverrideMeta, path)
+	if ov, ok := a.cfg.OverrideMeta[path]; ok && ov.Favorite {
+		a.cfg.OverrideMeta[path] = config.ScriptMeta{Path: path, Favorite: true}
+	} else {
+		delete(a.cfg.OverrideMeta, path)
+	}
 	return a.cfg.Save()
 }
 

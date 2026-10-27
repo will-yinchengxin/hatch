@@ -25,6 +25,7 @@ type AIScriptSuggestion struct {
 	Commands  []string               `json:"commands"`
 	PidFile   string                 `json:"pidFile"`
 	NeedsArgs bool                   `json:"needsArgs"`
+	Args      []config.ArgDef        `json:"args"`
 	Tags      []string               `json:"tags"`
 	Presets   []config.CommandPreset `json:"presets"`
 }

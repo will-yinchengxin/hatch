@@ -184,6 +184,7 @@ export namespace app {
 	    commands: string[];
 	    pidFile: string;
 	    needsArgs: boolean;
+	    args: config.ArgDef[];
 	    tags: string[];
 	    presets: config.CommandPreset[];
 	
@@ -199,6 +200,7 @@ export namespace app {
 	        this.commands = source["commands"];
 	        this.pidFile = source["pidFile"];
 	        this.needsArgs = source["needsArgs"];
+	        this.args = this.convertValues(source["args"], config.ArgDef);
 	        this.tags = source["tags"];
 	        this.presets = this.convertValues(source["presets"], config.CommandPreset);
 	    }
@@ -757,6 +759,7 @@ export namespace config {
 	    requires?: string[];
 	    healthUrl?: string;
 	    preScripts?: string[];
+	    favorite?: boolean;
 	    lastRunAt: number;
 	    updatedAt: number;
 	
@@ -782,6 +785,7 @@ export namespace config {
 	        this.requires = source["requires"];
 	        this.healthUrl = source["healthUrl"];
 	        this.preScripts = source["preScripts"];
+	        this.favorite = source["favorite"];
 	        this.lastRunAt = source["lastRunAt"];
 	        this.updatedAt = source["updatedAt"];
 	    }
@@ -807,6 +811,9 @@ export namespace config {
 	export class ExportVar {
 	    name: string;
 	    value: string;
+	    kind?: string;
+	    secret?: boolean;
+	    note?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ExportVar(source);
@@ -816,6 +823,9 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.value = source["value"];
+	        this.kind = source["kind"];
+	        this.secret = source["secret"];
+	        this.note = source["note"];
 	    }
 	}
 	export class Directory {

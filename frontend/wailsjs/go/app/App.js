@@ -482,6 +482,10 @@ export function ResolveSkillImportConflict(arg1, arg2, arg3) {
   return window['go']['app']['App']['ResolveSkillImportConflict'](arg1, arg2, arg3);
 }
 
+export function RevealFile(arg1) {
+  return window['go']['app']['App']['RevealFile'](arg1);
+}
+
 export function ReviewVocabEntry(arg1, arg2) {
   return window['go']['app']['App']['ReviewVocabEntry'](arg1, arg2);
 }
@@ -642,6 +646,10 @@ export function SetMCPEnabled(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetMCPEnabled'](arg1, arg2, arg3);
 }
 
+export function SetScriptFavorite(arg1, arg2) {
+  return window['go']['app']['App']['SetScriptFavorite'](arg1, arg2);
+}
+
 export function SetSkillSync(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetSkillSync'](arg1, arg2, arg3);
 }
@@ -708,6 +716,10 @@ export function TestVPNNodeDelay(arg1) {
 
 export function TestVPNRule(arg1, arg2) {
   return window['go']['app']['App']['TestVPNRule'](arg1, arg2);
+}
+
+export function TrashScriptFile(arg1) {
+  return window['go']['app']['App']['TrashScriptFile'](arg1);
 }
 
 export function UpdateDirectoryExport(arg1, arg2) {

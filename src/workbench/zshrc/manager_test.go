@@ -184,3 +184,21 @@ func TestWriteBlock_PreservesContentAfterBlock(t *testing.T) {
 		t.Error("content after block lost")
 	}
 }
+
+func TestWriteVars_OnlyPathVarsJoinPATH(t *testing.T) {
+	path := tmpZshrc(t, "")
+	err := WriteVars(path, []Var{
+		{Name: "TOOLS", Value: "/Users/me/tools", InPath: true},
+		{Name: "API_TOKEN", Value: "abc 123"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readFile(t, path)
+	if !strings.Contains(got, "export API_TOKEN='abc 123'\n") {
+		t.Fatalf("plain var missing:\n%s", got)
+	}
+	if !strings.Contains(got, "export PATH=$TOOLS:$PATH\n") || strings.Contains(got, "$API_TOKEN:") {
+		t.Fatalf("only path vars should join PATH:\n%s", got)
+	}
+}

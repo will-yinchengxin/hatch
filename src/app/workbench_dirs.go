@@ -2,8 +2,10 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"hatch/core/config"
+	"hatch/core/fsutil"
 	"hatch/workbench/zshrc"
 )
 
@@ -49,6 +51,13 @@ func (a *App) RemoveDirectory(path string) error {
 		}
 	}
 	a.cfg.Directories = kept
+	// Drop per-script settings of files that lived directly in this directory.
+	for p := range a.cfg.OverrideMeta {
+		if filepath.Dir(p) == filepath.Clean(path) {
+			delete(a.cfg.OverrideMeta, p)
+		}
+	}
+	delete(a.cfg.ScriptOrders, path)
 
 	if removedExport != "" {
 		a.removeExportLocked(removedExport)
@@ -101,14 +110,16 @@ func (a *App) SaveExports(exports []config.ExportVar) error {
 	return a.cfg.Save()
 }
 
+// upsertExportLocked records a directory export; directories always join PATH.
 func (a *App) upsertExportLocked(name, value string) {
 	for i, e := range a.cfg.Exports {
 		if e.Name == name {
 			a.cfg.Exports[i].Value = value
+			a.cfg.Exports[i].Kind = "path"
 			return
 		}
 	}
-	a.cfg.Exports = append(a.cfg.Exports, config.ExportVar{Name: name, Value: value})
+	a.cfg.Exports = append(a.cfg.Exports, config.ExportVar{Name: name, Value: value, Kind: "path"})
 }
 
 func (a *App) removeExportLocked(name string) {
@@ -128,14 +139,18 @@ func (a *App) syncZshrcLocked() error {
 	if err != nil {
 		return err
 	}
-	exports := make(map[string]string, len(a.cfg.Exports))
+	vars := make([]zshrc.Var, 0, len(a.cfg.Exports))
+	seen := make(map[string]bool, len(a.cfg.Exports))
 	for _, e := range a.cfg.Exports {
-		if e.Name != "" {
-			exports[e.Name] = e.Value
+		if e.Name == "" || seen[e.Name] {
+			continue
 		}
+		seen[e.Name] = true
+		// "~/x" would be single-quoted in the block, so expand it here.
+		vars = append(vars, zshrc.Var{Name: e.Name, Value: fsutil.ExpandHome(e.Value), InPath: e.InPath()})
 	}
-	if len(exports) == 0 {
+	if len(vars) == 0 {
 		return zshrc.RemoveBlock(p)
 	}
-	return zshrc.WriteBlock(p, exports)
+	return zshrc.WriteVars(p, vars)
 }

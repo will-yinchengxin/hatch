@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
+	"strings"
 	"sync"
 )
 
@@ -78,9 +80,13 @@ func runOneshotInternal(
 	if logFn != nil {
 		logFn("[hatch] command: "+buildScriptCommandForLog(scriptPath, args), "stdout")
 		if len(env) > 0 {
-			for k, v := range env {
-				logFn("[hatch] env: "+k+"="+v, "stdout")
+			// Names only: values may be tokens and the log is archived to run history.
+			keys := make([]string, 0, len(env))
+			for k := range env {
+				keys = append(keys, k)
 			}
+			sort.Strings(keys)
+			logFn("[hatch] env: "+strings.Join(keys, ", "), "stdout")
 		}
 	}
 

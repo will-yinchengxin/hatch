@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type ScriptType string
@@ -43,6 +44,7 @@ type ScriptMeta struct {
 	Requires     []string          `json:"requires,omitempty"`     // v1.2: required CLI commands
 	HealthURL    string            `json:"healthUrl,omitempty"`    // v1.2: health-check URL for service scripts
 	PreScripts   []string          `json:"preScripts,omitempty"`   // v1.3: scripts to run (in order) before this one; failure aborts
+	Favorite     bool              `json:"favorite,omitempty"`     // pinned to the top of the workbench list
 	LastRunAt    int64             `json:"lastRunAt"`
 	UpdatedAt    int64             `json:"updatedAt"`
 }
@@ -56,6 +58,23 @@ type Directory struct {
 type ExportVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+	// Kind is "var" (plain export) or "path" (also appended to PATH).
+	// Empty means legacy: treated as "path" when Value looks like a path.
+	Kind   string `json:"kind,omitempty"`
+	Secret bool   `json:"secret,omitempty"` // UI masks the value; still written to ~/.zshrc
+	Note   string `json:"note,omitempty"`
+}
+
+// InPath reports whether the export is appended to PATH in the zshrc block.
+func (e ExportVar) InPath() bool {
+	switch e.Kind {
+	case "path":
+		return true
+	case "var":
+		return false
+	}
+	v := strings.TrimSpace(e.Value)
+	return strings.HasPrefix(v, "/") || strings.HasPrefix(v, "~/") || strings.HasPrefix(v, "$")
 }
 
 type AIConfig struct {

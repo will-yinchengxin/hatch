@@ -5,7 +5,6 @@ import Alpine from 'alpinejs';
 import {
   GetConfig,
   ScanAll,
-  GetScriptsByDir,
   AddDirectory,
   RemoveDirectory,
   UpdateDirectoryExport,
@@ -147,20 +146,30 @@ window.hatchApp = function () {
     hostError: '',
     hostTimer: null,
 
-    selectedDir: null,
     allScripts: [],
-    currentScripts: [],
 
-    dragSrcPath: null,
-    dragOverPath: null,
-    sortMode: false,
-    _dragScrollY: 0,
-    _dragScrollRAF: null,
-    _dragScrollHandler: null,
+    // Workbench (工作台): sidebar sub-page, master list filter, selected script + detail pane
+    wbSubTab: 'scripts',   // scripts | env | dirs | runs
+    wbQuery: '',
+    wbFilter: 'all',       // all | fav | service | scheduled
+    wbSelected: null,      // script path
+    wbPane: 'run',         // run | code | config | history
+    wbArgValues: {},       // path → { argIndex: value } for declared @hatch.arg fields
+    wbCode: { path: '', content: '', original: '', loading: false, saving: false },
+    wbAI: { instruction: '', busy: false, result: null, diff: [], stats: { add: 0, del: 0 } },
+    wbFormSnapshot: '',
+    wbRecentRuns: [],
+    // Global env editor (rows mirror cfg.exports plus UI-only fields)
+    envRows: [],
+    envDirty: false,
+    envQuery: '',
+    envReveal: {},
+    envImportOpen: false,
+    envImportText: '',
+    // New script dialog + ⌘K palette
+    newScript: { open: false, dir: '', filename: '', mode: 'template', template: 'zsh', instruction: '', content: '', busy: false, saving: false },
+    palette: { open: false, query: '', index: 0 },
 
-    query: '',
-    page: 1,
-    pageSize: 15,
     loading: false,
     error: '',
     errorTimer: null,
@@ -172,7 +181,6 @@ window.hatchApp = function () {
     scriptArgs: {},
     scriptLogs: {},
     scriptExitCodes: {},   // path → exit code (number)
-    logTarget: null,
 
     cfg: { directories: [], exports: [] },
     aiForm: { enabled: false, baseUrl: '', apiKey: '', model: '' },
@@ -200,10 +208,7 @@ window.hatchApp = function () {
     inlineExportDir: null,
     inlineExportName: '',
 
-    exportsDirty: false,
-
-    // Edit drawer
-    editTarget: null,
+    // Script config form (workbench 配置 pane)
     editForm: {},
     editSaving: false,
 
@@ -306,19 +311,6 @@ window.hatchApp = function () {
     codexConfigOpen: false,
     codexConfigContent: '',
     codexConfigSaving: false,
-
-    // Script content editor
-    scriptEditorTarget: null,   // ScriptMeta of the script being edited
-    scriptEditorContent: '',
-    scriptEditorSaving: false,
-    scriptEditorAIBusy: false,
-    scriptEditorInstruction: '',
-
-    // New script creation
-    newScriptOpen: false,
-    newScriptForm: { filename: '', content: '#!/bin/zsh\n\n' },
-    newScriptSaving: false,
-    newScriptAIBusy: false,
 
     // AI trace log
     aiTraces: [],
@@ -437,39 +429,29 @@ window.hatchApp = function () {
     vpnBulk: { open: false, text: '', target: 'DIRECT', busy: false },
     vpnRuleTest: { input: '', busy: false, result: null, error: '' },
 
-    // Memo module
-    memoSubTab: 'today',      // 'today' | 'all' | 'words' | 'review' | 'storage'
+    // Memo module: todos (today / upcoming / done) + word book + flashcard review
+    memoSubTab: 'today',      // today | upcoming | done | words | review | storage
     memoDashboard: { today: 0, overdue: 0, reminders: 0, reviewDue: 0, totalMemos: 0, totalVocab: 0 },
     memos: [],
     memoSearch: '',
-    memoFilter: 'open',       // open | done | all
-    memoFormOpen: false,
-    memoEditingID: '',
-    memoForm: { title: '', body: '', date: '', priority: 'normal', tagsRaw: '', reminderLocal: '', reminderMode: 'both', attachments: [] },
-    memoAttachmentForm: { path: '', label: '', kind: 'file' },
-    memoSaving: false,
+    memoQuick: '',            // quick-add text, parsed by parseQuickTodo
+    memoDraft: null,          // editable copy of the selected todo; fields auto-save
+    memoDraftSaving: false,
+    memoAttachmentForm: { path: '' },
     memoSettings: { filesDir: '', retainDays: 90, autoCleanup: true },
     memoSettingsSaving: false,
     memoPreviewCache: {},
     vocabEntries: [],
     vocabSearch: '',
-    vocabSort: 'alpha',       // alpha | created
-    vocabDateFilter: '',
-    vocabPage: 1,
-    vocabPageSize: 10,
-    vocabDeleteConfirmID: '',
-    vocabFormOpen: false,
-    vocabEditingID: '',
-    vocabForm: { word: '', chinese: '', phonetic: '', partOfSpeech: '', collocationsRaw: '', example: '', audioUrl: '', tagsRaw: '' },
+    vocabFilter: 'all',       // all | due | new | mastered
+    vocabLimit: 40,
+    vocabQuick: '',
+    vocabDraft: null,         // selected or new word (explicit save)
+    vocabDraftSnapshot: '',
     vocabLookupBusy: false,
     vocabAIBusy: false,
     vocabSaving: false,
-    reviewReveal: {},
-
-    // Workspace-settings accordion state
-    wsShellOpen: false,
-    wsDirsOpen: true,
-    wsEnvOpen: true,
+    review: { queue: [], index: 0, revealed: false, tally: { hard: 0, known: 0, mastered: 0 } },
 
     // App data paths config
     dataPaths: {},           // AppDataPaths from Go
@@ -508,102 +490,270 @@ window.hatchApp = function () {
       return counts;
     },
 
-    get filteredScripts() {
-      const src = this.currentScripts;
-      if (!this.query.trim()) return src;
-      const q = this.query.toLowerCase();
-      return src.filter(s =>
-        (s.name || '').toLowerCase().includes(q) ||
-        (s.desc || '').toLowerCase().includes(q) ||
-        (s.language || '').toLowerCase().includes(q) ||
-        (s.tags || []).some(t => t.toLowerCase().includes(q)) ||
-        (s.commands || []).some(c => c.toLowerCase().includes(q))
-      );
+    // ── Workbench (工作台) ─────────────────────────────────────────────
+    get wbFilterOptions() {
+      const all = this.allScripts;
+      return [
+        { id: 'all', label: '全部', count: 0 },
+        { id: 'fav', label: '★ 收藏', count: all.filter(s => s.favorite).length },
+        { id: 'service', label: '服务', count: all.filter(s => s.type === 'service').length },
+        { id: 'scheduled', label: '定时', count: all.filter(s => s.schedule).length },
+      ].filter(f => f.id === 'all' || f.count > 0);
     },
 
-    get todayMemos() {
+    // Scripts matching the search + filter, ranked by fuzzy score when searching.
+    get wbVisibleScripts() {
+      const q = this.wbQuery.trim();
+      let list = this.allScripts.filter(s =>
+        this.wbFilter === 'fav' ? s.favorite :
+        this.wbFilter === 'service' ? s.type === 'service' :
+        this.wbFilter === 'scheduled' ? !!s.schedule : true);
+      if (!q) return list;
+      return list
+        .map(s => ({ s, score: this.fuzzyScore(q, this.wbSearchText(s)) }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(x => x.s);
+    },
+
+    // List groups: 收藏 first, then one group per script directory.
+    // While searching, a single ranked "结果" group keeps the best match on top.
+    get wbGroups() {
+      const list = this.wbVisibleScripts;
+      if (this.wbQuery.trim()) return list.length ? [{ key: 'q', label: '搜索结果', items: list }] : [];
+      const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'zh');
+      const groups = [];
+      const favs = this.wbFilter === 'fav' ? [] : list.filter(s => s.favorite).sort(byName);
+      if (favs.length) groups.push({ key: 'fav', label: '★ 收藏', items: favs });
+      for (const d of this.scriptDirs) {
+        const items = list.filter(s => this.wbDirOf(s.path) === d.path).sort(byName);
+        if (items.length) groups.push({ key: d.path, label: d.exportName ? '$' + d.exportName : this.baseName(d.path), items });
+      }
+      return groups;
+    },
+
+    get wbCurrent() {
+      return this.wbSelected ? this.allScripts.find(s => s.path === this.wbSelected) || null : null;
+    },
+
+    get wbRunningCount() {
+      const svc = this.allScripts.filter(s => s.type === 'service' && this.statuses[s.path] === 'running').length;
+      return svc + Object.keys(this.runningSet).length;
+    },
+
+    get wbCodeDirty() {
+      return !!this.wbCode.path && this.wbCode.content !== this.wbCode.original;
+    },
+
+    get wbFormDirty() {
+      return !!this.wbFormSnapshot && JSON.stringify(this.editForm) !== this.wbFormSnapshot;
+    },
+
+    get wbScriptEnvList() {
+      return this.allScripts.filter(s => Object.keys(s.env || {}).length > 0);
+    },
+
+    get envHasIssues() {
+      return this.envRows.some(e => this.envIssue(e));
+    },
+
+    get envImportPreview() {
+      return this.parseDotenv(this.envImportText);
+    },
+
+    // ⌘K items: scripts, their presets, and a few navigation actions.
+    get paletteItems() {
+      const q = this.palette.query.trim();
+      const items = [];
+      for (const s of this.allScripts) {
+        items.push({ key: 's:' + s.path, kind: 'script', script: s, icon: s.favorite ? '★' : this.langIcon(s.language),
+          title: s.name, sub: s.desc || this.wbDisplayPath(s), hint: s.type === 'service' ? '服务' : '运行',
+          text: this.wbSearchText(s), boost: s.favorite ? 2 : 0 });
+        for (const p of this.normalizedPresets(s)) {
+          items.push({ key: 'p:' + s.path + ':' + p.name, kind: 'preset', script: s, preset: p, icon: '🔖',
+            title: s.name + ' › ' + p.name, sub: p.args, hint: '运行预设', text: s.name + ' ' + p.name + ' ' + p.args, boost: 0 });
+        }
+      }
+      items.push({ key: 'a:new', kind: 'action', action: 'new', icon: '＋', title: '新建脚本', sub: '从模板或 AI 草稿创建', hint: '', text: '新建脚本 new script create', boost: -1 });
+      items.push({ key: 'a:env', kind: 'action', action: 'env', icon: '🔑', title: '环境变量', sub: '编辑 ~/.zshrc 中的 Hatch 变量', hint: '', text: '环境变量 env export path', boost: -1 });
+      if (!q) {
+        const recent = new Map(this.wbRecentRuns.map((r, i) => [r.script, i]));
+        return items.filter(it => it.kind !== 'preset')
+          .sort((a, b) => (b.boost - a.boost) || ((recent.get(a.script?.path) ?? 999) - (recent.get(b.script?.path) ?? 999)))
+          .slice(0, 50);
+      }
+      return items
+        .map(it => ({ it, score: this.fuzzyScore(q, it.text) + (it.boost > 0 ? 1 : 0) }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 50)
+        .map(x => x.it);
+    },
+
+    scriptTemplates: [
+      { id: 'zsh', label: 'zsh 脚本', hint: '日常自动化，带参数与错误处理', ext: '.sh', body:
+`#!/bin/zsh
+# @hatch.name: {{name}}
+# @hatch.desc: 一句话说明这个脚本做什么
+# @hatch.arg: 目标 | | | required
+set -euo pipefail
+
+target="\${1:?用法: {{file}} <目标>}"
+echo "处理: $target"
+` },
+      { id: 'python', label: 'Python 脚本', hint: 'argparse 参数，适合数据处理', ext: '.py', body:
+`#!/usr/bin/env python3
+# @hatch.name: {{name}}
+# @hatch.desc: 一句话说明这个脚本做什么
+# @hatch.arg: 输入文件 | | | required
+# @hatch.arg: 输出目录 | --out | . | optional
+import argparse
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input")
+    parser.add_argument("--out", default=".")
+    args = parser.parse_args()
+    print(f"input={args.input} out={args.out}")
+
+
+if __name__ == "__main__":
+    main()
+` },
+      { id: 'node', label: 'Node 脚本', hint: '调用 HTTP API、处理 JSON', ext: '.js', body:
+`#!/usr/bin/env node
+// @hatch.name: {{name}}
+// @hatch.desc: 一句话说明这个脚本做什么
+// @hatch.arg: URL | | https://example.com | optional
+const url = process.argv[2] || 'https://example.com';
+
+const res = await fetch(url);
+console.log(res.status, (await res.text()).slice(0, 200));
+` },
+      { id: 'service', label: '常驻服务', hint: 'start / stop / status，Hatch 管理进程', ext: '.sh', body:
+`#!/bin/zsh
+# @hatch.name: {{name}}
+# @hatch.desc: 启停一个后台进程
+# @hatch.type: service
+# @hatch.commands: start, stop, restart, status
+case "\${1:-}" in
+  start)   exec python3 -m http.server 8000 ;;
+  stop)    echo "Hatch 会向进程组发送 SIGTERM" ;;
+  restart) "$0" stop; exec "$0" start ;;
+  status)  echo "running" ;;
+  *)       echo "用法: $0 {start|stop|restart|status}"; exit 2 ;;
+esac
+` },
+    ],
+
+    // ── Memo: todos ────────────────────────────────────────────────────
+    get memoOverdue() {
       const today = this.todayDate();
-      return this.memos
-        .filter(m => m.date === today && m.status !== 'done')
-        .sort((a, b) => (a.reminderAt || 0) - (b.reminderAt || 0));
+      return this.memos.filter(m => m.status !== 'done' && m.date && m.date < today)
+        .sort((a, b) => a.date.localeCompare(b.date) || (a.reminderAt || 0) - (b.reminderAt || 0));
     },
 
-    get filteredMemos() {
-      const q = (this.memoSearch || '').trim().toLowerCase();
-      return this.memos.filter(m => {
-        if (this.memoFilter === 'open' && m.status === 'done') return false;
-        if (this.memoFilter === 'done' && m.status !== 'done') return false;
-        if (!q) return true;
-        return [m.title, m.body, ...(m.tags || [])].some(v => (v || '').toLowerCase().includes(q));
-      });
+    get memoTodayOpen() {
+      const today = this.todayDate();
+      return this.memos.filter(m => m.status !== 'done' && (m.date === today || !m.date)).sort(this.memoOrder);
+    },
+
+    get memoTodayCount() {
+      return this.memoOverdue.length + this.memoTodayOpen.length;
+    },
+
+    get memoUpcoming() {
+      const today = this.todayDate();
+      return this.memos.filter(m => m.status !== 'done' && m.date > today)
+        .sort((a, b) => a.date.localeCompare(b.date) || this.memoOrder(a, b));
+    },
+
+    get memoQuickParsed() {
+      return this.parseQuickTodo(this.memoQuick);
+    },
+
+    // Groups for the current todo view; a search query spans every todo.
+    get memoGroups() {
+      const q = this.memoSearch.trim().toLowerCase();
+      if (q) {
+        const hits = this.memos.filter(m => [m.title, m.body, ...(m.tags || [])].some(v => (v || '').toLowerCase().includes(q)))
+          .sort((a, b) => (a.status === 'done') - (b.status === 'done') || b.date.localeCompare(a.date));
+        return hits.length ? [{ key: 'q', label: '搜索结果', items: hits, showDate: true }] : [];
+      }
+      const today = this.todayDate();
+      if (this.memoSubTab === 'today') {
+        const groups = [];
+        if (this.memoOverdue.length) groups.push({ key: 'overdue', label: '已过期', tone: 'warn', items: this.memoOverdue, showDate: true });
+        if (this.memoTodayOpen.length) groups.push({ key: 'today', label: '今天', items: this.memoTodayOpen });
+        const doneToday = this.memos.filter(m => m.status === 'done' && m.date === today);
+        if (doneToday.length) groups.push({ key: 'done', label: '今天已完成', tone: 'muted', items: doneToday });
+        return groups;
+      }
+      const byDate = new Map();
+      const list = this.memoSubTab === 'upcoming'
+        ? this.memoUpcoming
+        : this.memos.filter(m => m.status === 'done').sort((a, b) => b.date.localeCompare(a.date) || (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 200);
+      for (const m of list) {
+        if (!byDate.has(m.date)) byDate.set(m.date, { key: m.date, label: this.memoDateLabel(m.date, true), items: [] });
+        byDate.get(m.date).items.push(m);
+      }
+      return [...byDate.values()];
+    },
+
+    // ── Memo: words ────────────────────────────────────────────────────
+    get vocabFilterOptions() {
+      const all = this.vocabEntries;
+      return [
+        { id: 'all', label: '全部', count: all.length },
+        { id: 'due', label: '待复习', count: this.reviewDueEntries.length },
+        { id: 'new', label: '新词', count: all.filter(v => !v.lastReviewedAt).length },
+        { id: 'mastered', label: '已掌握', count: all.filter(v => (v.reviewLevel || 0) >= 6).length },
+      ];
     },
 
     get filteredVocabEntries() {
-      const q = (this.vocabSearch || '').trim().toLowerCase();
-      const items = (this.vocabEntries || []).filter(v => {
-        if (this.vocabDateFilter && this.vocabEntryDate(v) !== this.vocabDateFilter) return false;
+      const q = this.vocabSearch.trim().toLowerCase();
+      const now = Math.floor(Date.now() / 1000);
+      return this.vocabEntries.filter(v => {
+        if (this.vocabFilter === 'due' && v.nextReviewAt && v.nextReviewAt > now) return false;
+        if (this.vocabFilter === 'new' && v.lastReviewedAt) return false;
+        if (this.vocabFilter === 'mastered' && (v.reviewLevel || 0) < 6) return false;
         if (!q) return true;
-        return [v.word, v.chinese, v.phonetic, v.partOfSpeech, v.example, ...(v.tags || [])]
-          .some(x => (x || '').toLowerCase().includes(q));
-      });
-      return items.sort((a, b) => {
-        if (this.vocabSort === 'created') return (b.createdAt || 0) - (a.createdAt || 0);
-        const aw = (a.word || '').toLowerCase();
-        const bw = (b.word || '').toLowerCase();
-        if (aw !== bw) return aw.localeCompare(bw);
+        return [v.word, v.chinese, v.example, ...(v.tags || [])].some(x => (x || '').toLowerCase().includes(q));
+      }).sort((a, b) => {
+        if (q) {
+          const aw = (a.word || '').toLowerCase().startsWith(q), bw = (b.word || '').toLowerCase().startsWith(q);
+          if (aw !== bw) return aw ? -1 : 1;
+        }
         return (b.createdAt || 0) - (a.createdAt || 0);
       });
     },
 
-    get groupedVocabEntries() {
-      const byDay = new Map();
-      for (const entry of this.pagedVocabEntries) {
-        const key = this.vocabEntryDate(entry) || 'unknown';
-        const label = key === 'unknown' ? '未记录日期' : this.vocabDayLabel(key);
-        if (!byDay.has(key)) {
-          byDay.set(key, { key, label, items: [] });
-        }
-        byDay.get(key).items.push(entry);
-      }
-      return [...byDay.values()].sort((a, b) => {
-        if (a.key === 'unknown') return 1;
-        if (b.key === 'unknown') return -1;
-        return b.key.localeCompare(a.key);
-      });
+    get visibleVocab() {
+      return this.filteredVocabEntries.slice(0, this.vocabLimit);
     },
 
-    get vocabTotalPages() {
-      return Math.max(1, Math.ceil(this.filteredVocabEntries.length / this.vocabPageSize));
+    get vocabDraftDirty() {
+      return !!this.vocabDraft && JSON.stringify(this.vocabDraft) !== this.vocabDraftSnapshot;
     },
 
-    get pagedVocabEntries() {
-      const page = Math.min(Math.max(this.vocabPage, 1), this.vocabTotalPages);
-      const start = (page - 1) * this.vocabPageSize;
-      return this.filteredVocabEntries.slice(start, start + this.vocabPageSize);
+    get vocabDraftDuplicate() {
+      const d = this.vocabDraft;
+      if (!d || d.id) return null;
+      const w = (d.word || '').trim().toLowerCase();
+      return w ? this.vocabEntries.find(v => (v.word || '').toLowerCase() === w) || null : null;
     },
 
-    get vocabPageStart() {
-      if (!this.filteredVocabEntries.length) return 0;
-      return (Math.min(this.vocabPage, this.vocabTotalPages) - 1) * this.vocabPageSize + 1;
-    },
-
-    get vocabPageEnd() {
-      return Math.min(this.filteredVocabEntries.length, Math.min(this.vocabPage, this.vocabTotalPages) * this.vocabPageSize);
+    get reviewCard() {
+      const r = this.review;
+      if (!r.queue.length || r.index >= r.queue.length) return null;
+      return this.vocabEntries.find(v => v.id === r.queue[r.index]) || null;
     },
 
     get reviewDueEntries() {
       const now = Math.floor(Date.now() / 1000);
       return this.vocabEntries.filter(v => !v.nextReviewAt || v.nextReviewAt <= now);
-    },
-
-    get totalPages() {
-      return Math.max(1, Math.ceil(this.filteredScripts.length / this.pageSize));
-    },
-
-    get pagedScripts() {
-      if (this.sortMode) return this.filteredScripts;
-      const start = (this.page - 1) * this.pageSize;
-      return this.filteredScripts.slice(start, start + this.pageSize);
     },
 
     get totalScriptCount() {
@@ -680,7 +830,9 @@ window.hatchApp = function () {
       this.applyInitialRoute();
       await this.loadModules({ init: true });
       await this.loadConfig();
+      await this.loadRecentRuns();
       await this.scanAll();
+      if (this.tab === 'scripts' && this.wbSubTab === 'env') this.envLoad();
       this.loadDataPaths();
       this.loadDocLinks();
       this.loadAIProviders();
@@ -694,6 +846,7 @@ window.hatchApp = function () {
       this.setupEvents();
       this.setupModuleReload();
       this.setupSearchShortcuts();
+      this.setupWorkbenchKeys();
       setInterval(() => this.refreshStatuses(), 3000);
       if (this.modules.vpn) {
         try { this.vpnStatus = await GetVPNStatus(); } catch (_) {}
@@ -711,7 +864,6 @@ window.hatchApp = function () {
       if (!this.moduleOn(tab)) return;
       if (this.hostTimer) { clearTimeout(this.hostTimer); this.hostTimer = null; }
       this.tab = tab;
-      this.selectedDir = null;
       if (tab === 'ai') { this.loadAIUsageStatuses(); this.loadAITraces(); }
       else if (tab === 'vpn') this.loadVPNOverview();
       else if (tab === 'memo') this.loadMemoModule();
@@ -738,7 +890,6 @@ window.hatchApp = function () {
       const next = ['ai', 'scripts', 'vpn', 'memo', 'host'].find(t => this.moduleOn(t)) || 'scripts';
       if (init) {
         this.tab = next;
-        this.selectedDir = null;
       } else {
         this.openTab(next);
       }
@@ -758,21 +909,23 @@ window.hatchApp = function () {
       const memo = params.get('memoSubTab') || params.get('memo');
       const vpn = params.get('vpnSubTab') || params.get('vpn');
       const allowedAI = ['overview', 'connect', 'tools', 'workspace', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
-      const allowedMemo = ['today', 'all', 'words', 'review', 'storage'];
+      const allowedMemo = ['today', 'upcoming', 'done', 'words', 'review', 'storage'];
       if (allowedAI.includes(ai)) {
         this.tab = 'ai';
-        this.selectedDir = null;
         this.aiSubTab = ai;
       }
       if (['overview', 'subs', 'rules', 'backup', 'config'].includes(vpn)) {
         this.tab = 'vpn';
-        this.selectedDir = null;
         this.vpnSubTab = vpn;
       }
       if (allowedMemo.includes(memo)) {
         this.tab = 'memo';
-        this.selectedDir = null;
         this.memoSubTab = memo;
+      }
+      const wb = params.get('wbSubTab') || params.get('wb');
+      if (['scripts', 'env', 'dirs', 'runs'].includes(wb)) {
+        this.tab = 'scripts';
+        this.wbSubTab = wb;
       }
       if (this.aiSubTab === 'mcp' && params.get('mcpAdd') === '1') {
         this.openMCPAdd(params.get('mcpAddTab') || 'paste');
@@ -800,129 +953,694 @@ window.hatchApp = function () {
       this.loading = true;
       try {
         this.allScripts = await ScanAll() || [];
+        this.wbEnsureSelection();
         await this.refreshStatuses();
       } catch (e) { this.showError(`扫描失败: ${e}`);   }
       finally { this.loading = false; }
     },
 
-    // ── Directory navigation ───────────────────────────────────────────
-    async enterDir(dir) {
-      this.selectedDir = dir;
-      this.query = '';
-      this.page = 1;
-      await this.scanDir(dir);
+    // ── Workbench: navigation + selection ─────────────────────────────
+    wbGo(sub) {
+      this.wbSubTab = sub;
+      if (sub === 'env') { if (!this.envDirty) this.envLoad(); }
+      else if (sub === 'runs') this.loadRecentRuns();
     },
 
-    exitDir() {
-      this.selectedDir = null;
-      this.currentScripts = [];
-      this.query = '';
+    wbDirOf(path) {
+      const d = this.scriptDirs.find(d => path.startsWith(d.path + '/'));
+      return d ? d.path : '';
     },
 
-    async scanDir(dir) {
-      this.loading = true;
-      try {
-        this.currentScripts = await GetScriptsByDir(dir.path) || [];
-        this.page = 1;
-        await this.refreshStatuses();
-        const idx = this.allScripts.findIndex(s => s.path.startsWith(dir.path));
-        if (idx === -1) this.scanAll();
-      } catch (e) { this.showError(`扫描目录失败: ${e}`);   }
-      finally { this.loading = false; }
+    wbSearchText(s) {
+      return [s.name, this.baseName(s.path), s.desc, (s.tags || []).join(' '), s.language].filter(Boolean).join(' ');
     },
 
-    // ── Drag-to-reorder ────────────────────────────────────────────────
-    enterSortMode() {
-      this.query = '';
-      this.page = 1;
-      this.sortMode = true;
-      this._dragScrollHandler = (e) => { this._dragScrollY = e.clientY; };
-      document.addEventListener('dragover', this._dragScrollHandler);
-    },
-
-    exitSortMode() {
-      this.sortMode = false;
-      this.dragSrcPath = null;
-      this.dragOverPath = null;
-      this._stopDragScroll();
-      if (this._dragScrollHandler) {
-        document.removeEventListener('dragover', this._dragScrollHandler);
-        this._dragScrollHandler = null;
+    // Subsequence match; contiguous runs and word starts score higher. 0 = no match.
+    fuzzyScore(query, text) {
+      const q = query.toLowerCase().replace(/\s+/g, '');
+      const t = String(text || '').toLowerCase();
+      if (!q) return 1;
+      const direct = t.indexOf(q);
+      if (direct >= 0) return 100 - Math.min(direct, 50) + q.length;
+      let score = 0, ti = 0, run = 0;
+      for (const ch of q) {
+        const found = t.indexOf(ch, ti);
+        if (found < 0) return 0;
+        run = found === ti ? run + 1 : 1;
+        score += run + (found === 0 || /[\s\-_./]/.test(t[found - 1]) ? 2 : 0);
+        ti = found + 1;
       }
+      return score;
     },
 
-    scriptDragStart(e, path) {
-      this.dragSrcPath = path;
-      e.dataTransfer.effectAllowed = 'move';
-      this._startDragScroll();
-    },
-
-    scriptDragOver(e, path) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      if (path !== this.dragSrcPath) this.dragOverPath = path;
-    },
-
-    scriptDragLeave(e) {
-      if (!e.currentTarget.contains(e.relatedTarget)) {
-        this.dragOverPath = null;
+    async wbSelect(script, pane) {
+      if (!script) return;
+      if (this.wbSelected !== script.path) {
+        if ((this.wbCodeDirty || this.wbFormDirty) &&
+            !(await this.askConfirm('当前脚本有未保存的修改，切换后会丢失。', { title: '放弃修改？', confirmText: '放弃修改' }))) return;
+        this.wbSelected = script.path;
+        this.wbCode = { path: '', content: '', original: '', loading: false, saving: false };
+        this.wbAIDiscard();
+        this.wbAI.instruction = '';
+        this.wbFormSnapshot = '';
+        this.$nextTick(() => document.querySelector('.wb-item.active')?.scrollIntoView({ block: 'nearest' }));
       }
+      this.wbOpenPane(pane || this.wbPane);
     },
 
-    async scriptDrop(e, targetPath) {
-      e.preventDefault();
-      this._stopDragScroll();
-      const src = this.dragSrcPath;
-      this.dragSrcPath = null;
-      this.dragOverPath = null;
-      if (!src || src === targetPath) return;
+    wbMoveSelection(delta) {
+      const flat = this.wbGroups.flatMap(g => g.items);
+      if (!flat.length) return;
+      const i = flat.findIndex(s => s.path === this.wbSelected);
+      const next = flat[Math.max(0, Math.min(flat.length - 1, i + delta))] || flat[0];
+      this.wbSelect(next);
+      this.$nextTick(() => document.querySelector('.wb-item.active')?.scrollIntoView({ block: 'nearest' }));
+    },
 
-      const scripts = [...this.currentScripts];
-      const si = scripts.findIndex(s => s.path === src);
-      const ti = scripts.findIndex(s => s.path === targetPath);
-      if (si === -1 || ti === -1) return;
-      const [item] = scripts.splice(si, 1);
-      scripts.splice(ti, 0, item);
-      this.currentScripts = scripts;
+    wbOpenPane(pane) {
+      this.wbPane = pane;
+      const s = this.wbCurrent;
+      if (!s) return;
+      if (pane === 'code' && this.wbCode.path !== s.path) this.wbLoadCode(s);
+      if (pane === 'config' && !this.wbFormSnapshot) this.wbLoadForm(s);
+      if (pane === 'history') this.openHistory(s);
+    },
 
+    wbEnsureSelection() {
+      if (this.wbCurrent || !this.allScripts.length) return;
+      const recent = this.wbRecentRuns.find(r => this.allScripts.some(s => s.path === r.script));
+      const first = this.wbGroups[0]?.items[0];
+      this.wbSelected = recent ? recent.script : first?.path || null;
+    },
+
+    wbStatusClass(s) {
+      if (this.runningSet[s.path] || this.statuses[s.path] === 'running') return 'is-running';
+      const code = this.scriptExitCodes[s.path] ?? this.wbLastRun(s.path)?.exitCode;
+      if (code === undefined) return '';
+      return code === 0 ? 'is-ok' : 'is-err';
+    },
+
+    wbLastRun(path) {
+      return this.wbRecentRuns.find(r => r.script === path);
+    },
+
+    wbScriptName(path) {
+      return this.allScripts.find(s => s.path === path)?.name || this.baseName(path);
+    },
+
+    wbOpenRun(r) {
+      const s = this.allScripts.find(x => x.path === r.script);
+      if (!s) { this.showError('脚本已不在扫描目录中'); return; }
+      this.wbGo('scripts');
+      this.wbSelect(s, 'history');
+    },
+
+    async loadRecentRuns() {
+      try { this.wbRecentRuns = await window['go']['app']['App']['ListRecentRunsSorted'](80) || []; } catch (_) {}
+    },
+
+    wbDisplayPath(s) {
+      const dir = this.scriptDirs.find(d => s.path.startsWith(d.path + '/'));
+      return dir?.exportName ? '$' + dir.exportName + s.path.slice(dir.path.length) : s.path.replace(/^\/Users\/[^/]+/, '~');
+    },
+
+    // Command the user can paste into a terminal. Uses the directory's PATH
+    // variable when it has one so the line keeps working if the folder moves.
+    wbShellCommand(s, withArgs = false) {
+      const dir = this.scriptDirs.find(d => s.path.startsWith(d.path + '/'));
+      const cmd = dir?.exportName ? `"$${dir.exportName}/${this.baseName(s.path)}"` : this.shellArg(s.path);
+      if (!withArgs && !this.wbHasArgs(s)) return cmd;
+      const args = this.wbArgs(s, { lenient: true }).args.map(a => this.shellArg(a));
+      return [cmd, ...args].join(' ');
+    },
+
+    wbHasArgs(s) {
+      return (s.args || []).length > 0 || !!(this.scriptArgs[s.path] || '').trim();
+    },
+
+    shellArg(v) {
+      return /^[A-Za-z0-9_\-+=.,/:@%]+$/.test(v) ? v : this.shellSingleQuote(v);
+    },
+
+    revealFile(path) {
+      window['go']['app']['App']['RevealFile'](path).catch(e => this.showError(`打开 Finder 失败: ${e}`));
+    },
+
+    async toggleFavorite(s) {
+      const next = !s.favorite;
       try {
-        await window['go']['app']['App']['SaveScriptOrder'](
-          this.selectedDir.path,
-          scripts.map(s => s.path)
-        );
-      } catch (err) { this.showError(`保存排序失败: ${err}`); }
+        await window['go']['app']['App']['SetScriptFavorite'](s.path, next);
+        s.favorite = next;
+        this.allScripts = [...this.allScripts];
+      } catch (e) { this.showError(`收藏失败: ${e}`); }
     },
 
-    scriptDragEnd() {
-      this.dragSrcPath = null;
-      this.dragOverPath = null;
-      this._stopDragScroll();
+    async trashScript(s) {
+      if (!(await this.askConfirm(`把「${this.baseName(s.path)}」移到废纸篓？\n可以在 Finder 的废纸篓中恢复，Hatch 中的配置会一并清除。`, { title: '删除脚本', confirmText: '移到废纸篓' }))) return;
+      try {
+        await window['go']['app']['App']['TrashScriptFile'](s.path);
+        this.wbSelected = null;
+        this.wbFormSnapshot = '';
+        this.wbCode = { path: '', content: '', original: '', loading: false, saving: false };
+        await this.scanAll();
+        this.showSuccess('已移到废纸篓');
+      } catch (e) { this.showError(`删除失败: ${e}`); }
     },
 
-    _startDragScroll() {
-      const ZONE = 100;
-      const MAX_SPEED = 20;
-      const loop = () => {
-        if (!this.dragSrcPath) return;
-        const y = this._dragScrollY;
-        const h = window.innerHeight;
-        let speed = 0;
-        if (y < ZONE) {
-          speed = -MAX_SPEED * (1 - y / ZONE);
-        } else if (y > h - ZONE) {
-          speed = MAX_SPEED * (1 - (h - y) / ZONE);
+    // ── Workbench: run ────────────────────────────────────────────────
+    wbArgValue(path, i) {
+      const v = this.wbArgValues[path]?.[i];
+      return v === undefined ? '' : v;
+    },
+
+    wbSetArgValue(path, i, value) {
+      this.wbArgValues = { ...this.wbArgValues, [path]: { ...(this.wbArgValues[path] || {}), [i]: value } };
+    },
+
+    // Build argv from declared fields (flag + value, or positional) or the free-text box.
+    // An empty field is omitted so the script applies its own default (the
+    // declared default is only a placeholder; argv is not shell-expanded).
+    // Positional args stop at the first empty one to keep later ones in place.
+    wbArgs(s, { lenient = false } = {}) {
+      const defs = s.args || [];
+      if (!defs.length) return { args: this.splitArgs(this.scriptArgs[s.path] || ''), missing: [] };
+      const args = [], missing = [];
+      let positionalGap = false;
+      defs.forEach((d, i) => {
+        const v = this.wbArgValue(s.path, i).trim() ? this.wbArgValue(s.path, i) : '';
+        if (!v) {
+          if (d.required) { missing.push(d.name); if (lenient) args.push(`<${d.name}>`); }
+          if (!d.flag) positionalGap = true;
+          return;
         }
-        if (speed !== 0) window.scrollBy(0, speed);
-        this._dragScrollRAF = requestAnimationFrame(loop);
-      };
-      this._dragScrollRAF = requestAnimationFrame(loop);
+        if (d.flag) args.push(d.flag, v);
+        else if (!positionalGap) args.push(v);
+      });
+      return { args, missing };
     },
 
-    _stopDragScroll() {
-      if (this._dragScrollRAF) {
-        cancelAnimationFrame(this._dragScrollRAF);
-        this._dragScrollRAF = null;
+    async wbRun(s, argsOverride = null) {
+      if (!s || this.runningSet[s.path]) return;
+      let args = argsOverride;
+      if (!args) {
+        const built = this.wbArgs(s);
+        if (built.missing.length) { this.showError(`请填写必填参数：${built.missing.join('、')}`); return; }
+        args = built.args;
       }
+      const id = s.path;
+      this.runningSet = { ...this.runningSet, [id]: true };
+      this.scriptLogs[id] = [];
+      const codes = { ...this.scriptExitCodes };
+      delete codes[id];
+      this.scriptExitCodes = codes;
+      try {
+        await RunScript(id, s.path, args);
+      } catch (e) {
+        this.showError(`运行失败: ${e}`);
+        const next = { ...this.runningSet };
+        delete next[id];
+        this.runningSet = next;
+      }
+    },
+
+    wbRunPreset(s, p) {
+      const action = this.presetAction(p);
+      if (s.type === 'service' && action) {
+        this.serviceAction(s, action, this.splitArgs(p.args).slice(1));
+        return;
+      }
+      this.wbPane = 'run';
+      this.wbRun(s, this.splitArgs(p.args));
+    },
+
+    wbServiceCommands(s) {
+      const cmds = (s.commands || []).length ? s.commands : ['start', 'stop', 'restart'];
+      return cmds;
+    },
+
+    wbRelTime(t) {
+      const ms = typeof t === 'number' ? t : Date.parse(t);
+      if (!ms) return '';
+      const diff = (Date.now() - ms) / 1000;
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+      if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+      if (diff < 86400 * 7) return Math.floor(diff / 86400) + ' 天前';
+      return new Date(ms).toLocaleDateString();
+    },
+
+    wbDuration(ms) {
+      if (ms == null) return '';
+      if (ms < 1000) return ms + 'ms';
+      if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+      return Math.floor(ms / 60000) + 'm' + Math.round((ms % 60000) / 1000) + 's';
+    },
+
+    // ── Workbench: code editor + AI diff ──────────────────────────────
+    async wbLoadCode(s) {
+      this.wbCode = { path: s.path, content: '', original: '', loading: true, saving: false };
+      try {
+        const text = await ReadScriptFile(s.path);
+        if (this.wbCode.path === s.path) this.wbCode = { ...this.wbCode, content: text, original: text, loading: false };
+      } catch (e) {
+        this.wbCode.loading = false;
+        this.showError(`读取文件失败: ${e}`);
+      }
+    },
+
+    async wbSaveCode() {
+      if (!this.wbCodeDirty || this.wbCode.saving) return;
+      this.wbCode.saving = true;
+      try {
+        await WriteScriptFile(this.wbCode.path, this.wbCode.content);
+        this.wbCode.original = this.wbCode.content;
+        await this.scanAll();
+        this.showSuccess('脚本已保存');
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.wbCode.saving = false;
+      }
+    },
+
+    async wbRevertCode() {
+      if (!(await this.askConfirm('撤销编辑器中所有未保存的修改？', { title: '还原', confirmText: '还原' }))) return;
+      this.wbCode.content = this.wbCode.original;
+    },
+
+    wbInsertTab(e) {
+      const el = e.target;
+      const { selectionStart: a, selectionEnd: b, value } = el;
+      el.value = value.slice(0, a) + '  ' + value.slice(b);
+      el.selectionStart = el.selectionEnd = a + 2;
+      el.dispatchEvent(new Event('input'));
+    },
+
+    async wbAIGenerate() {
+      const s = this.wbCurrent;
+      if (!s || !this.wbAI.instruction.trim()) return;
+      if (!this.aiReady) { this.showError('请先在 ✦ AI → 连接 中配置并启用 AI'); return; }
+      if (this.wbCode.path !== s.path) await this.wbLoadCode(s);
+      this.wbAI.busy = true;
+      try {
+        const result = await SuggestScriptContent(s.path, this.wbCode.content, this.wbAI.instruction);
+        const diff = this.lineDiff(this.wbCode.content, result);
+        this.wbAI = {
+          ...this.wbAI, result,
+          diff: this.compactDiff(diff),
+          stats: { add: diff.filter(d => d.type === 'add').length, del: diff.filter(d => d.type === 'del').length },
+        };
+      } catch (e) {
+        this.showError(`AI 生成失败: ${e}`);
+      } finally {
+        this.wbAI.busy = false;
+      }
+    },
+
+    wbAIAccept() {
+      if (this.wbAI.result === null) return;
+      this.wbCode.content = this.wbAI.result;
+      this.wbAI = { ...this.wbAI, result: null, diff: [], instruction: '' };
+      this.showSuccess('已放入编辑器，确认后点「保存」写入文件');
+    },
+
+    wbAIDiscard() {
+      this.wbAI = { ...this.wbAI, result: null, diff: [], stats: { add: 0, del: 0 } };
+    },
+
+    // Line-level LCS diff → [{type: same|add|del, text}]
+    lineDiff(a, b) {
+      const x = String(a || '').split('\n'), y = String(b || '').split('\n');
+      const n = x.length, m = y.length;
+      if (n * m > 4_000_000) return [...x.map(t => ({ type: 'del', text: t })), ...y.map(t => ({ type: 'add', text: t }))];
+      const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+      for (let i = n - 1; i >= 0; i--)
+        for (let j = m - 1; j >= 0; j--)
+          dp[i][j] = x[i] === y[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      const out = [];
+      let i = 0, j = 0;
+      while (i < n && j < m) {
+        if (x[i] === y[j]) { out.push({ type: 'same', text: x[i] }); i++; j++; }
+        else if (dp[i + 1][j] >= dp[i][j + 1]) out.push({ type: 'del', text: x[i++] });
+        else out.push({ type: 'add', text: y[j++] });
+      }
+      while (i < n) out.push({ type: 'del', text: x[i++] });
+      while (j < m) out.push({ type: 'add', text: y[j++] });
+      return out;
+    },
+
+    // Keep 2 lines of context around changes; fold the rest into "… N 行未改动".
+    compactDiff(diff, ctx = 2) {
+      const keep = diff.map(() => false);
+      diff.forEach((d, i) => {
+        if (d.type === 'same') return;
+        for (let k = Math.max(0, i - ctx); k <= Math.min(diff.length - 1, i + ctx); k++) keep[k] = true;
+      });
+      const out = [];
+      let skipped = 0;
+      diff.forEach((d, i) => {
+        if (keep[i]) {
+          if (skipped) out.push({ type: 'gap', text: `… ${skipped} 行未改动` });
+          skipped = 0;
+          out.push(d);
+        } else skipped++;
+      });
+      if (skipped) out.push({ type: 'gap', text: `… ${skipped} 行未改动` });
+      return out;
+    },
+
+    // ── Workbench: config form ────────────────────────────────────────
+    wbLoadForm(s) {
+      const defs = (s.args || []).map(a => ({ name: a.name || '', flag: a.flag || '', default: a.default || '', required: !!a.required }));
+      this.editForm = {
+        name: s.name || '',
+        desc: s.desc || '',
+        type: s.type || 'oneshot',
+        commandsRaw: (s.commands || []).join(', '),
+        pidFile: s.pidFile || '',
+        tagsRaw: (s.tags || []).join(', '),
+        argMode: defs.length ? 'fields' : (Array.isArray(s.args) ? 'none' : 'free'),
+        argDefs: defs,
+        presets: this.normalizedPresets(s),
+        envPairs: Object.entries(s.env || {}).map(([key, value]) => ({ key, value })),
+        notifyOnDone: !!s.notifyOnDone,
+        schedule: s.schedule || '',
+        requiresRaw: (s.requires || []).join(', '),
+        healthUrl: s.healthUrl || '',
+        preScriptsRaw: (s.preScripts || []).join('\n'),
+      };
+      this.wbFormSnapshot = JSON.stringify(this.editForm);
+    },
+
+    async wbSaveConfig() {
+      const s = this.wbCurrent;
+      if (!s) return;
+      const f = this.editForm;
+      const list = raw => (raw || '').split(',').map(x => x.trim()).filter(Boolean);
+      const defs = f.argDefs.filter(a => a.name.trim()).map(a => ({ ...a, name: a.name.trim(), flag: a.flag.trim() }));
+      this.editSaving = true;
+      try {
+        await SaveScriptMeta({
+          ...s,
+          name: f.name.trim(),
+          desc: f.desc.trim(),
+          type: f.type,
+          commands: f.type === 'service' ? list(f.commandsRaw) : [],
+          pidFile: f.type === 'service' ? f.pidFile : '',
+          tags: list(f.tagsRaw),
+          // nil = free-text box, [] = no args, [...] = generated fields
+          args: f.type !== 'oneshot' ? null : f.argMode === 'none' ? [] : f.argMode === 'fields' && defs.length ? defs : null,
+          presets: this.normalizePresetList(f.presets),
+          env: f.envPairs.reduce((acc, p) => { const k = (p.key || '').trim(); if (k) acc[k] = p.value || ''; return acc; }, {}),
+          notifyOnDone: !!f.notifyOnDone,
+          schedule: f.schedule.trim(),
+          requires: list(f.requiresRaw),
+          healthUrl: f.healthUrl.trim(),
+          preScripts: f.preScriptsRaw.split('\n').map(x => x.trim()).filter(Boolean),
+        });
+        await this.scanAll();
+        const fresh = this.allScripts.find(x => x.path === s.path);
+        if (fresh) this.wbLoadForm(fresh);
+        this.showSuccess('配置已保存');
+      } catch (e) {
+        this.showError(`保存失败: ${e}`);
+      } finally {
+        this.editSaving = false;
+      }
+    },
+
+    async wbResetConfig() {
+      const s = this.wbCurrent;
+      if (!s) return;
+      if (!(await this.askConfirm(`清除「${s.name}」在 Hatch 中的手动配置（参数、预设、变量、定时等），恢复为脚本头部注释与自动检测的结果？`, { title: '恢复自动检测', confirmText: '恢复' }))) return;
+      try {
+        await DeleteScriptMeta(s.path);
+        await this.scanAll();
+        const fresh = this.allScripts.find(x => x.path === s.path);
+        if (fresh) this.wbLoadForm(fresh);
+        this.showSuccess('已恢复自动检测');
+      } catch (e) { this.showError(`重置失败: ${e}`); }
+    },
+
+    async wbAIFillConfig() {
+      const s = this.wbCurrent;
+      if (!s) return;
+      if (!this.aiReady) { this.showError('请先在 ✦ AI → 连接 中配置并启用 AI'); return; }
+      this.aiBusyScript = s.path;
+      try {
+        const sug = await SuggestScriptMeta(s);
+        if (!this.wbFormSnapshot) this.wbLoadForm(s);
+        const f = this.editForm;
+        f.name = sug.name || f.name;
+        f.desc = sug.desc || f.desc;
+        f.type = sug.type || f.type;
+        if ((sug.commands || []).length) f.commandsRaw = sug.commands.join(', ');
+        if (sug.pidFile) f.pidFile = sug.pidFile;
+        if ((sug.tags || []).length) f.tagsRaw = sug.tags.join(', ');
+        if ((sug.args || []).length) {
+          f.argMode = 'fields';
+          f.argDefs = sug.args.map(a => ({ name: a.name || '', flag: a.flag || '', default: a.default || '', required: !!a.required }));
+        } else if (f.type === 'oneshot' && !f.argDefs.length) {
+          f.argMode = sug.needsArgs ? 'free' : 'none';
+        }
+        const presets = this.normalizePresetList(sug.presets || []);
+        if (presets.length) f.presets = presets;
+        this.showSuccess('AI 已填写，检查后点「保存配置」');
+      } catch (e) {
+        this.showError(`AI 分析失败: ${e}`);
+      } finally {
+        this.aiBusyScript = null;
+      }
+    },
+
+    // ── Workbench: global env editor ──────────────────────────────────
+    envLoad() {
+      const dirVars = new Map(this.scriptDirs.filter(d => d.exportName).map(d => [d.exportName, d.path]));
+      this.envRows = (this.cfg.exports || []).map((e, i) => {
+        const inPath = e.kind ? e.kind === 'path' : /^(\/|~\/|\$)/.test((e.value || '').trim());
+        return { _id: 'e' + i + Date.now(), _dir: dirVars.get(e.name) || '', name: e.name || '', value: e.value || '',
+          kind: inPath ? 'path' : 'var', secret: !!e.secret, note: e.note || '' };
+      });
+      this.envDirty = false;
+      this.envReveal = {};
+    },
+
+    envAdd(row = {}) {
+      this.envRows = [...this.envRows, { _id: 'n' + Date.now() + Math.random(), _dir: '', name: '', value: '', kind: 'var', secret: false, note: '', ...row }];
+      this.envDirty = true;
+      if (!row.name) this.$nextTick(() => {
+        const inputs = document.querySelectorAll('.wb-env-name input');
+        inputs[inputs.length - 1]?.focus();
+      });
+    },
+
+    async envRemove(i) {
+      const e = this.envRows[i];
+      if (e.name && !(await this.askConfirm(`删除变量 ${e.name}？保存后会从 ~/.zshrc 中移除。`, { title: '删除变量', confirmText: '删除' }))) return;
+      this.envRows = this.envRows.filter((_, idx) => idx !== i);
+      this.envDirty = true;
+    },
+
+    envMatches(e) {
+      const q = this.envQuery.trim().toLowerCase();
+      return !q || (e.name + ' ' + e.note + ' ' + (e.secret ? '' : e.value)).toLowerCase().includes(q);
+    },
+
+    envIssue(e) {
+      if (!e.name.trim()) return e.value ? '缺少名称' : '';
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(e.name.trim())) return '只能用字母、数字、下划线，且不以数字开头';
+      if (['PATH', 'HOME', 'SHELL', 'USER'].includes(e.name.trim())) return '系统变量，不建议在这里覆盖';
+      if (this.envRows.filter(x => x.name.trim() === e.name.trim()).length > 1) return '名称重复';
+      return '';
+    },
+
+    async envSave() {
+      if (this.envHasIssues) return;
+      this.savingExports = true;
+      try {
+        const exports = this.envRows.filter(e => e.name.trim()).map(e => ({
+          name: e.name.trim(), value: e.value, kind: e.kind, secret: !!e.secret, note: e.note.trim(),
+        }));
+        await SaveExports(exports);
+        await this.loadConfig();
+        this.envLoad();
+        this.showSuccess('已写入 ~/.zshrc，新开的终端生效');
+      } catch (e) { this.showError(`保存失败: ${e}`); }
+      finally { this.savingExports = false; }
+    },
+
+    // KEY=value lines; tolerates `export`, quotes and comments.
+    parseDotenv(text) {
+      const out = [];
+      for (const raw of String(text || '').split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('#')) continue;
+        const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+        if (!m) continue;
+        let v = m[2].trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+        else v = v.replace(/\s+#.*$/, '');
+        out.push({ name: m[1], value: v });
+      }
+      return out;
+    },
+
+    envImport() {
+      const rows = this.envImportPreview;
+      for (const r of rows) {
+        const existing = this.envRows.find(e => e.name === r.name && !e._dir);
+        const secret = /KEY|TOKEN|SECRET|PASSWORD|PASS/i.test(r.name);
+        if (existing) existing.value = r.value;
+        else this.envAdd({ name: r.name, value: r.value, secret, kind: /^(\/|~\/)/.test(r.value) ? 'path' : 'var' });
+      }
+      this.envDirty = true;
+      this.envImportOpen = false;
+      this.envImportText = '';
+      this.showSuccess(`已导入 ${rows.length} 个变量，确认后保存`);
+    },
+
+    envPreview() {
+      const rows = this.envRows.filter(e => e.name.trim()).sort((a, b) => a.name.localeCompare(b.name));
+      const lines = ['# >>> Hatch managed block >>>'];
+      const home = (this.zshrcInfo?.zshrcPath || '').replace(/\/\.zshrc$/, '');
+      const expand = v => (home && /^~(\/|$)/.test(v) ? home + v.slice(1) : v);
+      for (const e of rows) lines.push(`export ${e.name.trim()}=${this.shellValue(expand(e.value))}`);
+      const paths = rows.filter(e => e.kind === 'path').map(e => '$' + e.name.trim());
+      if (paths.length) lines.push(`export PATH=${paths.join(':')}:$PATH`);
+      lines.push('# <<< Hatch managed block <<<');
+      return lines.join('\n');
+    },
+
+    // ── Workbench: new script dialog ──────────────────────────────────
+    openNewScriptDialog() {
+      const dir = this.wbCurrent ? this.wbDirOf(this.wbCurrent.path) : this.scriptDirs[0]?.path || '';
+      if (!dir) { this.wbGo('dirs'); this.showError('先添加一个脚本目录'); return; }
+      this.newScript = { open: true, dir, filename: '', mode: 'template', template: '', instruction: '', content: '', rendered: '', busy: false, saving: false };
+      this.applyScriptTemplate(this.scriptTemplates[0]);
+    },
+
+    scriptTemplateExt() {
+      return this.scriptTemplates.find(t => t.id === this.newScript.template)?.ext || '.sh';
+    },
+
+    renderScriptTemplate(t, file) {
+      return t.body.replaceAll('{{name}}', file.replace(/\.[^.]+$/, '')).replaceAll('{{file}}', file);
+    },
+
+    closeNewScriptDialog() {
+      this.newScript = { ...this.newScript, open: false };
+    },
+
+    // Switching template swaps a known extension on the typed name and
+    // re-renders the body (unless the user already edited it).
+    applyScriptTemplate(t) {
+      const ns = this.newScript;
+      const name = ns.filename.trim();
+      if (name && this.scriptTemplates.some(x => name.endsWith(x.ext))) ns.filename = name.replace(/\.[^.]+$/, '') + t.ext;
+      ns.template = t.id;
+      ns.content = ns.rendered = this.renderScriptTemplate(t, this.newScriptFileName());
+    },
+
+    // Final file name: typed name, plus the template extension when it has none.
+    newScriptFileName() {
+      const name = this.newScript.filename.trim() || 'my-script';
+      return /\.[A-Za-z0-9]+$/.test(name) ? name : name + this.scriptTemplateExt();
+    },
+
+    async newScriptAIGenerateDraft() {
+      const ns = this.newScript;
+      if (!this.aiReady || !ns.instruction.trim()) return;
+      ns.busy = true;
+      try {
+        ns.content = await SuggestScriptContent(this.newScriptFileName(), '', ns.instruction);
+        ns.rendered = '';
+        const py = /^#!.*python/.test(ns.content), js = /^#!.*node/.test(ns.content);
+        ns.template = py ? 'python' : js ? 'node' : 'zsh';
+      } catch (e) {
+        this.showError(`AI 生成失败: ${e}`);
+      } finally {
+        ns.busy = false;
+      }
+    },
+
+    async createNewScript() {
+      const ns = this.newScript;
+      if (!ns.filename.trim() || !ns.dir) return;
+      const name = this.newScriptFileName();
+      const t = this.scriptTemplates.find(x => x.id === ns.template);
+      if (t && ns.mode === 'template' && ns.content === ns.rendered) ns.content = this.renderScriptTemplate(t, name);
+      if (name.includes('/') || name.startsWith('.')) { this.showError('文件名不能包含 / 或以 . 开头'); return; }
+      ns.saving = true;
+      try {
+        const path = await CreateScriptFile(ns.dir, name, ns.content);
+        await this.scanAll();
+        this.closeNewScriptDialog();
+        this.wbGo('scripts');
+        this.wbQuery = '';
+        const s = this.allScripts.find(x => x.path === path);
+        if (s) await this.wbSelect(s, 'run');
+        this.showSuccess(`已创建 ${name}`);
+      } catch (e) {
+        this.showError(`创建失败: ${e}`);
+      } finally {
+        ns.saving = false;
+      }
+    },
+
+    // ── Workbench: ⌘K command palette ─────────────────────────────────
+    openPalette() {
+      if (!this.moduleOn('scripts')) return;
+      this.palette = { open: true, query: '', index: 0 };
+      if (!this.wbRecentRuns.length) this.loadRecentRuns();
+    },
+
+    closePalette() {
+      this.palette = { ...this.palette, open: false };
+    },
+
+    paletteMove(delta) {
+      const n = this.paletteItems.length;
+      if (!n) return;
+      this.palette.index = (this.palette.index + delta + n) % n;
+      this.$nextTick(() => document.querySelector('.wb-palette-item.active')?.scrollIntoView({ block: 'nearest' }));
+    },
+
+    // Enter runs (when no required input is missing); ⌘Enter / missing args opens the detail page.
+    async paletteExec(it, openOnly = false) {
+      if (!it) return;
+      this.closePalette();
+      if (this.tab !== 'scripts') this.openTab('scripts');
+      if (it.kind === 'action') {
+        if (it.action === 'new') this.openNewScriptDialog();
+        else this.wbGo(it.action);
+        return;
+      }
+      this.wbGo('scripts');
+      this.wbQuery = '';
+      await this.wbSelect(it.script, 'run');
+      if (openOnly) return;
+      if (it.kind === 'preset') { this.wbRunPreset(it.script, it.preset); return; }
+      if (it.script.type === 'service') return;
+      const { missing } = this.wbArgs(it.script);
+      if (missing.length) {
+        this.$nextTick(() => document.querySelector('.wb-arg input')?.focus());
+        return;
+      }
+      this.wbRun(it.script);
+    },
+
+    setupWorkbenchKeys() {
+      if (window.__hatchWbKeys) window.removeEventListener('keydown', window.__hatchWbKeys);
+      window.__hatchWbKeys = (e) => {
+        if (e.metaKey && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          this.palette.open ? this.closePalette() : this.openPalette();
+        } else if (e.metaKey && e.key === 'Enter' && this.tab === 'scripts' && this.wbSubTab === 'scripts' && this.wbPane === 'run' && this.wbCurrent && !this.palette.open) {
+          e.preventDefault();
+          this.wbRun(this.wbCurrent);
+        }
+      };
+      window.addEventListener('keydown', window.__hatchWbKeys);
     },
 
     // ── Events ─────────────────────────────────────────────────────────
@@ -954,6 +1672,8 @@ window.hatchApp = function () {
         delete this.runningSet[ev.id];
         this.runningSet = { ...this.runningSet };
         this.scriptExitCodes = { ...this.scriptExitCodes, [ev.id]: ev.exitCode };
+        this.loadRecentRuns();
+        if (this.historyTarget?.path === ev.id && this.wbPane === 'history') this.openHistory(this.historyTarget);
       });
 
       EventsOn('executor:status', (ev) => {
@@ -969,34 +1689,10 @@ window.hatchApp = function () {
       try { this.statuses = await GetAllServiceStatuses() || {}; } catch (_) {}
     },
 
-    // ── Script operations ──────────────────────────────────────────────
-    async runScript(script) {
-      const id = script.path;
-      this.runningSet = { ...this.runningSet, [id]: true };
-      this.scriptLogs[id] = [];
-      delete this.scriptExitCodes[id];
-      this.scriptExitCodes = { ...this.scriptExitCodes };
-      this.logTarget = id;
-      const args = this.splitArgs(this.scriptArgs[id] || '');
-      try {
-        await RunScript(id, script.path, args);
-      } catch (e) {
-        this.showError(`运行失败: ${e}`);  
-        delete this.runningSet[id];
-        this.runningSet = { ...this.runningSet };
-      }
-    },
-
-    async runPreset(script, preset) {
-      this.scriptArgs[script.path] = preset.args || '';
-      await this.runScript(script);
-    },
-
     async serviceAction(script, action, args = []) {
       const id = script.path;
       if (!this.scriptLogs[id]) this.scriptLogs[id] = [];
       this.scriptLogs[id].push({ line: `[hatch] ${action}…`, stream: 'stdout' });
-      this.logTarget = id;
       try {
         await ServiceAction(id, action, args);
         this.scriptLogs[id].push({ line: `[hatch] ${action} OK`, stream: 'stdout' });
@@ -1040,7 +1736,6 @@ window.hatchApp = function () {
       this.scriptLogs[path] = [];
       delete this.scriptExitCodes[path];
       this.scriptExitCodes = { ...this.scriptExitCodes };
-      if (this.logTarget === path) this.logTarget = null;
     },
 
     // ── Settings ───────────────────────────────────────────────────────
@@ -1099,55 +1794,6 @@ window.hatchApp = function () {
         await this.loadConfig();
         this.showSuccess('路径导出已取消');
       } catch (e) { this.showError(`取消导出失败: ${e}`);   }
-    },
-
-    async saveExports() {
-      this.savingExports = true;
-      try {
-        await SaveExports(this.cfg.exports || []);
-        await this.loadConfig();
-        this.exportsDirty = false;
-        this.showSuccess('环境变量已写入 ~/.zshrc');
-      } catch (e) { this.showError(`保存失败: ${e}`);   }
-      finally { this.savingExports = false; }
-    },
-
-    addExportRow() {
-      if (!this.cfg.exports) this.cfg.exports = [];
-      this.cfg.exports = [...this.cfg.exports, { name: '', value: '' }];
-      this.exportsDirty = true;
-      this.$nextTick(() => {
-        const inputs = document.querySelectorAll('.export-row .var-name');
-        const last = inputs[inputs.length - 1];
-        if (last) last.focus();
-      });
-    },
-
-    removeExportRow(i) {
-      this.cfg.exports = this.cfg.exports.filter((_, idx) => idx !== i);
-      this.exportsDirty = true;
-    },
-
-    exportsPreview(extra = null) {
-      const exports = [...(this.cfg.exports || [])];
-      if (extra?.name) {
-        const idx = exports.findIndex(e => e.name === extra.name);
-        if (idx >= 0) exports[idx] = extra;
-        else exports.push(extra);
-      }
-      const rows = exports
-        .filter(e => (e.name || '').trim())
-        .map(e => ({ name: String(e.name).trim(), value: String(e.value || '') }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      const lines = ['# >>> Hatch managed block >>>'];
-      for (const e of rows) {
-        lines.push(`export ${e.name}=${this.shellValue(e.value)}`);
-      }
-      if (rows.length > 0) {
-        lines.push(`export PATH=${rows.map(e => '$' + e.name).join(':')}:$PATH`);
-      }
-      lines.push('# <<< Hatch managed block <<<');
-      return lines.join('\n');
     },
 
     shellValue(value) {
@@ -1216,26 +1862,6 @@ window.hatchApp = function () {
     },
 
     // ── Script metadata editing ────────────────────────────────────────
-    openEdit(script) {
-      this.editTarget = script;
-      this.editForm = {
-        name: script.name || '',
-        desc: script.desc || '',
-        type: script.type || 'oneshot',
-        commandsRaw: (script.commands || []).join(', '),
-        pidFile: script.pidFile || '',
-        tagsRaw: (script.tags || []).join(', '),
-        needsArgs: script.args === null || (Array.isArray(script.args) && script.args.length > 0),
-        presets: this.normalizedPresets(script),
-        envPairs: Object.entries(script.env || {}).map(([k, v]) => ({ key: k, value: v })),
-        notifyOnDone: !!script.notifyOnDone,
-        schedule: script.schedule || '',
-        requiresRaw: (script.requires || []).join(', '),
-        healthUrl: script.healthUrl || '',
-        preScriptsRaw: (script.preScripts || []).join('\n'),
-      };
-    },
-
     // v1.3+: data dir inventory + retention
     async loadDataInventory() {
       try {
@@ -1399,12 +2025,10 @@ window.hatchApp = function () {
       }
     },
     rerunFromHistory(r) {
-      const path = this.historyTarget.path;
-      this.scriptArgs[path] = (r.args || []).join(' ');
-      this.closeHistory();
-      // Trigger the normal run path so logs and UI update.
-      const script = (this.scripts || []).find(s => s.path === path) || { path };
-      this.runScript(script);
+      const script = this.allScripts.find(s => s.path === this.historyTarget?.path);
+      if (!script) return;
+      this.wbPane = 'run';
+      this.wbRun(script, r.args || []);
     },
 
     addEnvPair() {
@@ -1415,114 +2039,8 @@ window.hatchApp = function () {
       this.editForm.envPairs = this.editForm.envPairs.filter((_, idx) => idx !== i);
     },
 
-    cancelEdit() {
-      this.editTarget = null;
-      this.editForm = {};
-    },
-
-    async saveEdit() {
-      if (!this.editTarget) return;
-      this.editSaving = true;
-      try {
-        const meta = {
-          ...this.editTarget,
-          name: this.editForm.name,
-          desc: this.editForm.desc,
-          type: this.editForm.type,
-          commands: this.editForm.type === 'service'
-            ? this.editForm.commandsRaw.split(',').map(s => s.trim()).filter(Boolean)
-            : [],
-          pidFile: this.editForm.type === 'service' ? this.editForm.pidFile : '',
-          tags: this.editForm.tagsRaw.split(',').map(s => s.trim()).filter(Boolean),
-          args: this.editForm.type === 'oneshot'
-            ? (this.editForm.needsArgs ? null : [])
-            : null,
-          presets: this.normalizedEditPresets(),
-          env: (this.editForm.envPairs || []).reduce((acc, p) => {
-            const k = (p.key || '').trim();
-            if (k) acc[k] = p.value || '';
-            return acc;
-          }, {}),
-          notifyOnDone: !!this.editForm.notifyOnDone,
-          schedule: (this.editForm.schedule || '').trim(),
-          requires: (this.editForm.requiresRaw || '').split(',').map(s => s.trim()).filter(Boolean),
-          healthUrl: (this.editForm.healthUrl || '').trim(),
-          preScripts: (this.editForm.preScriptsRaw || '').split('\n').map(s => s.trim()).filter(Boolean),
-        };
-        await SaveScriptMeta(meta);
-        if (this.selectedDir) await this.scanDir(this.selectedDir);
-        else await this.scanAll();
-        this.cancelEdit();
-        this.showSuccess('脚本元信息已保存');
-      } catch (e) {
-        this.showError(`保存失败: ${e}`);  
-      } finally {
-        this.editSaving = false;
-      }
-    },
-
-    async resetEdit() {
-      if (!this.editTarget) return;
-      if (!(await this.askConfirm(`重置「${this.baseName(this.editTarget.path)}」的手动配置，恢复自动检测？此操作不可撤销。`, { title: '重置脚本配置', confirmText: '重置' }))) return;
-      this.editSaving = true;
-      try {
-        await DeleteScriptMeta(this.editTarget.path);
-        if (this.selectedDir) await this.scanDir(this.selectedDir);
-        else await this.scanAll();
-        this.cancelEdit();
-        this.showSuccess('已重置为自动检测');
-      } catch (e) {
-        this.showError(`重置失败: ${e}`);  
-      } finally {
-        this.editSaving = false;
-      }
-    },
-
-    addPreset() {
-      if (!this.editForm.presets) this.editForm.presets = [];
-      this.editForm.presets = [...this.editForm.presets, { name: '', args: '' }];
-      this.$nextTick(() => {
-        const drawer = document.querySelector('.edit-drawer .drawer-body');
-        const latest = document.querySelector('.preset-edit-row:last-child input');
-        if (latest) {
-          latest.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          latest.focus();
-        } else if (drawer) {
-          drawer.scrollTop = drawer.scrollHeight;
-        }
-      });
-    },
-
     removePreset(i) {
       this.editForm.presets = this.editForm.presets.filter((_, idx) => idx !== i);
-    },
-
-    async fillScriptWithAI(script) {
-      if (!this.aiReady) {
-        if (this.moduleOn('ai')) {
-          this.selectedDir = null;
-          this.tab = 'ai';
-        }
-        this.showError('请先完成并启用 AI 配置');  
-        return;
-      }
-      this.aiBusyScript = script.path;
-      try {
-        const suggestion = await SuggestScriptMeta(script);
-        this.openEdit(script);
-        this.editForm.name = suggestion.name || this.editForm.name;
-        this.editForm.desc = suggestion.desc || this.editForm.desc;
-        this.editForm.type = suggestion.type || this.editForm.type;
-        this.editForm.commandsRaw = (suggestion.commands || []).join(', ');
-        this.editForm.pidFile = suggestion.pidFile || this.editForm.pidFile;
-        this.editForm.tagsRaw = (suggestion.tags || []).join(', ');
-        this.editForm.needsArgs = !!suggestion.needsArgs;
-        this.editForm.presets = this.normalizePresetList(suggestion.presets || []);
-      } catch (e) {
-        this.showError(`AI 分析脚本失败: ${e}`);  
-      } finally {
-        this.aiBusyScript = null;
-      }
     },
 
     // ── Skills management ─────────────────────────────────────────────
@@ -2928,120 +3446,6 @@ window.hatchApp = function () {
       }
     },
 
-    // ── Script content editor ──────────────────────────────────────────
-    async openScriptEditor(script) {
-      this.scriptEditorTarget = script;
-      this.scriptEditorInstruction = '';
-      try {
-        this.scriptEditorContent = await ReadScriptFile(script.path);
-      } catch (e) {
-        this.showError(`读取文件失败: ${e}`);
-        this.scriptEditorTarget = null;
-      }
-    },
-
-    closeScriptEditor() {
-      this.scriptEditorTarget = null;
-      this.scriptEditorContent = '';
-      this.scriptEditorInstruction = '';
-    },
-
-    async saveScriptContent() {
-      if (!this.scriptEditorTarget) return;
-      this.scriptEditorSaving = true;
-      try {
-        await WriteScriptFile(this.scriptEditorTarget.path, this.scriptEditorContent);
-        if (this.selectedDir) await this.scanDir(this.selectedDir);
-        this.closeScriptEditor();
-        this.showSuccess('脚本已保存');
-      } catch (e) {
-        this.showError(`保存失败: ${e}`);
-      } finally {
-        this.scriptEditorSaving = false;
-      }
-    },
-
-    async scriptAIGenerate() {
-      if (!this.aiReady) {
-        if (this.moduleOn('ai')) this.tab = 'ai';
-        this.showError('请先完成并启用 AI 配置');
-        return;
-      }
-      if (!this.scriptEditorInstruction.trim()) {
-        this.showError('请输入 AI 指令（如：加错误处理、重写为 python3）');
-        return;
-      }
-      this.scriptEditorAIBusy = true;
-      try {
-        const result = await SuggestScriptContent(
-          this.scriptEditorTarget?.path || '',
-          this.scriptEditorContent,
-          this.scriptEditorInstruction
-        );
-        this.scriptEditorContent = result;
-      } catch (e) {
-        this.showError(`AI 生成失败: ${e}`);
-      } finally {
-        this.scriptEditorAIBusy = false;
-      }
-    },
-
-    // ── New script creation ────────────────────────────────────────────
-    openNewScript() {
-      this.newScriptForm = { filename: '', content: '#!/bin/zsh\n\n' };
-      this.newScriptOpen = true;
-    },
-
-    closeNewScript() {
-      this.newScriptOpen = false;
-      this.newScriptForm = { filename: '', content: '#!/bin/zsh\n\n' };
-    },
-
-    async saveNewScript() {
-      if (!this.selectedDir || !this.newScriptForm.filename.trim()) return;
-      this.newScriptSaving = true;
-      try {
-        const fname = this.newScriptForm.filename.trim();
-        await CreateScriptFile(
-          this.selectedDir.path,
-          fname,
-          this.newScriptForm.content
-        );
-        await this.scanDir(this.selectedDir);
-        this.closeNewScript();
-        this.showSuccess(`脚本「${fname}」已创建`);
-      } catch (e) {
-        this.showError(`创建失败: ${e}`);
-      } finally {
-        this.newScriptSaving = false;
-      }
-    },
-
-    async newScriptAIGenerate() {
-      if (!this.aiReady) {
-        if (this.moduleOn('ai')) this.tab = 'ai';
-        this.showError('请先完成并启用 AI 配置');
-        return;
-      }
-      if (!this.scriptEditorInstruction.trim()) {
-        this.showError('请输入 AI 指令');
-        return;
-      }
-      this.newScriptAIBusy = true;
-      try {
-        const result = await SuggestScriptContent(
-          this.newScriptForm.filename || 'new-script',
-          this.newScriptForm.content,
-          this.scriptEditorInstruction
-        );
-        this.newScriptForm.content = result;
-      } catch (e) {
-        this.showError(`AI 生成失败: ${e}`);
-      } finally {
-        this.newScriptAIBusy = false;
-      }
-    },
-
     // ── Helpers ────────────────────────────────────────────────────────
     showError(msg) {
       this.error = msg;
@@ -3130,9 +3534,24 @@ window.hatchApp = function () {
       return path.split('/').filter(Boolean).pop() || path;
     },
 
+    // Shell-like split: whitespace separates, '…' and "…" group, \ escapes.
     splitArgs(raw) {
-      const text = String(raw || '').trim();
-      return text ? text.split(/\s+/) : [];
+      const out = [];
+      let cur = '', quote = '', has = false;
+      const text = String(raw || '');
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (quote) {
+          if (c === quote) quote = '';
+          else if (c === '\\' && quote === '"' && i + 1 < text.length) cur += text[++i];
+          else cur += c;
+        } else if (c === '"' || c === "'") { quote = c; has = true; }
+        else if (c === '\\' && i + 1 < text.length) { cur += text[++i]; has = true; }
+        else if (/\s/.test(c)) { if (has || cur) out.push(cur); cur = ''; has = false; }
+        else { cur += c; has = true; }
+      }
+      if (has || cur) out.push(cur);
+      return out;
     },
 
     // Safe DOM id from a path (avoids btoa encoding issues)
@@ -3152,22 +3571,6 @@ window.hatchApp = function () {
 
     normalizedPresets(script) {
       return this.normalizePresetList(script?.presets || script?.Presets || []);
-    },
-
-    normalizedEditPresets() {
-      return this.normalizePresetList(this.editForm?.presets || []);
-    },
-
-    dirTypeSummary(dirPath) {
-      const scripts = this.allScripts.filter(s =>
-        s.path.startsWith(dirPath + '/') || s.path.startsWith(dirPath + '\\')
-      );
-      const svcCount     = scripts.filter(s => s.type === 'service').length;
-      const oneshotCount = scripts.filter(s => s.type === 'oneshot').length;
-      const parts = [];
-      if (svcCount > 0)     parts.push(`${svcCount} service`);
-      if (oneshotCount > 0) parts.push(`${oneshotCount} oneshot`);
-      return parts.join(' · ');
     },
 
     // ── Doc links ──────────────────────────────────────────────────────────
@@ -3257,7 +3660,6 @@ window.hatchApp = function () {
         this.memoDashboard = dash || this.memoDashboard;
         this.memos = memos || [];
         this.vocabEntries = vocab || [];
-        this.clampVocabPage();
         this.memoSettings = settings || this.memoSettings;
         this.loadMemoImagePreviews();
       } catch (e) {
@@ -3270,52 +3672,6 @@ window.hatchApp = function () {
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
       return `${d.getFullYear()}-${mm}-${dd}`;
-    },
-
-    vocabEntryDate(entry) {
-      const unix = entry?.createdAt || entry?.updatedAt || 0;
-      if (!unix) return '';
-      const d = new Date(unix * 1000);
-      if (Number.isNaN(d.getTime())) return '';
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${d.getFullYear()}-${mm}-${dd}`;
-    },
-
-    vocabDayLabel(day) {
-      if (!day) return '全部日期';
-      const [year, month, date] = day.split('-');
-      if (!year || !month || !date) return day;
-      return `${Number(month)} 月 ${Number(date)} 日`;
-    },
-
-    resetVocabPage() {
-      this.vocabPage = 1;
-      this.vocabDeleteConfirmID = '';
-    },
-
-    clampVocabPage() {
-      this.vocabPage = Math.min(Math.max(this.vocabPage || 1, 1), this.vocabTotalPages);
-    },
-
-    setVocabSearch(value) {
-      this.vocabSearch = value;
-      this.resetVocabPage();
-    },
-
-    setVocabSort(value) {
-      this.vocabSort = value || 'alpha';
-      this.resetVocabPage();
-    },
-
-    setVocabDateFilter(value) {
-      this.vocabDateFilter = value || '';
-      this.resetVocabPage();
-    },
-
-    gotoVocabPage(page) {
-      this.vocabPage = Math.min(Math.max(page, 1), this.vocabTotalPages);
-      this.vocabDeleteConfirmID = '';
     },
 
     unixToLocalInput(unix) {
@@ -3339,78 +3695,184 @@ window.hatchApp = function () {
       return (tags || []).join(', ');
     },
 
-    openNewMemo() {
-      this.memoEditingID = '';
-      this.memoFormOpen = true;
-      this.memoForm = {
-        title: '',
-        body: '',
-        date: this.todayDate(),
-        priority: 'normal',
-        tagsRaw: '',
-        reminderLocal: '',
-        reminderMode: 'both',
-        attachments: [],
-      };
-      this.memoAttachmentForm = { path: '', label: '', kind: 'file' };
+    // ── Memo: navigation + labels ─────────────────────────────────────
+    memoGo(sub) {
+      this.memoSubTab = sub;
+      this.memoSearch = '';
+      if (!['today', 'upcoming', 'done'].includes(sub)) this.memoDraft = null;
+      if (sub !== 'words') this.vocabDraft = null;
+      this.loadMemoModule();
+      if (sub === 'today' || sub === 'upcoming') this.$nextTick(() => this.$refs.memoQuickInput?.focus());
     },
 
-    editMemo(item) {
-      this.memoEditingID = item.id;
-      this.memoFormOpen = true;
-      this.memoForm = {
-        title: item.title || '',
-        body: item.body || '',
-        date: item.date || this.todayDate(),
-        priority: item.priority || 'normal',
+    // Undone first by priority (high → low), then reminder time, then newest.
+    memoOrder(a, b) {
+      const rank = { high: 0, normal: 1, low: 2 };
+      return (rank[a.priority || 'normal'] - rank[b.priority || 'normal'])
+        || ((a.reminderAt || Infinity) - (b.reminderAt || Infinity))
+        || ((b.createdAt || 0) - (a.createdAt || 0));
+    },
+
+    ymd(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    },
+
+    memoDateLabel(date, long = false) {
+      if (!date) return '无日期';
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const d = new Date(date + 'T00:00:00');
+      if (Number.isNaN(d.getTime())) return date;
+      const diff = Math.round((d - today) / 86400000);
+      const week = '日一二三四五六'[d.getDay()];
+      const md = `${d.getMonth() + 1}月${d.getDate()}日`;
+      if (diff === 0) return '今天';
+      if (diff === 1) return long ? `明天 · ${md}` : '明天';
+      if (diff === 2) return long ? `后天 · ${md}` : '后天';
+      if (diff === -1) return '昨天';
+      if (diff > 2 && diff < 7) return long ? `周${week} · ${md}` : `周${week}`;
+      if (diff < -1) return long ? md : `${-diff} 天前`;
+      return long ? `${md} · 周${week}` : md;
+    },
+
+    // Time only when the reminder falls on the todo's own date (or today).
+    memoTimeLabel(unix, date = '') {
+      if (!unix) return '';
+      const d = new Date(unix * 1000);
+      const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const day = this.ymd(d);
+      return day === date || day === this.todayDate() ? hm : `${this.memoDateLabel(day)} ${hm}`;
+    },
+
+    memoIsOverdue(item) {
+      return item.status !== 'done' && !!item.date && item.date < this.todayDate();
+    },
+
+    memoReminderPast(item) {
+      return item.status !== 'done' && item.reminderAt && item.reminderAt * 1000 < Date.now();
+    },
+
+    // ── Memo: quick add with natural-language parsing ─────────────────
+    // "明天 9:30 交周报 #工作 !高" → { title, date, time, tags, priority }.
+    // Recognises 今天/明天/后天/大后天, (下)周X/星期X, YYYY-MM-DD, M月D日, M/D,
+    // HH:MM, (上午|下午|晚上)H点(半|M分), #tag, !高/!低/!!.
+    parseQuickTodo(text, now = new Date()) {
+      let rest = ` ${String(text || '')} `;
+      const out = { title: '', date: this.ymd(now), time: '', tags: [], priority: 'normal' };
+      const take = (re, fn) => { rest = rest.replace(re, (...m) => { fn(...m); return ' '; }); };
+      const base = new Date(now); base.setHours(0, 0, 0, 0);
+      const setDays = n => { const d = new Date(base); d.setDate(d.getDate() + n); out.date = this.ymd(d); };
+
+      take(/\s#([^\s#!]+)/g, (_, t) => out.tags.push(t));
+      take(/\s(?:!{2,}|!(?:高|high|急|1))(?=\s)/gi, () => { out.priority = 'high'; });
+      take(/\s!(?:低|low|3)(?=\s)/gi, () => { out.priority = 'low'; });
+      take(/(大后天|后天|明天|明日|今天|今日)/, (_, w) => setDays({ 今天: 0, 今日: 0, 明天: 1, 明日: 1, 后天: 2, 大后天: 3 }[w]));
+      take(/(下)?(?:周|星期|礼拜)([一二三四五六日天])/, (_, next, w) => {
+        const target = '一二三四五六日'.indexOf(w === '天' ? '日' : w); // Monday = 0
+        const todayIdx = (base.getDay() + 6) % 7;
+        if (next) { setDays(7 - todayIdx + target); return; }  // that day of next week
+        const diff = target - todayIdx;
+        setDays(diff > 0 ? diff : diff + 7);                    // next occurrence
+      });
+      take(/(\d{4})-(\d{1,2})-(\d{1,2})/, (_, y, m, d) => { out.date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`; });
+      take(/(\d{1,2})月(\d{1,2})[日号]?/, (_, m, d) => {
+        let y = base.getFullYear();
+        const cand = new Date(y, +m - 1, +d);
+        if (cand < base) y += 1;
+        out.date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      });
+      take(/\s(\d{1,2})\/(\d{1,2})(?=\s)/, (_, m, d) => {
+        let y = base.getFullYear();
+        if (new Date(y, +m - 1, +d) < base) y += 1;
+        out.date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      });
+      take(/(上午|早上|中午|下午|傍晚|晚上)?\s*(\d{1,2})(?::|：)(\d{2})/, (_, part, h, m) => { out.time = this.quickTime(part, +h, +m); });
+      if (!out.time) take(/(上午|早上|中午|下午|傍晚|晚上)?\s*(\d{1,2})\s*点\s*(半|(\d{1,2})\s*分?)?/, (_, part, h, half, m) => {
+        out.time = this.quickTime(part, +h, half === '半' ? 30 : (+m || 0));
+      });
+      out.title = rest.replace(/\s+/g, ' ').trim();
+      return out;
+    },
+
+    quickTime(part, h, m) {
+      if (['下午', '傍晚', '晚上'].includes(part) && h < 12) h += 12;
+      if (part === '中午' && h < 6) h += 12;
+      if (h > 23 || m > 59) return '';
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    },
+
+    async addQuickMemo() {
+      const p = this.memoQuickParsed;
+      if (!p.title) { this.showError('写一点待办内容'); return; }
+      const reminderAt = p.time ? this.localInputToUnix(`${p.date}T${p.time}`) : 0;
+      try {
+        const saved = await SaveMemo({
+          id: '', title: p.title, body: '', date: p.date, status: 'todo', priority: p.priority,
+          tags: p.tags, reminderAt, reminderMode: 'both', attachments: [],
+        });
+        this.memos = [saved, ...this.memos];
+        this.memoQuick = '';
+        const where = p.date === this.todayDate() ? '今天' : this.memoDateLabel(p.date, true);
+        this.showSuccess(`已添加到${where}${p.time ? ' · ' + p.time + ' 提醒' : ''}`);
+      } catch (e) {
+        this.showError(`添加失败: ${e}`);
+      }
+    },
+
+    // ── Memo: detail panel (auto-save) ────────────────────────────────
+    selectMemo(item) {
+      this.memoDraft = {
+        ...item,
         tagsRaw: this.tagsRaw(item.tags),
         reminderLocal: this.unixToLocalInput(item.reminderAt),
         reminderMode: item.reminderMode || 'both',
+        priority: item.priority || 'normal',
         attachments: [...(item.attachments || [])],
       };
-      this.memoAttachmentForm = { path: '', label: '', kind: 'file' };
+      this.memoAttachmentForm = { path: '' };
+      if ((item.attachments || []).some(a => a.kind === 'image')) this.loadMemoImagePreviews();
     },
 
-    memoPayloadFromForm() {
-      const existing = this.memos.find(m => m.id === this.memoEditingID) || {};
-      return {
-        ...existing,
-        id: this.memoEditingID || existing.id || '',
-        title: this.memoForm.title,
-        body: this.memoForm.body,
-        date: this.memoForm.date || this.todayDate(),
-        priority: this.memoForm.priority || 'normal',
-        tags: this.parseTags(this.memoForm.tagsRaw),
-        reminderAt: this.localInputToUnix(this.memoForm.reminderLocal),
-        reminderMode: this.memoForm.reminderMode || 'both',
-        attachments: this.memoForm.attachments || [],
-        status: existing.status || 'todo',
-      };
+    closeMemoDetail() {
+      this.memoDraft = null;
     },
 
-    async saveMemoForm() {
-      if (!this.memoForm.title.trim()) { this.showError('请填写待办标题'); return; }
-      this.memoSaving = true;
+    replaceMemo(saved) {
+      const i = this.memos.findIndex(m => m.id === saved.id);
+      if (i >= 0) this.memos.splice(i, 1, saved); else this.memos = [saved, ...this.memos];
+      this.memos = [...this.memos];
+    },
+
+    async saveMemoDraft() {
+      const d = this.memoDraft;
+      if (!d) return;
+      if (!d.title.trim()) { this.showError('标题不能为空'); return; }
+      this.memoDraftSaving = true;
       try {
-        const saved = await SaveMemo(this.memoPayloadFromForm());
-        const idx = this.memos.findIndex(m => m.id === saved.id);
-        if (idx >= 0) this.memos.splice(idx, 1, saved);
-        else this.memos = [saved, ...this.memos];
-        this.memoFormOpen = false;
-        this.memoEditingID = '';
-        await this.loadMemoModule();
-        this.showSuccess('备忘录已保存');
+        const { tagsRaw, reminderLocal, ...rest } = d;
+        const reminderAt = this.localInputToUnix(reminderLocal);
+        const saved = await SaveMemo({
+          ...rest,
+          title: d.title.trim(),
+          date: d.date || this.todayDate(),
+          tags: this.parseTags(tagsRaw),
+          reminderAt,
+          // a new reminder time should fire again
+          reminderSentAt: reminderAt !== (rest.reminderAt || 0) ? 0 : rest.reminderSentAt,
+        });
+        this.replaceMemo(saved);
+        if (this.memoDraft?.id === saved.id) Object.assign(this.memoDraft, { reminderAt: saved.reminderAt, reminderSentAt: saved.reminderSentAt, updatedAt: saved.updatedAt });
       } catch (e) {
-        this.showError(`保存备忘录失败: ${e}`);
+        this.showError(`保存失败: ${e}`);
       } finally {
-        this.memoSaving = false;
+        this.memoDraftSaving = false;
       }
     },
 
     async toggleMemoDone(item) {
       try {
-        await MarkMemoDone(item.id, item.status !== 'done');
-        await this.loadMemoModule();
+        const saved = await MarkMemoDone(item.id, item.status !== 'done');
+        this.replaceMemo(saved);
+        if (this.memoDraft?.id === saved.id) this.memoDraft.status = saved.status;
       } catch (e) {
         this.showError(`更新状态失败: ${e}`);
       }
@@ -3420,20 +3882,23 @@ window.hatchApp = function () {
       if (!(await this.askConfirm(`删除「${item.title}」及其托管附件？此操作不可撤销。`))) return;
       try {
         await DeleteMemo(item.id);
-        await this.loadMemoModule();
-        this.showSuccess('备忘录已删除');
+        this.memos = this.memos.filter(m => m.id !== item.id);
+        if (this.memoDraft?.id === item.id) this.memoDraft = null;
+        this.showSuccess('已删除');
       } catch (e) {
-        this.showError(`删除备忘录失败: ${e}`);
+        this.showError(`删除失败: ${e}`);
       }
     },
 
     async addMemoAttachment() {
       const path = (this.memoAttachmentForm.path || '').trim();
-      if (!path) return;
+      if (!path || !this.memoDraft) return;
+      const kind = /^https?:\/\//.test(path) ? 'link' : /\.(png|jpe?g|gif|webp|heic|bmp|svg)$/i.test(path) ? 'image' : 'file';
       try {
-        const att = await ImportMemoAttachment(path, this.memoAttachmentForm.label || '', this.memoAttachmentForm.kind || 'file');
-        this.memoForm.attachments = [...(this.memoForm.attachments || []), att];
-        this.memoAttachmentForm = { path: '', label: '', kind: 'file' };
+        const att = await ImportMemoAttachment(path, '', kind);
+        this.memoDraft.attachments = [...this.memoDraft.attachments, att];
+        this.memoAttachmentForm = { path: '' };
+        await this.saveMemoDraft();
         if (att.kind === 'image') this.loadMemoImagePreviews();
       } catch (e) {
         this.showError(`添加附件失败: ${e}`);
@@ -3441,19 +3906,16 @@ window.hatchApp = function () {
     },
 
     async removeMemoAttachment(att) {
-      if (this.memoEditingID) {
-        if (!(await this.askConfirm(`删除附件「${att.label || att.url || '附件'}」？托管目录中的副本也会被删除。`))) return;
-        try {
-          const saved = await DeleteMemoAttachment(this.memoEditingID, att.id);
-          this.memoForm.attachments = saved.attachments || [];
-          await this.loadMemoModule();
-          return;
-        } catch (e) {
-          this.showError(`删除附件失败: ${e}`);
-          return;
-        }
+      const d = this.memoDraft;
+      if (!d) return;
+      if (!(await this.askConfirm(`移除附件「${att.label || att.url || '附件'}」？托管目录中的副本也会被删除。`, { title: '移除附件', confirmText: '移除' }))) return;
+      try {
+        const saved = await DeleteMemoAttachment(d.id, att.id);
+        this.replaceMemo(saved);
+        d.attachments = saved.attachments || [];
+      } catch (e) {
+        this.showError(`移除附件失败: ${e}`);
       }
-      this.memoForm.attachments = (this.memoForm.attachments || []).filter(a => a.id !== att.id);
     },
 
     async openMemoAttachment(att) {
@@ -3483,98 +3945,82 @@ window.hatchApp = function () {
       return '📄';
     },
 
-    reminderLabel(item) {
-      if (!item.reminderAt) return '';
-      const when = this.formatTime(item.reminderAt);
-      if (item.status !== 'done' && item.reminderAt < Math.floor(Date.now() / 1000)) return `已过期 · ${when}`;
-      return when;
-    },
-
-    openNewVocab() {
-      this.vocabEditingID = '';
-      this.vocabDeleteConfirmID = '';
-      this.vocabFormOpen = true;
-      this.vocabForm = { word: '', chinese: '', phonetic: '', partOfSpeech: '', collocationsRaw: '', example: '', audioUrl: '', tagsRaw: '' };
-    },
-
-    editVocab(entry) {
-      this.vocabEditingID = entry.id;
-      this.vocabDeleteConfirmID = '';
-      this.vocabFormOpen = true;
-      this.vocabForm = {
-        word: entry.word || '',
-        chinese: entry.chinese || '',
-        phonetic: entry.phonetic || '',
-        partOfSpeech: entry.partOfSpeech || '',
-        collocationsRaw: this.collocationsToRaw(entry.collocations || []),
-        example: entry.example || '',
-        audioUrl: entry.audioUrl || '',
-        tagsRaw: this.tagsRaw(entry.tags),
-      };
-    },
-
-    collocationsToRaw(list) {
-      return (list || []).map(c => [c.pattern, c.meaning, c.example].filter(Boolean).join(' | ')).join('\n');
-    },
-
-    parseCollocations(raw) {
-      return (raw || '').split('\n').map(line => {
-        const parts = line.split('|').map(s => s.trim());
-        return { pattern: parts[0] || '', meaning: parts[1] || '', example: parts[2] || '' };
-      }).filter(c => c.pattern || c.meaning || c.example);
-    },
-
-    vocabPayloadFromForm() {
-      const existing = this.vocabEntries.find(v => v.id === this.vocabEditingID) || {};
+    // ── Memo: word book ───────────────────────────────────────────────
+    vocabToDraft(v) {
       return {
-        ...existing,
-        id: this.vocabEditingID || existing.id || '',
-        word: this.vocabForm.word,
-        chinese: this.vocabForm.chinese,
-        phonetic: this.vocabForm.phonetic,
-        partOfSpeech: this.vocabForm.partOfSpeech,
-        collocations: this.parseCollocations(this.vocabForm.collocationsRaw),
-        example: this.vocabForm.example,
-        audioUrl: this.vocabForm.audioUrl,
-        tags: this.parseTags(this.vocabForm.tagsRaw),
+        ...v,
+        word: v.word || '', chinese: v.chinese || '', phonetic: v.phonetic || '', partOfSpeech: v.partOfSpeech || '',
+        example: v.example || '', audioUrl: v.audioUrl || '',
+        collocations: (v.collocations || []).map(c => ({ pattern: c.pattern || '', meaning: c.meaning || '', example: c.example || '' })),
+        tagsRaw: this.tagsRaw(v.tags),
       };
     },
 
-    async lookupVocab() {
-      const word = (this.vocabForm.word || '').trim();
-      if (!word) { this.showError('请先填写英文单词'); return; }
+    async selectVocab(v) {
+      if (this.vocabDraftDirty && this.vocabDraft?.id !== v.id &&
+          !(await this.askConfirm('当前单词有未保存的修改，切换后会丢失。', { title: '放弃修改？', confirmText: '放弃修改' }))) return;
+      this.vocabDraft = this.vocabToDraft(v);
+      this.vocabDraftSnapshot = JSON.stringify(this.vocabDraft);
+    },
+
+    closeVocabDetail() {
+      this.vocabDraft = null;
+    },
+
+    // Quick capture: existing word → open it; new word → draft + dictionary + AI.
+    async startVocabCapture() {
+      const word = this.vocabQuick.trim();
+      if (!word) return;
+      const existing = this.vocabEntries.find(v => (v.word || '').toLowerCase() === word.toLowerCase());
+      if (existing) {
+        this.vocabQuick = '';
+        this.vocabSearch = '';
+        this.vocabFilter = 'all';
+        await this.selectVocab(existing);
+        this.showSuccess(`「${existing.word}」已在单词本中`);
+        return;
+      }
+      this.vocabDraft = this.vocabToDraft({ id: '', word });
+      this.vocabDraftSnapshot = '';
+      this.vocabQuick = '';
+      await this.lookupVocab(true);
+      if (this.aiReady && !this.vocabDraft.chinese) await this.suggestVocab(true);
+    },
+
+    async lookupVocab(quiet = false) {
+      const d = this.vocabDraft;
+      const word = (d?.word || '').trim();
+      if (!word) return;
       this.vocabLookupBusy = true;
       try {
         const r = await LookupVocabWord(word);
-        this.vocabForm.word = r.word || word;
-        this.vocabForm.phonetic = r.phonetic || this.vocabForm.phonetic;
-        this.vocabForm.partOfSpeech = r.partOfSpeech || this.vocabForm.partOfSpeech;
-        this.vocabForm.audioUrl = r.audioUrl || this.vocabForm.audioUrl;
-        if (!this.vocabForm.collocationsRaw && r.collocations?.length) this.vocabForm.collocationsRaw = this.collocationsToRaw(r.collocations);
-        this.showSuccess('词典信息已填入草稿');
+        if (this.vocabDraft !== d) return;
+        d.word = r.word || word;
+        d.phonetic = d.phonetic || r.phonetic || '';
+        d.partOfSpeech = d.partOfSpeech || r.partOfSpeech || '';
+        d.audioUrl = d.audioUrl || r.audioUrl || '';
+        d.definitions = r.definitions || [];
+        if (!d.collocations.length && r.collocations?.length) d.collocations = r.collocations.map(c => ({ pattern: c.pattern || '', meaning: c.meaning || '', example: c.example || '' }));
       } catch (e) {
-        this.showError(`词典查询失败: ${e}`);
+        if (!quiet) this.showError(`词典查询失败: ${e}`);
       } finally {
         this.vocabLookupBusy = false;
       }
     },
 
-    async suggestVocab() {
-      if (!this.vocabForm.word.trim()) { this.showError('请先填写英文单词'); return; }
+    async suggestVocab(quiet = false) {
+      const d = this.vocabDraft;
+      if (!d?.word.trim() || !this.aiReady) return;
       this.vocabAIBusy = true;
       try {
-        const r = await SuggestVocabEntry(this.vocabPayloadFromForm());
-        this.vocabForm = {
-          ...this.vocabForm,
-          word: r.word || this.vocabForm.word,
-          chinese: r.chinese || this.vocabForm.chinese,
-          phonetic: r.phonetic || this.vocabForm.phonetic,
-          partOfSpeech: r.partOfSpeech || this.vocabForm.partOfSpeech,
-          collocationsRaw: this.collocationsToRaw(r.collocations || this.parseCollocations(this.vocabForm.collocationsRaw)),
-          example: r.example || this.vocabForm.example,
-          audioUrl: r.audioUrl || this.vocabForm.audioUrl,
-        };
-        this.showSuccess('AI 已补全单词草稿');
+        const r = await SuggestVocabEntry(this.vocabDraftPayload(d));
+        if (this.vocabDraft !== d) return;
+        d.chinese = r.chinese || d.chinese;
+        d.phonetic = d.phonetic || r.phonetic || '';
+        d.partOfSpeech = d.partOfSpeech || r.partOfSpeech || '';
+        d.example = r.example || d.example;
+        if ((r.collocations || []).length) d.collocations = r.collocations.map(c => ({ pattern: c.pattern || '', meaning: c.meaning || '', example: c.example || '' }));
+        if (!quiet) this.showSuccess('AI 已补全，确认后保存');
       } catch (e) {
         this.showError(`AI 补全失败: ${e}`);
       } finally {
@@ -3582,40 +4028,52 @@ window.hatchApp = function () {
       }
     },
 
-    async saveVocabForm() {
-      if (!this.vocabForm.word.trim()) { this.showError('请填写英文单词'); return; }
+    vocabDraftPayload(d) {
+      const { tagsRaw, definitions, ...rest } = d;
+      return {
+        ...rest,
+        word: d.word.trim(),
+        tags: this.parseTags(tagsRaw),
+        collocations: d.collocations.filter(c => c.pattern.trim() || c.meaning.trim()),
+      };
+    },
+
+    async saveVocabDraft() {
+      const d = this.vocabDraft;
+      if (!d?.word.trim()) return;
       this.vocabSaving = true;
       try {
-        await SaveVocabEntry(this.vocabPayloadFromForm());
-        this.vocabFormOpen = false;
-        this.vocabEditingID = '';
-        await this.loadMemoModule();
-        this.showSuccess('单词已保存');
+        const saved = await SaveVocabEntry(this.vocabDraftPayload(d));
+        const i = this.vocabEntries.findIndex(v => v.id === saved.id);
+        if (i >= 0) this.vocabEntries.splice(i, 1, saved); else this.vocabEntries = [saved, ...this.vocabEntries];
+        this.vocabEntries = [...this.vocabEntries];
+        this.vocabDraft = this.vocabToDraft(saved);
+        this.vocabDraftSnapshot = JSON.stringify(this.vocabDraft);
+        this.showSuccess(i >= 0 ? '已保存' : '已加入单词本，可在「复习」中练习');
       } catch (e) {
-        this.showError(`保存单词失败: ${e}`);
+        this.showError(`保存失败: ${e}`);
       } finally {
         this.vocabSaving = false;
       }
     },
 
-    requestDeleteVocab(entry) {
-      this.vocabDeleteConfirmID = entry?.id || '';
-    },
-
-    cancelDeleteVocab() {
-      this.vocabDeleteConfirmID = '';
-    },
-
-    async confirmDeleteVocab(entry) {
-      if (!entry?.id || this.vocabDeleteConfirmID !== entry.id) return;
+    async deleteVocab(v) {
+      if (!(await this.askConfirm(`从单词本删除「${v.word}」及其复习记录？`, { title: '删除单词', confirmText: '删除' }))) return;
       try {
-        await DeleteVocabEntry(entry.id);
-        this.vocabDeleteConfirmID = '';
-        await this.loadMemoModule();
-        this.showSuccess('单词已删除');
+        await DeleteVocabEntry(v.id);
+        this.vocabEntries = this.vocabEntries.filter(x => x.id !== v.id);
+        if (this.vocabDraft?.id === v.id) this.vocabDraft = null;
+        this.showSuccess('已删除');
       } catch (e) {
-        this.showError(`删除单词失败: ${e}`);
+        this.showError(`删除失败: ${e}`);
       }
+    },
+
+    vocabLevelTitle(v) {
+      if (!v.lastReviewedAt) return '还没复习过';
+      const next = v.nextReviewAt ? new Date(v.nextReviewAt * 1000) : null;
+      const due = !next || next <= new Date();
+      return `熟练度 ${v.reviewLevel || 0} · ` + (due ? '现在可复习' : `下次复习 ${this.memoDateLabel(this.ymd(next), true)}`);
     },
 
     async speakVocabWord(entry) {
@@ -3637,13 +4095,47 @@ window.hatchApp = function () {
       new Audio(url).play().catch(() => this.speakVocabWord(entry));
     },
 
-    async reviewVocab(entry, result) {
+    // ── Memo: flashcard review (mirrors memo.ApplyReview intervals) ───
+    startReview(n) {
+      const queue = [...this.reviewDueEntries]
+        .sort((a, b) => (a.nextReviewAt || 0) - (b.nextReviewAt || 0) || (a.createdAt || 0) - (b.createdAt || 0))
+        .slice(0, n)
+        .map(v => v.id);
+      this.review = { queue, index: 0, revealed: false, tally: { hard: 0, known: 0, mastered: 0 } };
+      if (queue.length) this.$nextTick(() => this.playVocabAudio(this.reviewCard));
+    },
+
+    reviewIntervalLabel(v, result) {
+      const level = v.reviewLevel || 0;
+      const days = result === 'known' ? 3 + (level + 1) * 2 : 14 + (level + 2) * 3;
+      return `${days} 天后`;
+    },
+
+    async gradeReview(result) {
+      const card = this.reviewCard;
+      if (!card || !this.review.revealed) return;
       try {
-        await ReviewVocabEntry(entry.id, result);
-        this.reviewReveal = { ...this.reviewReveal, [entry.id]: false };
-        await this.loadMemoModule();
+        const saved = await ReviewVocabEntry(card.id, result);
+        const i = this.vocabEntries.findIndex(v => v.id === saved.id);
+        if (i >= 0) this.vocabEntries.splice(i, 1, saved);
+        this.review.tally[result]++;
+        this.review.index++;
+        this.review.revealed = false;
+        if (this.reviewCard) this.$nextTick(() => this.playVocabAudio(this.reviewCard));
       } catch (e) {
-        this.showError(`保存复盘结果失败: ${e}`);
+        this.showError(`保存复习结果失败: ${e}`);
+      }
+    },
+
+    reviewKey(e) {
+      if (this.tab !== 'memo' || this.memoSubTab !== 'review' || !this.reviewCard || this.palette.open) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        if (!this.review.revealed) this.review.revealed = true;
+      } else if (this.review.revealed && ['1', '2', '3'].includes(e.key)) {
+        e.preventDefault();
+        this.gradeReview({ 1: 'hard', 2: 'known', 3: 'mastered' }[e.key]);
       }
     },
 
@@ -3910,7 +4402,8 @@ window.hatchApp = function () {
     headerRefresh() {
       this.loadModules();
       if (this.tab === 'scripts') {
-        this.selectedDir ? this.scanDir(this.selectedDir) : this.scanAll();
+        this.scanAll();
+        this.loadRecentRuns();
       } else if (this.tab === 'vpn') {
         this.refreshVPNStatus();
         if (this.vpnSubTab === 'subs') this.loadVPNSubscriptions();

@@ -83,3 +83,21 @@ func TestModulesNormalizedNeverAllHidden(t *testing.T) {
 		t.Fatalf("normalize changed a valid selection: %+v", got)
 	}
 }
+
+func TestExportVarInPath(t *testing.T) {
+	cases := []struct {
+		e    ExportVar
+		want bool
+	}{
+		{ExportVar{Name: "A", Value: "/usr/local/x"}, true},
+		{ExportVar{Name: "A", Value: "~/bin"}, true},
+		{ExportVar{Name: "A", Value: "secret"}, false},
+		{ExportVar{Name: "A", Value: "/tmp/x", Kind: "var"}, false},
+		{ExportVar{Name: "A", Value: "rel", Kind: "path"}, true},
+	}
+	for _, c := range cases {
+		if got := c.e.InPath(); got != c.want {
+			t.Errorf("%+v InPath = %v, want %v", c.e, got, c.want)
+		}
+	}
+}

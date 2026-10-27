@@ -257,6 +257,8 @@ export function RemoveSchedule(arg1:string):Promise<void>;
 
 export function ResolveSkillImportConflict(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function RevealFile(arg1:string):Promise<void>;
+
 export function ReviewVocabEntry(arg1:string,arg2:string):Promise<memo.VocabEntry>;
 
 export function RollbackAIWorkspaceSnapshot(arg1:string):Promise<void>;
@@ -337,6 +339,8 @@ export function SetMCPDisabledTools(arg1:string,arg2:string,arg3:Array<string>):
 
 export function SetMCPEnabled(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
+export function SetScriptFavorite(arg1:string,arg2:boolean):Promise<void>;
+
 export function SetSkillSync(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SpeakVocabWord(arg1:string):Promise<void>;
@@ -370,6 +374,8 @@ export function TestAIConfig(arg1:config.AIConfig):Promise<string>;
 export function TestVPNNodeDelay(arg1:string):Promise<number>;
 
 export function TestVPNRule(arg1:string,arg2:vpn.RulesDraft):Promise<vpn.RuleMatch>;
+
+export function TrashScriptFile(arg1:string):Promise<string>;
 
 export function UpdateDirectoryExport(arg1:string,arg2:string):Promise<void>;
 
