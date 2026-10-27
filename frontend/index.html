@@ -26,9 +26,9 @@
 
     <nav class="tab-nav" x-show="!selectedDir">
       <!-- Visibility comes from config.json "modules" (see loadModules) -->
-      <button class="tab" x-show="moduleOn('scripts')" :class="tab==='scripts' ? 'active' : ''" @click="openTab('scripts')">🗂 工作台</button>
+      <button class="tab" x-show="moduleOn('scripts')" :class="tab==='scripts' ? 'active' : ''" @click="openTab('scripts')">▦ 工作台</button>
       <button class="tab" x-show="moduleOn('ai')"      :class="tab==='ai'      ? 'active' : ''" @click="openTab('ai')">✦ AI</button>
-      <button class="tab" x-show="moduleOn('vpn')"     :class="tab==='vpn'     ? 'active' : ''" @click="openTab('vpn')">🔒 VPN</button>
+      <button class="tab" x-show="moduleOn('vpn')"     :class="tab==='vpn'     ? 'active' : ''" @click="openTab('vpn')">◈ VPN</button>
       <button class="tab" x-show="moduleOn('memo')"    :class="tab==='memo'    ? 'active' : ''" @click="openTab('memo')">✓ 备忘录</button>
       <button class="tab" x-show="moduleOn('host')"    :class="tab==='host'    ? 'active' : ''" @click="openTab('host')">◉ 主机</button>
     </nav>
@@ -176,63 +176,157 @@
   </template>
 
   <!-- ══════════════════════════════════════════════════════════════════
-       SCRIPTS — Directory list
+       HOST — macOS host monitoring
   ══════════════════════════════════════════════════════════════════ -->
   <main x-show="tab==='host' && !selectedDir" class="host-page">
-    <section class="host-hero">
-      <div><p class="host-eyebrow">YOUR MAC · 实时监控</p><h1>主机状况</h1><p>让机器的每一次呼吸，都清晰可见。</p></div>
-      <div class="host-hero-meta"><span class="host-live-dot"></span> <span x-text="hostLoading ? '正在采样' : '实时采样' "></span><small x-text="hostSnapshot ? new Date(hostSnapshot.timestamp).toLocaleTimeString() : '等待数据'"></small></div>
+    <section class="page-hero ai-hero host-hero">
+      <div class="host-hero-top">
+        <div>
+          <p class="eyebrow">Your Mac · 实时监控</p>
+          <h1>主机状况</h1>
+          <p class="page-subtitle">处理器、内存、磁盘、温度与网络的实时采样，以及磁盘 / 网络测速。</p>
+        </div>
+        <div class="host-hero-meta">
+          <span class="host-live-dot" :class="{ 'is-busy': hostLoading }"></span>
+          <span x-text="hostLoading ? '正在采样' : '实时采样'"></span>
+          <small x-text="hostSnapshot ? new Date(hostSnapshot.timestamp).toLocaleTimeString() : '等待数据'"></small>
+        </div>
+      </div>
+      <div class="host-stat-grid">
+        <div class="host-card" :class="{ 'is-warn': hostSnapshot?.cpuPercent != null && hostSnapshot.cpuPercent >= 80 }">
+          <span class="host-label">处理器使用率</span>
+          <strong x-text="hostSnapshot?.cpuPercent == null ? '—' : hostSnapshot.cpuPercent.toFixed(1) + '%'"></strong>
+          <small>系统采样 · CPU</small>
+          <small class="host-card-warning" x-show="hostSnapshot?.cpuPercent != null && hostSnapshot.cpuPercent >= 80">使用率较高（≥ 80%）</small>
+        </div>
+        <div class="host-card" :class="{ 'is-warn': hostSnapshot?.memoryTotal > 0 && hostSnapshot.memoryUsed / hostSnapshot.memoryTotal >= 0.85 }">
+          <span class="host-label">活跃 / 固定 / 压缩内存</span>
+          <strong x-text="hostBytes(hostSnapshot?.memoryUsed)"></strong>
+          <small x-text="'物理内存 ' + hostBytes(hostSnapshot?.memoryTotal)"></small>
+          <small class="host-card-warning" x-show="hostSnapshot?.memoryTotal > 0 && hostSnapshot.memoryUsed / hostSnapshot.memoryTotal >= 0.85">使用量较高（≥ 85%）</small>
+        </div>
+        <div class="host-card" :class="{ 'is-warn': hostSnapshot?.diskTotal > 0 && hostSnapshot.diskAvailable / hostSnapshot.diskTotal <= 0.1 }">
+          <span class="host-label">磁盘可用空间</span>
+          <strong x-text="hostBytes(hostSnapshot?.diskAvailable)"></strong>
+          <small x-text="'APFS 容器总量 ' + hostBytes(hostSnapshot?.diskTotal)"></small>
+          <small class="host-card-warning" x-show="hostSnapshot?.diskTotal > 0 && hostSnapshot.diskAvailable / hostSnapshot.diskTotal <= 0.1">可用空间不足（≤ 10%）</small>
+        </div>
+        <div class="host-card" :class="{ 'is-warn': hostSnapshot?.cpuTemperature != null && hostSnapshot.cpuTemperature >= 85 }">
+          <span class="host-label">CPU 温度</span>
+          <strong x-text="hostSnapshot?.cpuTemperature == null ? '—' : hostSnapshot.cpuTemperature.toFixed(1) + ' °C'"></strong>
+          <small x-text="hostSnapshot?.fanSpeeds?.length ? '风扇 ' + hostSnapshot.fanSpeeds.map(speed => speed + ' RPM').join(' / ') : '风扇读数不可用或设备无风扇'"></small>
+          <small class="host-card-warning" x-show="hostSnapshot?.cpuTemperature != null && hostSnapshot.cpuTemperature >= 85">温度较高（≥ 85 °C）</small>
+        </div>
+      </div>
     </section>
+
     <p class="host-warning" x-show="hostError" x-text="hostError"></p>
-    <section class="host-stat-grid">
-      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.cpuPercent != null && hostSnapshot.cpuPercent >= 80 }"><span class="host-label">处理器使用率</span><strong x-text="hostSnapshot?.cpuPercent == null ? '—' : hostSnapshot.cpuPercent.toFixed(1) + '%'"></strong><small>系统采样 · CPU</small><small class="host-card-warning" x-show="hostSnapshot?.cpuPercent != null && hostSnapshot.cpuPercent >= 80">使用率较高（≥ 80%）</small></article>
-      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.memoryTotal > 0 && hostSnapshot.memoryUsed / hostSnapshot.memoryTotal >= 0.85 }"><span class="host-label">活跃 / 固定 / 压缩内存</span><strong x-text="hostBytes(hostSnapshot?.memoryUsed)"></strong><small x-text="'物理内存 ' + hostBytes(hostSnapshot?.memoryTotal)"></small><small class="host-card-warning" x-show="hostSnapshot?.memoryTotal > 0 && hostSnapshot.memoryUsed / hostSnapshot.memoryTotal >= 0.85">使用量较高（≥ 85%）</small></article>
-      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.diskTotal > 0 && hostSnapshot.diskAvailable / hostSnapshot.diskTotal <= 0.1 }"><span class="host-label">磁盘可用空间</span><strong x-text="hostBytes(hostSnapshot?.diskAvailable)"></strong><small x-text="'APFS 容器总量 ' + hostBytes(hostSnapshot?.diskTotal)"></small><small class="host-card-warning" x-show="hostSnapshot?.diskTotal > 0 && hostSnapshot.diskAvailable / hostSnapshot.diskTotal <= 0.1">可用空间不足（≤ 10%）</small></article>
-      <article class="host-card" :class="{ 'is-warn': hostSnapshot?.cpuTemperature != null && hostSnapshot.cpuTemperature >= 85 }"><span class="host-label">CPU 温度</span><strong x-text="hostSnapshot?.cpuTemperature == null ? '—' : hostSnapshot.cpuTemperature.toFixed(1) + ' °C'"></strong><small x-text="hostSnapshot?.fanSpeeds?.length ? '风扇 ' + hostSnapshot.fanSpeeds.map(speed => speed + ' RPM').join(' / ') : '风扇读数不可用或设备无风扇'"></small><small class="host-card-warning" x-show="hostSnapshot?.cpuTemperature != null && hostSnapshot.cpuTemperature >= 85">温度较高（≥ 85 °C）</small></article>
-    </section>
+
     <div class="host-grid">
-      <section class="host-panel"><div class="host-panel-head"><div><span class="host-eyebrow">STORAGE</span><h2>磁盘空间与测速</h2></div><span class="host-tag">本机存储</span></div>
+      <section class="settings-section host-panel">
+        <div class="section-header-row">
+          <h3>💽 磁盘空间与测速</h3>
+          <span class="host-tag">本机存储</span>
+        </div>
         <div class="host-storage"><strong x-text="hostSnapshot?.diskTotal ? ((1 - hostSnapshot.diskAvailable / hostSnapshot.diskTotal) * 100).toFixed(1) + '%' : '—'"></strong><span>容器空间已使用或不可用</span></div>
         <progress :value="hostSnapshot?.diskTotal ? hostSnapshot.diskTotal - hostSnapshot.diskAvailable : 0" :max="hostSnapshot?.diskTotal || 1"></progress>
         <p class="host-muted">可用 <b x-text="hostBytes(hostSnapshot?.diskAvailable)"></b> / 总计 <b x-text="hostBytes(hostSnapshot?.diskTotal)"></b>。空间可能包含可清除数据及系统保留空间。</p>
-        <div class="host-actions"><button @click="hostDiskTest()" :disabled="hostDiskBusy" x-text="hostDiskBusy ? '正在测速…' : '重新测速'"></button><span>进入主机页面时自动测速：写入并同步 64 MiB 临时文件，结束后删除；读取可能命中缓存。</span></div>
-        <div class="host-result" x-show="hostDiskResult"><div><small>顺序写入</small><strong x-text="hostBytes(hostDiskResult?.writeBytesPerSecond) + '/s'"></strong></div><div><small>顺序读取</small><strong x-text="hostBytes(hostDiskResult?.readBytesPerSecond) + '/s'"></strong></div></div>
-        <div class="host-actions"><button class="secondary" @click="hostAnalyzeStorage()" :disabled="hostStorageBusy" x-text="hostStorageBusy ? '正在分析…' : '分析 Mac 目录'"></button><span>统计根目录各项（含隐藏目录）；不跨挂载点，权限不足或超时会标记为不完整。完整磁盘访问权限可提高覆盖率。</span></div>
-        <div class="host-network-list" x-show="hostStorage"><template x-for="entry in (hostStorage || [])" :key="entry.name"><div class="host-network-row"><b x-text="entry.name"></b><span x-text="entry.partial ? '不完整' : '已统计'"></span><span x-text="entry.partial && !entry.bytes ? '—' : hostBytes(entry.bytes)"></span></div></template></div>
+        <div class="host-actions">
+          <button class="btn-sm" @click="hostDiskTest()" :disabled="hostDiskBusy" x-text="hostDiskBusy ? '正在测速…' : '↻ 重新测速'"></button>
+          <span>进入主机页面时自动测速：写入并同步 64 MiB 临时文件，结束后删除；读取可能命中缓存。</span>
+        </div>
+        <div class="host-result" x-show="hostDiskResult">
+          <div><small>顺序写入</small><strong x-text="hostBytes(hostDiskResult?.writeBytesPerSecond) + '/s'"></strong></div>
+          <div><small>顺序读取</small><strong x-text="hostBytes(hostDiskResult?.readBytesPerSecond) + '/s'"></strong></div>
+        </div>
+        <div class="host-actions">
+          <button class="btn-sm" @click="hostAnalyzeStorage()" :disabled="hostStorageBusy" x-text="hostStorageBusy ? '正在分析…' : '分析 Mac 目录'"></button>
+          <span>统计根目录各项（含隐藏目录）；不跨挂载点，权限不足或超时会标记为不完整。完整磁盘访问权限可提高覆盖率。</span>
+        </div>
+        <div class="host-network-list" x-show="hostStorage">
+          <template x-for="entry in (hostStorage || [])" :key="entry.name">
+            <div class="host-network-row"><b x-text="entry.name"></b><span x-text="entry.partial ? '不完整' : '已统计'"></span><span x-text="entry.partial && !entry.bytes ? '—' : hostBytes(entry.bytes)"></span></div>
+          </template>
+        </div>
       </section>
-      <section class="host-panel"><div class="host-panel-head"><div><span class="host-eyebrow">NETWORK</span><h2>网络流量与测速</h2></div><span class="host-tag">按网卡统计</span></div>
-        <div class="host-network-list"><template x-for="network in hostRates" :key="network.name"><div class="host-network-row"><b x-text="network.name"></b><span>↓ <span x-text="network.receive == null ? '采样中' : hostBytes(network.receive) + '/s'"></span></span><span>↑ <span x-text="network.send == null ? '采样中' : hostBytes(network.send) + '/s'"></span></span></div></template><p class="host-muted" x-show="!hostRates.length">等待网络接口数据</p></div>
+
+      <section class="settings-section host-panel">
+        <div class="section-header-row">
+          <h3>📶 网络流量与测速</h3>
+          <span class="host-tag">按网卡统计</span>
+        </div>
+        <div class="host-network-list">
+          <template x-for="network in hostRates" :key="network.name">
+            <div class="host-network-row"><b x-text="network.name"></b><span>↓ <span x-text="network.receive == null ? '采样中' : hostBytes(network.receive) + '/s'"></span></span><span>↑ <span x-text="network.send == null ? '采样中' : hostBytes(network.send) + '/s'"></span></span></div>
+          </template>
+          <p class="host-muted" x-show="!hostRates.length">等待网络接口数据</p>
+        </div>
         <p class="host-muted">按下载和上传速率之和降序排列；VPN / 虚拟接口可能与物理接口重复，不能直接相加。</p>
-        <div class="host-actions"><button @click="hostNetworkTest()" :disabled="hostNetworkBusy" x-text="hostNetworkBusy ? '正在测速…' : '重新测速'"></button><span>进入主机页面时自动使用 macOS networkQuality 测速，可能消耗大量流量，结果受代理和测试节点影响。</span></div>
-        <div class="host-result" x-show="hostNetworkResult"><div><small>下载</small><strong x-text="((hostNetworkResult?.downloadBps || 0) / 1000000).toFixed(1) + ' Mbps'"></strong></div><div><small>上传</small><strong x-text="((hostNetworkResult?.uploadBps || 0) / 1000000).toFixed(1) + ' Mbps'"></strong></div><div><small>延迟</small><strong x-text="(hostNetworkResult?.latencyMs || 0).toFixed(0) + ' ms'"></strong></div></div>
+        <div class="host-actions">
+          <button class="btn-sm" @click="hostNetworkTest()" :disabled="hostNetworkBusy" x-text="hostNetworkBusy ? '正在测速…' : '↻ 重新测速'"></button>
+          <span>进入主机页面时自动使用 macOS networkQuality 测速，可能消耗大量流量，结果受代理和测试节点影响。</span>
+        </div>
+        <div class="host-result" x-show="hostNetworkResult">
+          <div><small>下载</small><strong x-text="((hostNetworkResult?.downloadBps || 0) / 1000000).toFixed(1) + ' Mbps'"></strong></div>
+          <div><small>上传</small><strong x-text="((hostNetworkResult?.uploadBps || 0) / 1000000).toFixed(1) + ' Mbps'"></strong></div>
+          <div><small>延迟</small><strong x-text="(hostNetworkResult?.latencyMs || 0).toFixed(0) + ' ms'"></strong></div>
+        </div>
         <p class="host-muted" x-show="hostNetworkResult" x-text="'测速接口 ' + (hostNetworkResult?.interface || '未知') + ' · 消耗 ' + hostBytes((hostNetworkResult?.downloadBytes || 0) + (hostNetworkResult?.uploadBytes || 0))"></p>
-        <div class="host-actions"><button class="secondary" @click="hostLoadPorts()" :disabled="hostPortsBusy" x-text="hostPortsBusy ? '正在读取…' : '查看网络端口'"></button><span>显示当前用户可见的 TCP 监听与 UDP 端口，系统权限可能限制结果。</span></div>
-        <div class="host-network-list" x-show="hostPorts"><template x-for="port in (hostPorts || [])" :key="`${port.pid}-${port.protocol}-${port.address}`"><div class="host-network-row"><b x-text="port.process + ' · ' + port.pid"></b><span x-text="port.protocol"></span><span x-text="port.address"></span></div></template><p class="host-muted" x-show="hostPorts && !hostPorts.length">未发现可见端口</p></div>
+        <div class="host-actions">
+          <button class="btn-sm" @click="hostLoadPorts()" :disabled="hostPortsBusy" x-text="hostPortsBusy ? '正在读取…' : '查看网络端口'"></button>
+          <span>显示当前用户可见的 TCP 监听与 UDP 端口，系统权限可能限制结果。</span>
+        </div>
+        <div class="host-network-list" x-show="hostPorts">
+          <template x-for="port in (hostPorts || [])" :key="`${port.pid}-${port.protocol}-${port.address}`">
+            <div class="host-network-row"><b x-text="port.process + ' · ' + port.pid"></b><span x-text="port.protocol"></span><span x-text="port.address"></span></div>
+          </template>
+          <p class="host-muted" x-show="hostPorts && !hostPorts.length">未发现可见端口</p>
+        </div>
       </section>
     </div>
-    <section class="host-panel host-hardware"><div class="host-panel-head"><div><span class="host-eyebrow">HARDWARE</span><h2>设备详情</h2></div><span class="host-tag" x-text="hostHardware?.os ? 'macOS ' + hostHardware.os : 'macOS'"></span></div>
-      <div class="host-details"><div><small>设备</small><b x-text="hostHardware?.model || '—'"></b></div><div><small>芯片</small><b x-text="hostHardware?.chip || '—'"></b></div><div><small>核心</small><b x-text="hostHardware?.cores || '—'"></b></div><div><small>图形处理器</small><b x-text="hostHardware?.gpu || '—'"></b></div><div><small>显示器分辨率</small><b x-text="hostHardware?.display || '—'"></b></div><div><small>物理内存</small><b x-text="hostHardware?.memory || '—'"></b></div><div><small>当前电量</small><b x-text="hostSnapshot?.batteryPercent == null ? '—' : hostSnapshot.batteryPercent + '% · ' + hostSnapshot.batteryStatus"></b></div><div><small>电池循环</small><b x-text="hostHardware?.batteryCycles || '—'"></b></div><div><small>电池最大容量</small><b x-text="hostHardware?.batteryMaximum || '—'"></b></div><div><small>电池状况</small><b x-text="hostHardware?.batteryHealth || '—'"></b></div></div>
+
+    <section class="settings-section host-panel">
+      <div class="section-header-row">
+        <h3>💻 设备详情</h3>
+        <span class="host-tag" x-text="hostHardware?.os ? 'macOS ' + hostHardware.os : 'macOS'"></span>
+      </div>
+      <div class="host-details">
+        <div><small>设备</small><b x-text="hostHardware?.model || '—'"></b></div>
+        <div><small>芯片</small><b x-text="hostHardware?.chip || '—'"></b></div>
+        <div><small>核心</small><b x-text="hostHardware?.cores || '—'"></b></div>
+        <div><small>图形处理器</small><b x-text="hostHardware?.gpu || '—'"></b></div>
+        <div><small>显示器分辨率</small><b x-text="hostHardware?.display || '—'"></b></div>
+        <div><small>物理内存</small><b x-text="hostHardware?.memory || '—'"></b></div>
+        <div><small>当前电量</small><b x-text="hostSnapshot?.batteryPercent == null ? '—' : hostSnapshot.batteryPercent + '% · ' + hostSnapshot.batteryStatus"></b></div>
+        <div><small>电池循环</small><b x-text="hostHardware?.batteryCycles || '—'"></b></div>
+        <div><small>电池最大容量</small><b x-text="hostHardware?.batteryMaximum || '—'"></b></div>
+        <div><small>电池状况</small><b x-text="hostHardware?.batteryHealth || '—'"></b></div>
+      </div>
     </section>
   </main>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       SCRIPTS — Directory list
+  ══════════════════════════════════════════════════════════════════ -->
   <main x-show="tab==='scripts' && !selectedDir">
-    <section class="page-hero">
+    <section class="page-hero ai-hero scripts-hero">
       <div>
         <p class="eyebrow">Script Dashboard</p>
         <h1>脚本工作台</h1>
         <p class="page-subtitle">按目录管理一次性脚本和常驻服务，运行、查看日志和维护环境变量都在这里完成。</p>
       </div>
       <div class="hero-stats" x-show="scriptDirs.length>0">
-        <div class="stat-pill">
-          <span x-text="scriptDirs.length"></span>
-          <small>脚本目录</small>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">脚本目录</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="scriptDirs.length"></span></div>
         </div>
-        <div class="stat-pill">
-          <span x-text="totalScriptCount"></span>
-          <small>脚本</small>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">脚本</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="totalScriptCount"></span></div>
         </div>
-        <div class="stat-pill">
-          <span x-text="serviceScriptCount"></span>
-          <small>服务</small>
+        <div class="hero-stat-card">
+          <div class="hero-stat-label">服务</div>
+          <div class="hero-stat-body"><span class="hero-stat-total" x-text="serviceScriptCount"></span></div>
         </div>
       </div>
     </section>
@@ -2427,7 +2521,7 @@
 
         <!-- ══ 提示词 ═════════════════════════════════════════════════ -->
         <div x-show="aiSubTab==='prompts'">
-          <section class="ai-section">
+          <section class="settings-section ai-section">
             <h3 class="ai-section-title">📝 自定义提示词模板</h3>
             <p class="ai-section-desc">
               覆盖每个 AI 操作的 system prompt。留空则用 Hatch 内置的默认提示。改完点保存即生效（无需重启）。
@@ -2474,7 +2568,7 @@
 
         <!-- ══ 数据目录 / 清理 ══════════════════════════════════════════ -->
         <div x-show="aiSubTab==='data'">
-          <section class="ai-section">
+          <section class="settings-section ai-section">
             <h3 class="ai-section-title">📦 Hatch 数据目录</h3>
             <p class="ai-section-desc">
               Hatch 写入的所有文件、它们各自的大小和最早 / 最新修改时间。可一键清理可累积的目录，并设置自动保留天数。
