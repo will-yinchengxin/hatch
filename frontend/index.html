@@ -32,7 +32,7 @@
         @click="headerRefresh()"
         :aria-busy="loading || vpnStatusRefreshing"
         :title="tab==='vpn' ? '刷新代理状态' : (tab==='memo' ? '刷新备忘录' : (tab==='ai' ? '刷新 AI 状态与日志' : '重新扫描'))"
-      >↻ 刷新</button>
+      >↻<span class="hdr-label"> 刷新</span></button>
       <!-- v1.3+: quick AI panel (model switch + trace log) -->
       <div class="quick-ai-wrap" x-show="moduleOn('ai')">
         <button
@@ -41,7 +41,7 @@
           :class="{active: quickAIOpen}"
           :title="(activeProvider ? (activeProvider.name || '') + (activeProvider.baseUrl ? ' · ' + activeProvider.baseUrl : '') : '未配置 provider') + ' — 切换模型 / 查看 AI 调用日志'"
         >
-          <span x-text="quickAIActiveLabel || '✦ AI'"></span>
+          <span class="quick-ai-label" x-text="quickAIActiveLabel || '✦ AI'"></span>
           <span class="quick-ai-toggle-arrow" x-text="quickAIOpen ? '▲' : '▼'"></span>
         </button>
         <div
@@ -60,12 +60,12 @@
             <div class="quick-ai-section-label">当前模型</div>
             <select x-model="quickAIActiveID" @change="switchQuickAIProvider()" class="field-input">
               <template x-for="p in (aiProviders||[])" :key="p.id">
-                <option :value="p.id" x-text="(p.name || '未命名') + (p.model ? ' · ' + p.model : '')"></option>
+                <option :value="p.id" :selected="p.id === quickAIActiveID" x-text="(p.name || '未命名') + (p.model ? ' · ' + p.model : '')"></option>
               </template>
               <option x-show="!aiProviders.length" disabled selected>未配置 provider — 请去 ✦ AI → 🔌 连接 添加</option>
             </select>
             <div class="quick-ai-manage-row">
-              <button class="btn-edit" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false">⚙ 管理 provider</button>
+              <button class="btn-edit" @click="openTab('ai', 'connect'); quickAIOpen=false">⚙ 管理 provider</button>
             </div>
           </div>
 
@@ -75,7 +75,7 @@
               <strong class="quick-ai-section-title">最近 AI 调用</strong>
               <span class="quick-ai-actions">
                 <button class="icon-btn" @click="loadAITraces(); loadTraceStorage()" title="刷新">↻</button>
-                <button class="icon-btn" @click="tab='ai'; aiSubTab='connect'; quickAIOpen=false; setTimeout(()=>{aiTraceCollapsed=false}, 50)" title="去完整日志页">↗</button>
+                <button class="icon-btn" @click="openTab('ai', 'connect'); quickAIOpen=false; setTimeout(()=>{aiTraceCollapsed=false}, 50)" title="去完整日志页">↗</button>
               </span>
             </div>
             <template x-if="!(aiTraces || []).length">
@@ -123,7 +123,7 @@
 
       <label class="autolaunch-toggle" :class="{active: autoLaunchEnabled}" title="开机自启动 (点击切换)">
         <input type="checkbox" x-model="autoLaunchEnabled" @change="toggleAutoLaunch()" :disabled="autoLaunchSaving" />
-        <span x-text="autoLaunchEnabled ? '⏻ 自启 ✓' : '⏻ 自启'"></span>
+        <span>⏻<span class="hdr-label" x-text="autoLaunchEnabled ? ' 自启 ✓' : ' 自启'"></span></span>
       </label>
     </div>
   </header>
@@ -218,14 +218,14 @@
         <p class="host-muted">可用 <b x-text="hostBytes(hostSnapshot?.diskAvailable)"></b> / 总计 <b x-text="hostBytes(hostSnapshot?.diskTotal)"></b>。空间可能包含可清除数据及系统保留空间。</p>
         <div class="host-actions">
           <button class="btn-sm" @click="hostDiskTest()" :disabled="hostDiskBusy" x-text="hostDiskBusy ? '正在测速…' : '↻ 重新测速'"></button>
-          <span>进入主机页面时自动测速：写入并同步 64 MiB 临时文件，结束后删除；读取可能命中缓存。</span>
+          <span>首次打开主机页时自动测速，之后保留结果：写入并同步 64 MiB 临时文件，结束后删除；读取可能命中缓存。</span>
         </div>
         <div class="host-result" x-show="hostDiskResult">
           <div><small>顺序写入</small><strong x-text="hostBytes(hostDiskResult?.writeBytesPerSecond) + '/s'"></strong></div>
           <div><small>顺序读取</small><strong x-text="hostBytes(hostDiskResult?.readBytesPerSecond) + '/s'"></strong></div>
         </div>
         <div class="host-actions">
-          <button class="btn-sm" @click="hostAnalyzeStorage()" :disabled="hostStorageBusy" x-text="hostStorageBusy ? '正在分析…' : '分析 Mac 目录'"></button>
+          <button class="btn-sm" @click="hostAnalyzeStorage()" :disabled="hostStorageBusy" x-text="hostStorageBusy ? '正在分析…（约 30 秒）' : '分析 Mac 目录'"></button>
           <span>统计根目录各项（含隐藏目录）；不跨挂载点，权限不足或超时会标记为不完整。完整磁盘访问权限可提高覆盖率。</span>
         </div>
         <div class="host-network-list" x-show="hostStorage">
@@ -241,15 +241,18 @@
           <span class="host-tag">按网卡统计</span>
         </div>
         <div class="host-network-list">
-          <template x-for="network in hostRates" :key="network.name">
+          <template x-for="network in hostVisibleRates" :key="network.name">
             <div class="host-network-row"><b x-text="network.name"></b><span>↓ <span x-text="network.receive == null ? '采样中' : hostBytes(network.receive) + '/s'"></span></span><span>↑ <span x-text="network.send == null ? '采样中' : hostBytes(network.send) + '/s'"></span></span></div>
           </template>
           <p class="host-muted" x-show="!hostRates.length">等待网络接口数据</p>
+          <p class="host-muted" x-show="hostRates.length && !hostVisibleRates.length">当前没有网卡在收发数据</p>
         </div>
+        <button class="host-net-toggle" x-show="hostIdleNetCount > 0" @click="hostShowIdleNet = !hostShowIdleNet"
+          x-text="hostShowIdleNet ? '收起空闲网卡' : '显示 ' + hostIdleNetCount + ' 个空闲网卡'"></button>
         <p class="host-muted">按下载和上传速率之和降序排列；VPN / 虚拟接口可能与物理接口重复，不能直接相加。</p>
         <div class="host-actions">
           <button class="btn-sm" @click="hostNetworkTest()" :disabled="hostNetworkBusy" x-text="hostNetworkBusy ? '正在测速…' : '↻ 重新测速'"></button>
-          <span>进入主机页面时自动使用 macOS networkQuality 测速，可能消耗大量流量，结果受代理和测试节点影响。</span>
+          <span>首次打开主机页时自动使用 macOS networkQuality 测速，之后保留结果；每次测速可能消耗大量流量，结果受代理和测试节点影响。</span>
         </div>
         <div class="host-result" x-show="hostNetworkResult">
           <div><small>下载</small><strong x-text="((hostNetworkResult?.downloadBps || 0) / 1000000).toFixed(1) + ' Mbps'"></strong></div>
@@ -374,7 +377,7 @@
                         <span class="wb-item-dot" :class="wbStatusClass(s)"></span>
                         <span class="wb-item-main">
                           <span class="wb-item-name" x-text="s.name"></span>
-                          <span class="wb-item-desc" x-text="s.desc || baseName(s.path)"></span>
+                          <span class="wb-item-desc" x-text="wbItemSub(s)"></span>
                         </span>
                         <span class="wb-item-meta">
                           <span class="wb-item-star" x-show="s.favorite">★</span>
@@ -437,6 +440,20 @@
 
                   <!-- ── 运行 ── -->
                   <div class="wb-pane" x-show="wbPane==='run'">
+                    <template x-if="wbHealth.path === wbCurrent.path && wbHealth.result">
+                      <div class="wb-health" :class="(wbHealth.result.missingDeps || []).length || (wbHealth.result.healthUrl && !wbHealth.result.healthOk) ? 'is-warn' : 'is-ok'">
+                        <template x-if="(wbHealth.result.missingDeps || []).length">
+                          <span>⚠ 缺少依赖命令：<code x-text="wbHealth.result.missingDeps.join(', ')"></code>，运行可能失败</span>
+                        </template>
+                        <template x-if="!(wbHealth.result.missingDeps || []).length && (wbCurrent.requires || []).length">
+                          <span>✓ 依赖齐全</span>
+                        </template>
+                        <template x-if="wbHealth.result.healthUrl">
+                          <span x-text="wbHealth.result.healthOk ? '✓ 健康检查 ' + wbHealth.result.healthStatus + ' · ' + wbHealth.result.healthLatencyMs + 'ms' : '✗ 健康检查失败：' + (wbHealth.result.healthError || ('HTTP ' + wbHealth.result.healthStatus))"></span>
+                        </template>
+                        <button class="icon-btn" @click="wbCheckHealth(wbCurrent, true)" :aria-busy="wbHealth.loading" title="重新检查">↻</button>
+                      </div>
+                    </template>
                     <template x-if="wbCurrent.type==='service'">
                       <div class="wb-service">
                         <div class="status-info">
@@ -446,7 +463,7 @@
                         <div class="service-actions">
                           <template x-for="cmd in wbServiceCommands(wbCurrent)" :key="cmd">
                             <button @click="serviceAction(wbCurrent, cmd)"
-                              :disabled="(cmd==='start' && statuses[wbCurrent.path]==='running') || (cmd==='stop' && statuses[wbCurrent.path]!=='running')"
+                              :disabled="(cmd==='start' && statuses[wbCurrent.path]==='running') || (cmd==='stop' && statuses[wbCurrent.path]!=='running' && !(wbCurrent.commands || []).includes('stop'))"
                               :class="cmd==='start' ? 'btn-start' : cmd==='stop' ? 'btn-stop' : 'btn-restart'"
                               x-text="cmdLabel(cmd)"></button>
                           </template>
@@ -514,8 +531,8 @@
                   <div class="wb-pane" x-show="wbPane==='code'">
                     <div class="wb-ai-bar">
                       <span class="wb-ai-label">✦ AI</span>
-                      <input type="text" class="field-input" x-model="wbAI.instruction" placeholder="让 AI 修改：如「加参数校验」「失败时发通知」「改写成 python3」" @keydown.enter.prevent="wbAIGenerate()" :disabled="wbAI.busy" />
-                      <button class="btn-sm active" @click="wbAIGenerate()" :aria-busy="wbAI.busy" :disabled="wbAI.busy || !wbAI.instruction.trim()">生成修改</button>
+                      <input type="text" class="field-input" x-model="wbAI.instruction" placeholder="让 AI 修改：如「加参数校验」「失败时发通知」「改写成 python3」" @keydown.enter.prevent="wbAIGenerate()" :disabled="wbAI.busy || !!wbCode.blocked" />
+                      <button class="btn-sm active" @click="wbAIGenerate()" :aria-busy="wbAI.busy" :disabled="wbAI.busy || !!wbCode.blocked || !wbAI.instruction.trim()">生成修改</button>
                     </div>
                     <p class="field-hint" x-show="!aiReady">AI 未启用：请先在 ✦ AI → 连接 中配置。</p>
 
@@ -535,13 +552,21 @@
 
                     <div class="wb-editor">
                       <div class="wb-editor-bar">
-                        <span class="muted" x-text="wbCode.loading ? '读取中…' : (wbCodeDirty ? '● 未保存' : '已保存')"></span>
-                        <span class="wb-editor-actions">
+                        <span class="muted" x-text="wbCode.loading ? '读取中…' : wbCode.blocked ? '只读 · ' + formatBytes(wbCode.size) : (wbCodeDirty ? '● 未保存' : '已保存')"></span>
+                        <span class="wb-editor-actions" x-show="!wbCode.blocked">
                           <button class="btn-sm" @click="wbRevertCode()" :disabled="!wbCodeDirty">还原</button>
                           <button class="btn-sm active" @click="wbSaveCode()" :aria-busy="wbCode.saving" :disabled="!wbCodeDirty || wbCode.saving">保存 <kbd>⌘S</kbd></button>
                         </span>
                       </div>
-                      <textarea class="wb-code" x-model="wbCode.content" spellcheck="false" @keydown.meta.s.prevent="wbSaveCode()" @keydown.tab.prevent="wbInsertTab($event)"></textarea>
+                      <div class="wb-code-blocked" x-show="wbCode.blocked">
+                        <strong x-text="wbCode.blocked === 'binary' ? '这是二进制文件，无法作为文本显示' : '文件超过 1 MB，编辑器不加载以免卡顿'"></strong>
+                        <p class="muted" x-text="wbCode.blocked === 'binary' ? '可执行程序（如 kubectl）可以照常在「运行」中使用；名称、描述、参数请在「配置」里手动填写。' : '请用外部编辑器打开修改。'"></p>
+                        <div class="wb-code-blocked-actions">
+                          <button class="btn-sm" @click="revealFile(wbCode.path)">在 Finder 中显示</button>
+                          <button class="btn-sm active" @click="wbOpenPane('config')">去配置</button>
+                        </div>
+                      </div>
+                      <textarea class="wb-code" x-show="!wbCode.blocked" x-model="wbCode.content" spellcheck="false" @keydown.meta.s.prevent="wbSaveCode()" @keydown.tab.prevent="wbInsertTab($event)"></textarea>
                     </div>
                   </div>
 
@@ -646,14 +671,14 @@
                   <!-- ── 历史 ── -->
                   <div class="wb-pane" x-show="wbPane==='history'">
                     <p class="muted" x-show="historyLoading">加载中…</p>
-                    <p class="muted" x-show="!historyLoading && !historyRecords.length">还没有运行记录。</p>
+                    <p class="muted wb-empty-inline" x-show="!historyLoading && !historyRecords.length">还没有运行记录。<button class="btn-sm" @click="wbOpenPane('run')">▶ 去运行</button></p>
                     <div class="wb-history">
                       <template x-for="r in historyRecords" :key="r.id">
                         <div class="wb-history-item" :class="{ open: historyOpenId===r.id }">
                           <div class="wb-history-row" @click="viewHistoryLog(r)">
                             <span :class="r.exitCode===0 ? 'ok-mark' : 'err-mark'" x-text="r.exitCode===0 ? '✓' : '✗'"></span>
                             <span class="wb-history-time" x-text="wbRelTime(r.startedAt)"></span>
-                            <code class="wb-history-args" x-text="(r.args || []).join(' ') || '无参数'"></code>
+                            <code class="wb-history-args" :class="(r.args || []).length ? '' : 'is-empty'" x-text="(r.args || []).join(' ') || '无参数'"></code>
                             <span class="muted" x-text="wbDuration(r.durationMs)"></span>
                             <span class="wb-history-actions" @click.stop>
                               <button class="btn-sm" @click="rerunFromHistory(r)">重跑</button>
@@ -812,15 +837,21 @@
           <section class="settings-section">
             <div class="section-header-row">
               <h3>最近运行</h3>
-              <button class="btn-sm" @click="loadRecentRuns()">↻ 刷新</button>
+              <span class="wb-head-actions">
+                <span class="wb-seg wb-seg-sm">
+                  <button :class="!wbRunsFailedOnly ? 'active' : ''" @click="wbRunsFailedOnly = false">全部</button>
+                  <button :class="wbRunsFailedOnly ? 'active' : ''" @click="wbRunsFailedOnly = true" x-text="'仅失败 ' + wbRecentRuns.filter(r => r.exitCode !== 0).length"></button>
+                </span>
+                <button class="btn-sm" @click="loadRecentRuns()">↻ 刷新</button>
+              </span>
             </div>
             <p class="muted" x-show="!wbRecentRuns.length">还没有运行记录。</p>
             <div class="wb-history">
-              <template x-for="r in wbRecentRuns" :key="r.id">
+              <template x-for="r in (wbRunsFailedOnly ? wbRecentRuns.filter(r => r.exitCode !== 0) : wbRecentRuns)" :key="r.id">
                 <div class="wb-history-row wb-run-row-item" @click="wbOpenRun(r)">
                   <span :class="r.exitCode===0 ? 'ok-mark' : 'err-mark'" x-text="r.exitCode===0 ? '✓' : '✗'"></span>
                   <strong class="wb-history-name" x-text="wbScriptName(r.script)"></strong>
-                  <code class="wb-history-args" x-text="(r.args || []).join(' ') || '无参数'"></code>
+                  <code class="wb-history-args" :class="(r.args || []).length ? '' : 'is-empty'" x-text="(r.args || []).join(' ') || '无参数'"></code>
                   <span class="muted" x-text="wbDuration(r.durationMs)"></span>
                   <span class="wb-history-time" x-text="wbRelTime(r.startedAt)"></span>
                 </div>
@@ -900,58 +931,58 @@
       <!-- Left sidebar -->
       <nav class="ai-sidenav">
         <button class="ai-sidenav-item" :class="aiSubTab==='overview' ? 'active' : ''"
-          @click="aiSubTab='overview'; loadOverview()">
+          @click="aiGo('overview')">
           <span class="ai-sidenav-icon">📖</span>
           <span>概览</span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='connect' ? 'active' : ''"
-          @click="aiSubTab='connect'">
+          @click="aiGo('connect')">
           <span class="ai-sidenav-icon">🔌</span>
           <span>连接</span>
           <span class="ai-sidenav-badge" :class="aiReady ? 'badge-ok' : 'badge-warn'" x-text="aiReady ? '✓' : '!'"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='tools' ? 'active' : ''"
-          @click="aiSubTab='tools'; loadAIUsageStatuses()">
+          @click="aiGo('tools')">
           <span class="ai-sidenav-icon">🤖</span>
           <span>助手</span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='workspace' ? 'active' : ''"
-          @click="aiSubTab='workspace'; loadWorkspace()">
+          @click="aiGo('workspace')">
           <span class="ai-sidenav-icon">🗂</span>
           <span>工作区</span>
           <span class="ai-sidenav-count" x-show="workspaceProfiles.length > 0" x-text="workspaceProfiles.length"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='skills' ? 'active' : ''"
-          @click="aiSubTab='skills'; loadSkills()">
+          @click="aiGo('skills')">
           <span class="ai-sidenav-icon">📚</span>
           <span>Skills</span>
           <span class="ai-sidenav-count" x-show="skillsStats.total > 0" x-text="skillsStats.total"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='mcp' ? 'active' : ''"
-          @click="aiSubTab='mcp'; loadMCP()">
+          @click="aiGo('mcp')">
           <span class="ai-sidenav-icon">🧩</span>
           <span>MCP</span>
           <span class="ai-sidenav-count" x-show="mcpRowCount > 0" x-text="mcpRowCount"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='hooks' ? 'active' : ''"
-          @click="aiSubTab='hooks'; loadHooks()">
+          @click="aiGo('hooks')">
           <span class="ai-sidenav-icon">🪝</span>
           <span>Hooks</span>
           <span class="ai-sidenav-count" x-show="hooksStats.total > 0" x-text="hooksStats.total"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='docs' ? 'active' : ''"
-          @click="aiSubTab='docs'; loadDocLinks()">
+          @click="aiGo('docs')">
           <span class="ai-sidenav-icon">📎</span>
           <span>文档</span>
           <span class="ai-sidenav-count" x-show="docLinks.length > 0" x-text="docLinks.length"></span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='prompts' ? 'active' : ''"
-          @click="aiSubTab='prompts'; loadPromptTemplates()">
+          @click="aiGo('prompts')">
           <span class="ai-sidenav-icon">📝</span>
           <span>提示词</span>
         </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='data' ? 'active' : ''"
-          @click="aiSubTab='data'; loadDataInventory()">
+          @click="aiGo('data')">
           <span class="ai-sidenav-icon">📦</span>
           <span>数据</span>
         </button>
@@ -970,7 +1001,7 @@
             <div class="ai-dashboard-grid">
 
               <!-- 连接 -->
-              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='connect'" @keydown.enter="aiSubTab='connect'">
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiGo('connect')" @keydown.enter="aiGo('connect')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">🔌</span>
                   <span class="ai-dash-title">连接</span>
@@ -991,7 +1022,7 @@
               </div>
 
               <!-- Claude Code -->
-              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='tools'; loadAIUsageStatuses()" @keydown.enter="aiSubTab='tools'; loadAIUsageStatuses()">
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiGo('tools')" @keydown.enter="aiGo('tools')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">⚡</span>
                   <span class="ai-dash-title">Claude Code</span>
@@ -1018,7 +1049,7 @@
               </div>
 
               <!-- Codex -->
-              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='tools'; loadAIUsageStatuses()" @keydown.enter="aiSubTab='tools'; loadAIUsageStatuses()">
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiGo('tools')" @keydown.enter="aiGo('tools')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">🧠</span>
                   <span class="ai-dash-title">Codex</span>
@@ -1041,7 +1072,7 @@
               </div>
 
               <!-- Skills -->
-              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='skills'; loadSkills()" @keydown.enter="aiSubTab='skills'; loadSkills()">
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiGo('skills')" @keydown.enter="aiGo('skills')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">📚</span>
                   <span class="ai-dash-title">Skills</span>
@@ -1053,7 +1084,7 @@
               </div>
 
               <!-- MCP -->
-              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='mcp'; loadMCP()" @keydown.enter="aiSubTab='mcp'; loadMCP()">
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiGo('mcp')" @keydown.enter="aiGo('mcp')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">🧩</span>
                   <span class="ai-dash-title">MCP</span>
@@ -1066,7 +1097,7 @@
               </div>
 
               <!-- Hooks -->
-              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='hooks'; loadHooks()" @keydown.enter="aiSubTab='hooks'; loadHooks()">
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiGo('hooks')" @keydown.enter="aiGo('hooks')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">🪝</span>
                   <span class="ai-dash-title">Hooks</span>
@@ -1078,7 +1109,7 @@
               </div>
 
               <!-- Docs -->
-              <div class="ai-dash-card" role="button" tabindex="0" @click="aiSubTab='docs'; loadDocLinks()" @keydown.enter="aiSubTab='docs'; loadDocLinks()">
+              <div class="ai-dash-card" role="button" tabindex="0" @click="aiGo('docs')" @keydown.enter="aiGo('docs')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">📎</span>
                   <span class="ai-dash-title">文档</span>
@@ -1091,7 +1122,7 @@
               </div>
 
               <!-- 最近报错 -->
-              <div class="ai-dash-card ai-dash-card-wide" role="button" tabindex="0" @click="aiSubTab='connect'" @keydown.enter="aiSubTab='connect'">
+              <div class="ai-dash-card ai-dash-card-wide" role="button" tabindex="0" @click="aiGo('connect')" @keydown.enter="aiGo('connect')">
                 <div class="ai-dash-head">
                   <span class="ai-dash-icon">📡</span>
                   <span class="ai-dash-title">最近 AI 报错</span>
@@ -1119,7 +1150,7 @@
             <p class="hint">2. 前往「Skills」管理本地 Skill 仓库，一键同步到 Claude Code / Codex。</p>
             <p class="hint">3. 前往「MCP / Hooks / 文档」管理工具能力、自动化钩子和本地资料入口。</p>
             <p class="hint">4. 前往「助手」检测 Claude Code 和 Codex 安装状态及用量。</p>
-            <button class="secondary" @click="aiSubTab='connect'" x-show="!aiReady" style="margin-top:8px">
+            <button class="secondary" @click="aiGo('connect')" x-show="!aiReady" style="margin-top:8px">
               → 去配置 AI 连接
             </button>
           </section>
@@ -1152,12 +1183,14 @@
                     <span class="provider-model muted text-xs" x-text="p.model"></span>
                   </div>
                   <div class="provider-actions">
+                    <span class="provider-secondary">
+                      <button class="btn-sm" @click="copyToClipboard(p.baseUrl, 'Base URL')" title="复制 Base URL 到剪贴板">⧉ URL</button>
+                      <button class="btn-sm" @click="copyToClipboard(p.model, '模型名')" title="复制模型名到剪贴板">⧉ 模型</button>
+                      <button class="btn-sm" @click="duplicateProvider(p)" title="基于此条目新建一个提供商">另存为新</button>
+                    </span>
                     <button class="btn-sm" x-show="activeProviderID !== p.id"
                       @click="setActiveProvider(p.id)">切换</button>
                     <span class="badge badge-ok provider-badge-active" x-show="activeProviderID === p.id">活跃</span>
-                    <button class="btn-sm" @click="copyToClipboard(p.baseUrl, 'Base URL')" title="复制 Base URL">⧉ URL</button>
-                    <button class="btn-sm" @click="copyToClipboard(p.model, '模型名')" title="复制模型名">⧉ 模型</button>
-                    <button class="btn-sm" @click="duplicateProvider(p)" title="基于此条目复制为新提供商">复制</button>
                     <button class="btn-sm" @click="openProviderEditor(p)">编辑</button>
                     <button class="btn-sm btn-danger-sm" @click="deleteProvider(p.id)">✕</button>
                   </div>
@@ -1178,6 +1211,7 @@
             </div>
 
             <!-- Provider editor form -->
+            <template x-if="providerForm">
             <div class="provider-editor" x-show="providerForm !== null" x-transition>
               <div class="provider-editor-header">
                 <strong x-text="providerForm?._isNew ? '新增提供商' : '编辑提供商'"></strong>
@@ -1215,6 +1249,7 @@
                 </div>
               </div>
             </div>
+            </template>
           </section>
 
           <!-- Trace log -->
@@ -1370,6 +1405,7 @@
               </div>
             </div>
 
+            <template x-if="workspaceFormOpen && workspaceForm">
             <div class="workspace-editor" x-show="workspaceFormOpen" x-transition>
               <div class="workspace-editor-head">
                 <strong x-text="workspaceForm?.id ? '编辑工作区画像' : '新建工作区画像'"></strong>
@@ -1388,6 +1424,7 @@
                 <div class="workspace-resource-section">
                   <strong x-text="section.label"></strong>
                   <div class="workspace-resource-list">
+                    <p class="muted text-sm" x-show="!(section.items || []).length" x-text="'还没有 ' + section.label + '，可先在对应页面添加'"></p>
                     <template x-for="item in section.items" :key="item[section.id]">
                       <div class="workspace-resource-row">
                         <span x-text="item.name || item[section.id]"></span>
@@ -1403,6 +1440,7 @@
                 <button class="btn-primary" @click="saveWorkspaceProfile()">保存画像</button>
               </div>
             </div>
+            </template>
 
             <div class="workspace-snapshots" x-show="workspaceSnapshots.length > 0">
               <strong>最近应用快照</strong>
@@ -1652,13 +1690,13 @@
                     </div>
                     <div class="mcp-chips">
                       <template x-for="e in row.entries" :key="e.locationKey">
-                        <span class="mcp-chip" :class="mcpEntryState(e).cls" :title="e.readOnlyReason || e.file || ''">
+                        <label class="mcp-chip" :class="mcpEntryState(e).cls" :title="e.readOnlyReason || e.file || ''">
                           <template x-if="!e.readOnly">
-                            <input type="checkbox" :checked="e.enabled" :disabled="mcpIsBusy(row.name, e.locationKey, 'toggle') || (e.stale && !e.enabled)" @change="setMCPEntryEnabled(row, e, $event.target.checked)" />
+                            <input type="checkbox" :checked="e.enabled" :disabled="!!(mcpIsBusy(row.name, e.locationKey, 'toggle') || (e.stale && !e.enabled))" @change="setMCPEntryEnabled(row, e, $event.target.checked)" />
                           </template>
                           <span x-text="e.label"></span>
                           <span class="mcp-probe-dot" :class="mcpProbeClass(e.probe)" :title="e.probe ? e.probe.summary : '未测试'"></span>
-                        </span>
+                        </label>
                       </template>
                     </div>
                   </div>
@@ -1864,7 +1902,7 @@
                           <select class="field-input" x-model="mcpAdd.project" @change="mcpAdd.plan=null">
                             <option value="">（可选）写入某个项目…</option>
                             <template x-for="p in (mcpInventory?.projects || [])" :key="p.path">
-                              <option :value="p.path" x-text="p.name + ' — ' + p.path"></option>
+                              <option :value="p.path" :selected="p.path === mcpAdd.project" x-text="p.name + ' — ' + p.path"></option>
                             </template>
                           </select>
                           <template x-if="mcpAdd.project">
@@ -1952,7 +1990,7 @@
                     <span class="hook-field-label">事件</span>
                     <select x-model="hookForm.event">
                       <template x-for="e in hookEventSupport" :key="e.event">
-                        <option :value="e.event" x-text="e.label + ' (' + e.event + ')'"></option>
+                        <option :value="e.event" :selected="e.event === hookForm.event" x-text="e.label + ' (' + e.event + ')'"></option>
                       </template>
                     </select>
                   </label>
@@ -2161,7 +2199,7 @@
                 <!-- 当前配置 status 展示行 -->
                 <div class="cc-current-row agent-current-row">
                   <span class="cc-current-label">当前配置</span>
-                  <span class="badge cc-model-badge" x-text="claudeCodeConfig.effectiveModel ? modelLabel(claudeCodeConfig.effectiveModel) : (claudeCodeConfig.model ? modelLabel(claudeCodeConfig.model) : '加载中…')"></span>
+                  <span class="badge cc-model-badge" x-text="claudeCodeConfig.effectiveModel ? modelLabel(claudeCodeConfig.effectiveModel) : (claudeCodeConfig.model ? modelLabel(claudeCodeConfig.model) : '系统默认模型')"></span>
                   <span class="badge cc-effort-badge" :class="'cc-effort-'+(claudeCodeConfig.effortLevel||'default')" x-text="effortLabel(claudeCodeConfig.effortLevel)"></span>
                   <span class="cc-default-hint" x-show="!claudeCodeConfig.model && claudeCodeConfig.effectiveModel">系统默认</span>
                 </div>
@@ -2173,16 +2211,16 @@
                     <select class="cc-config-select agent-config-select" x-model="claudeCodeConfig.model" @change="normalizeClaudeEffort(claudeCodeConfig)">
                       <option value="">系统默认</option>
                       <template x-if="claudeCodeConfig.model && !isKnownClaudeModel(claudeCodeConfig.model)">
-                        <option :value="claudeCodeConfig.model" x-text="claudeCodeConfig.model + ' · 当前/自定义'"></option>
+                        <option :value="claudeCodeConfig.model" x-text="claudeCodeConfig.model + ' · 当前/自定义'" selected></option>
                       </template>
                       <optgroup label="别名 · 跟随最新">
                         <template x-for="model in claudeModels.filter(m => m.kind === 'alias')" :key="model.value">
-                          <option :value="model.value" x-text="model.value + ' · ' + model.label"></option>
+                          <option :value="model.value" :selected="model.value === claudeCodeConfig.model" x-text="model.value + ' · ' + model.label"></option>
                         </template>
                       </optgroup>
                       <optgroup label="固定版本">
                         <template x-for="model in claudeModels.filter(m => m.kind === 'pinned')" :key="model.value">
-                          <option :value="model.value" x-text="model.value"></option>
+                          <option :value="model.value" :selected="model.value === claudeCodeConfig.model" x-text="model.value"></option>
                         </template>
                       </optgroup>
                     </select>
@@ -2265,16 +2303,16 @@
                     <select class="cc-config-select" x-model="claudeCodePresetForm.model" @change="normalizeClaudeEffort(claudeCodePresetForm)">
                       <option value="">系统默认</option>
                       <template x-if="claudeCodePresetForm.model && !isKnownClaudeModel(claudeCodePresetForm.model)">
-                        <option :value="claudeCodePresetForm.model" x-text="claudeCodePresetForm.model + ' · 当前/自定义'"></option>
+                        <option :value="claudeCodePresetForm.model" x-text="claudeCodePresetForm.model + ' · 当前/自定义'" selected></option>
                       </template>
                       <optgroup label="别名 · 跟随最新">
                         <template x-for="model in claudeModels.filter(m => m.kind === 'alias')" :key="model.value">
-                          <option :value="model.value" x-text="model.value + ' · ' + model.label"></option>
+                          <option :value="model.value" :selected="model.value === claudeCodePresetForm.model" x-text="model.value + ' · ' + model.label"></option>
                         </template>
                       </optgroup>
                       <optgroup label="固定版本">
                         <template x-for="model in claudeModels.filter(m => m.kind === 'pinned')" :key="model.value">
-                          <option :value="model.value" x-text="model.value"></option>
+                          <option :value="model.value" :selected="model.value === claudeCodePresetForm.model" x-text="model.value"></option>
                         </template>
                       </optgroup>
                     </select>
@@ -2394,16 +2432,16 @@
                     <select class="codex-model-config-select agent-config-select" x-model="codexModelConfig.model" @change="normalizeCodexEffort(codexModelConfig)">
                       <option value="">系统默认</option>
                       <template x-if="codexModelConfig.model && !isKnownCodexModel(codexModelConfig.model)">
-                        <option :value="codexModelConfig.model" x-text="codexModelConfig.model + ' · 当前/自定义'"></option>
+                        <option :value="codexModelConfig.model" x-text="codexModelConfig.model + ' · 当前/自定义'" selected></option>
                       </template>
                       <optgroup label="最新">
                         <template x-for="model in codexModels.filter(m => m.kind === 'current')" :key="model.value">
-                          <option :value="model.value" x-text="model.label"></option>
+                          <option :value="model.value" :selected="model.value === codexModelConfig.model" x-text="model.label"></option>
                         </template>
                       </optgroup>
                       <optgroup label="旧版 · 逐步下线">
                         <template x-for="model in codexModels.filter(m => m.kind === 'legacy')" :key="model.value">
-                          <option :value="model.value" x-text="model.label"></option>
+                          <option :value="model.value" :selected="model.value === codexModelConfig.model" x-text="model.label"></option>
                         </template>
                       </optgroup>
                     </select>
@@ -2492,16 +2530,16 @@
                     <select class="codex-model-config-select" x-model="codexPresetForm.model" @change="normalizeCodexEffort(codexPresetForm)">
                       <option value="">系统默认</option>
                       <template x-if="codexPresetForm.model && !isKnownCodexModel(codexPresetForm.model)">
-                        <option :value="codexPresetForm.model" x-text="codexPresetForm.model + ' · 当前/自定义'"></option>
+                        <option :value="codexPresetForm.model" x-text="codexPresetForm.model + ' · 当前/自定义'" selected></option>
                       </template>
                       <optgroup label="最新">
                         <template x-for="model in codexModels.filter(m => m.kind === 'current')" :key="model.value">
-                          <option :value="model.value" x-text="model.label"></option>
+                          <option :value="model.value" :selected="model.value === codexPresetForm.model" x-text="model.label"></option>
                         </template>
                       </optgroup>
                       <optgroup label="旧版 · 逐步下线">
                         <template x-for="model in codexModels.filter(m => m.kind === 'legacy')" :key="model.value">
-                          <option :value="model.value" x-text="model.label"></option>
+                          <option :value="model.value" :selected="model.value === codexPresetForm.model" x-text="model.label"></option>
                         </template>
                       </optgroup>
                     </select>
@@ -2658,7 +2696,7 @@
               </div>
               </div>
             </template>
-            <div class="prompt-actions-row">
+            <div class="prompt-actions-row prompt-save-bar">
               <button @click="savePromptTemplates()" :aria-busy="promptSaving">💾 保存模板</button>
               <button class="secondary" @click="resetPromptTemplate()">↺ 全部清空（恢复默认）</button>
             </div>
@@ -2751,6 +2789,25 @@
 
             <div class="prompt-actions-row">
               <button class="secondary" @click="loadDataInventory()">↻ 刷新</button>
+            </div>
+          </section>
+
+          <section class="settings-section ai-section">
+            <h3 class="ai-section-title">🗄 备份与恢复</h3>
+            <p class="ai-section-desc">打包 config.json、脚本缓存和 Skills 主目录。恢复前会自动备份当前配置，恢复后建议重启 Hatch。</p>
+            <div class="backup-row">
+              <button class="btn-sm active" @click="exportHatchBackup()" :aria-busy="backupBusy" :disabled="backupBusy">导出备份到桌面</button>
+              <template x-if="backupResult">
+                <span class="backup-result">
+                  <span class="muted" x-text="backupResult.numFiles + ' 个文件 · ' + formatBytes(backupResult.size)"></span>
+                  <code x-text="backupResult.path"></code>
+                  <button class="btn-sm" @click="revealFile(backupResult.path)">在 Finder 中显示</button>
+                </span>
+              </template>
+            </div>
+            <div class="backup-row">
+              <input type="text" class="field-input" x-model="backupImportPath" placeholder="/Users/you/Desktop/hatch-backup-20261028-101500.zip" @keydown.enter="importHatchBackup()" />
+              <button class="btn-sm" @click="importHatchBackup()" :disabled="backupBusy || !backupImportPath.trim()">从 zip 恢复</button>
             </div>
           </section>
         </div>
@@ -3133,7 +3190,7 @@
                 <button class="btn-sm" @click="suggestVocab()" :aria-busy="vocabAIBusy" :disabled="!vocabDraft.word.trim() || !aiReady" :title="aiReady ? 'AI 补全中文释义、搭配和例句' : '先在 ✦ AI 中启用'">✦ AI 补全</button>
                 <span class="wb-form-bar-spacer"></span>
                 <button class="btn-sm secondary danger-text" x-show="vocabDraft.id" @click="deleteVocab(vocabDraft)">删除</button>
-                <button class="btn-sm active" @click="saveVocabDraft()" :aria-busy="vocabSaving" :disabled="!vocabDraft.word.trim() || (vocabDraft.id && !vocabDraftDirty)" x-text="vocabDraft.id ? '保存' : '加入单词本'"></button>
+                <button class="btn-sm active" @click="saveVocabDraft()" :aria-busy="vocabSaving" :disabled="!!(!vocabDraft.word.trim() || (vocabDraft.id && !vocabDraftDirty))" x-text="vocabDraft.id ? '保存' : '加入单词本'"></button>
               </div>
               <p class="muted text-xs vocab-review-info" x-show="vocabDraft.id" x-text="vocabLevelTitle(vocabDraft)"></p>
             </aside>
@@ -3224,7 +3281,7 @@
             <div class="retention-note">清理只删除 Hatch 托管目录里的附件文件，不删除备忘录文字记录。</div>
             <div class="prompt-actions-row">
               <button class="secondary" @click="cleanupMemoFilesNow()">🗑 立即清理过期附件</button>
-              <button class="secondary" x-show="moduleOn('ai')" @click="loadDataInventory(); tab='ai'; aiSubTab='data'">查看全部数据目录</button>
+              <button class="secondary" x-show="moduleOn('ai')" @click="openTab('ai', 'data')">查看全部数据目录</button>
             </div>
           </section>
         </div>
@@ -3356,7 +3413,6 @@
     </section>
 
     <!-- 全局消息条 -->
-    <div class="vpn-msg-bar" x-show="vpnMsg" x-text="vpnMsg"></div>
 
     <!-- Layout: sidenav + content -->
     <div class="ai-layout">
@@ -3788,7 +3844,7 @@
                 <span x-text="vpnBackupPreview && vpnBackupPreview.valid ? '可恢复' : '需检查'"></span>
                 <span x-text="'文件数: ' + (vpnBackupPreview && vpnBackupPreview.numFiles || 0)"></span>
                 <span x-show="vpnBackupPreview && vpnBackupPreview.keyFiles && vpnBackupPreview.keyFiles.length"
-                      x-text="'关键文件: ' + vpnBackupPreview.keyFiles.join(', ')"></span>
+                      x-text="'关键文件: ' + (vpnBackupPreview?.keyFiles || []).join(', ')"></span>
               </div>
               <template x-for="warn in (vpnBackupPreview && vpnBackupPreview.warnings || [])">
                 <div class="vpn-path-validation-row vpn-health-warn" x-text="warn"></div>

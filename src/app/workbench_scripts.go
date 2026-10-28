@@ -124,10 +124,23 @@ func (a *App) trackServices(scripts []config.ScriptMeta) {
 		if s.Type != config.TypeService {
 			continue
 		}
-		if _, ok := a.services[s.Path]; !ok {
-			a.services[s.Path] = executor.NewServiceManager(s.Path, s.PidFile, executor.NewEmitter(a.ctx))
+		if sm, ok := a.services[s.Path]; ok {
+			_, scriptPid := executor.SplitPidFile(s.PidFile)
+			sm.Configure(s.Commands, scriptPid) // commands / pid file may change between scans
+		} else {
+			a.services[s.Path] = a.newServiceManager(s)
 		}
 	}
+}
+
+// newServiceManager builds a ServiceManager from script metadata: detected
+// commands decide which action words reach the script, and a pid file outside
+// /tmp/hatch is treated as the script's own.
+func (a *App) newServiceManager(s config.ScriptMeta) *executor.ServiceManager {
+	hatchPid, scriptPid := executor.SplitPidFile(s.PidFile)
+	sm := executor.NewServiceManager(s.Path, hatchPid, executor.NewEmitter(a.ctx))
+	sm.Configure(s.Commands, scriptPid)
+	return sm
 }
 
 // scriptMetas returns the user override (if any) and the last scanned meta

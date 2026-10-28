@@ -76,6 +76,11 @@ func SetTOMLStringKey(content, key, value string) string {
 		if line == "" || isTOMLKeyLine(line, key) {
 			continue
 		}
+		// Collapse blank runs: every write adds a separator line, so keeping
+		// old blanks would grow the preamble by one line per save.
+		if strings.TrimSpace(line) == "" && (len(kept) == 0 || strings.TrimSpace(kept[len(kept)-1]) == "") {
+			continue
+		}
 		kept = append(kept, line)
 	}
 	content = strings.TrimLeft(strings.Join(kept, "")+rest, "\n")

@@ -67,8 +67,10 @@ func Export(targetDir, skillsDir string) (Result, error) {
 			if err != nil || d.IsDir() {
 				return nil
 			}
-			rel, _ := filepath.Rel(filepath.Dir(skillsDir), path)
-			return addFile(path, filepath.Join("skills", rel))
+			// Relative to skillsDir itself: entries are skills/<name>/…, which is
+			// what Import expects (older builds wrote skills/skills/<name>/…).
+			rel, _ := filepath.Rel(skillsDir, path)
+			return addFile(path, filepath.ToSlash(filepath.Join("skills", rel)))
 		})
 	}
 
@@ -97,14 +99,22 @@ func Import(zipPath, skillsDir string) (int, error) {
 		return 0, err
 	}
 
+	legacy := legacySkillsPrefix(r.File)
 	restored := 0
 	for _, f := range r.File {
 		var dst string
 		switch {
 		case f.Name == "config.json", f.Name == "scripts.json":
 			dst = filepath.Join(hatchDir, f.Name)
+			// Keep the current file restorable: a wrong zip shouldn't cost the config.
+			if err := fsutil.BackupIfExists(dst); err != nil {
+				return restored, err
+			}
 		case strings.HasPrefix(f.Name, "skills/"):
-			dst = filepath.Join(skillsDir, strings.TrimPrefix(f.Name, "skills/"))
+			dst = filepath.Join(skillsDir, strings.TrimPrefix(strings.TrimPrefix(f.Name, "skills/"), legacy))
+			if !fsutil.IsPathInside(dst, skillsDir) { // zip-slip: "skills/../../x"
+				continue
+			}
 			_ = os.MkdirAll(filepath.Dir(dst), 0o755)
 		default:
 			continue
@@ -114,6 +124,31 @@ func Import(zipPath, skillsDir string) (int, error) {
 		}
 	}
 	return restored, nil
+}
+
+// legacySkillsPrefix detects zips from builds that nested skills one level too
+// deep (skills/skills/<name>/…): every skills entry shares one top folder and
+// none sits directly in it as SKILL.md. Returns "<folder>/" to strip, or "".
+func legacySkillsPrefix(files []*zip.File) string {
+	top, seen := "", false
+	for _, f := range files {
+		rest, ok := strings.CutPrefix(f.Name, "skills/")
+		if !ok || f.FileInfo().IsDir() {
+			continue
+		}
+		parts := strings.SplitN(rest, "/", 3)
+		if len(parts) < 3 {
+			return "" // skills/<name>/<file>: current layout
+		}
+		if seen && parts[0] != top {
+			return ""
+		}
+		top, seen = parts[0], true
+	}
+	if !seen {
+		return ""
+	}
+	return top + "/"
 }
 
 func writeZipEntry(f *zip.File, dst string) error {

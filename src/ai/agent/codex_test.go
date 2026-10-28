@@ -191,3 +191,15 @@ func TestMigratePresetsCoversEveryPastGeneration(t *testing.T) {
 		t.Fatalf("Claude 5.0 default not migrated: %#v", gotC)
 	}
 }
+
+func TestSetTOMLStringKeyDoesNotAccumulateBlankLines(t *testing.T) {
+	content := "[features]\ngoals = false\n"
+	for i := 0; i < 5; i++ {
+		content = SetTOMLStringKey(content, "model_reasoning_effort", "high")
+		content = SetTOMLStringKey(content, "model", "gpt-6-sol")
+	}
+	want := "model = \"gpt-6-sol\"\n\nmodel_reasoning_effort = \"high\"\n\n[features]\ngoals = false\n"
+	if content != want {
+		t.Fatalf("repeated writes changed layout:\n%q\nwant\n%q", content, want)
+	}
+}

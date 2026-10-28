@@ -3,6 +3,7 @@
 package macos
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -68,6 +69,9 @@ func MoveToTrash(path string) (string, error) {
 		return "", err
 	}
 	trash := filepath.Join(home, ".Trash")
+	if err := os.MkdirAll(trash, 0o700); err != nil {
+		return "", err
+	}
 	base := filepath.Base(path)
 	dst := filepath.Join(trash, base)
 	if _, err := os.Stat(dst); err == nil {
@@ -75,6 +79,16 @@ func MoveToTrash(path string) (string, error) {
 		dst = filepath.Join(trash, fmt.Sprintf("%s %s%s", strings.TrimSuffix(base, ext), time.Now().Format("150405"), ext))
 	}
 	if err := os.Rename(path, dst); err != nil {
+		// A file on another volume can't be renamed into ~/.Trash; let Finder
+		// move it to that volume's own trash instead.
+		if errors.Is(err, syscall.EXDEV) {
+			abs, _ := filepath.Abs(path)
+			script := fmt.Sprintf(`tell application "Finder" to delete (POSIX file %q as alias)`, abs)
+			if out, ferr := exec.Command("osascript", "-e", script).CombinedOutput(); ferr != nil {
+				return "", fmt.Errorf("移到废纸篓失败: %s", strings.TrimSpace(string(out)))
+			}
+			return "", nil
+		}
 		return "", err
 	}
 	return dst, nil

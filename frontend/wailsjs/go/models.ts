@@ -1137,6 +1137,29 @@ export namespace executor {
 
 }
 
+export namespace fsutil {
+	
+	export class TextFile {
+	    content: string;
+	    size: number;
+	    binary: boolean;
+	    truncated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TextFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.content = source["content"];
+	        this.size = source["size"];
+	        this.binary = source["binary"];
+	        this.truncated = source["truncated"];
+	    }
+	}
+
+}
+
 export namespace hooks {
 	
 	export class EventInfo {

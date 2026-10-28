@@ -431,7 +431,7 @@ func (m Manager) CheckHealth() HealthReport {
 	default:
 		report.Summary = "VPN 配置存在需要处理的问题。"
 	}
-	report.Actions = append(report.Actions, HealthAction{Label: "重新体检", Tab: "overview"})
+	// No "重新体检" action: the health panel header already has that button.
 	return report
 }
 
@@ -1223,15 +1223,15 @@ func (m Manager) ImportBackup(zipPath string) (string, error) {
 func (m Manager) ListBackups() []string {
 	backupDir, err := m.EnsureBackupDir()
 	if err != nil {
-		return nil
+		return []string{}
 	}
 
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {
-		return nil
+		return []string{}
 	}
 
-	var paths []string
+	paths := []string{} // empty JSON array, not null, for the frontend
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasPrefix(e.Name(), "clash-verge-") && strings.HasSuffix(e.Name(), ".zip") {
 			paths = append(paths, filepath.Join(backupDir, e.Name()))

@@ -3,12 +3,12 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"hatch/ai/llm"
 	"hatch/ai/prompts"
 	"hatch/core/config"
+	"hatch/core/fsutil"
 	"hatch/workbench/zshrc"
 )
 
@@ -42,14 +42,14 @@ func (a *App) SuggestScriptMeta(meta config.ScriptMeta) (AIScriptSuggestion, err
 	if err != nil {
 		return AIScriptSuggestion{}, err
 	}
-	data, err := os.ReadFile(meta.Path)
+	tf, err := fsutil.ReadTextFile(meta.Path, 12000)
 	if err != nil {
 		return AIScriptSuggestion{}, err
 	}
-	content := string(data)
-	if len(content) > 12000 {
-		content = content[:12000]
+	if tf.Binary {
+		return AIScriptSuggestion{}, fmt.Errorf("二进制文件无法让 AI 分析，请在「配置」里手动填写")
 	}
+	content := tf.Content
 	userBytes, _ := json.Marshal(map[string]any{
 		"path":     meta.Path,
 		"name":     meta.Name,

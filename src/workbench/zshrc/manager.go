@@ -88,7 +88,7 @@ func WriteBlock(zshrcPath string, exports map[string]string) error {
 // with InPath set are appended to PATH; the rest are plain exports.
 func WriteVars(zshrcPath string, vars []Var) error {
 	data, err := os.ReadFile(zshrcPath)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) { // macOS doesn't create ~/.zshrc by default
 		return err
 	}
 	content := string(data)

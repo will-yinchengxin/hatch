@@ -12,13 +12,21 @@ import (
 
 // ─── 工作台 · 脚本文件与诊断 ─────────────────────────────────────────────────
 
-// ReadScriptFile returns the raw text content of a script file.
-func (a *App) ReadScriptFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
+// scriptEditorMaxBytes caps what the code editor loads; larger files (or
+// binaries such as kubectl) are reported instead of streamed into a textarea.
+const scriptEditorMaxBytes = 1 << 20
+
+// ReadScriptFile returns a script's text for the editor. Binary or oversized
+// files come back flagged with empty Content so the UI can show a notice.
+func (a *App) ReadScriptFile(path string) (fsutil.TextFile, error) {
+	tf, err := fsutil.ReadTextFile(path, scriptEditorMaxBytes)
 	if err != nil {
-		return "", err
+		return fsutil.TextFile{}, err
 	}
-	return string(data), nil
+	if tf.Truncated {
+		tf.Content = ""
+	}
+	return tf, nil
 }
 
 // WriteScriptFile writes new content to an existing script file.

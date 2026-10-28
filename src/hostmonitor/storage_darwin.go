@@ -7,8 +7,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+// storageWorkers bounds concurrent du processes during storage analysis.
+const storageWorkers = 4
 
 type StorageEntry struct {
 	Name    string `json:"name"`
@@ -39,17 +43,35 @@ func analyzeStorageRoot(root string, usage func(string) ([]byte, error)) ([]Stor
 	if err != nil {
 		return nil, err
 	}
-	entries := make([]StorageEntry, 0, len(children))
+	var names []string
 	for _, child := range children {
 		// Symlinks are aliases on macOS; following them would count data twice.
 		if child.Type()&os.ModeSymlink != 0 {
 			continue
 		}
-		name := child.Name()
-		data, runErr := usage(filepath.Join(root, name))
-		bytes, parseErr := parseDiskUsage(string(data))
-		entries = append(entries, StorageEntry{Name: name, Bytes: bytes, Partial: runErr != nil || parseErr != nil})
+		names = append(names, child.Name())
 	}
+	// du per top-level folder is slow (/Users, /System, /Library each take
+	// seconds to minutes); a small worker pool cuts the wall time several-fold.
+	entries := make([]StorageEntry, len(names))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for w := 0; w < storageWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				data, runErr := usage(filepath.Join(root, names[i]))
+				bytes, parseErr := parseDiskUsage(string(data))
+				entries[i] = StorageEntry{Name: names[i], Bytes: bytes, Partial: runErr != nil || parseErr != nil}
+			}
+		}()
+	}
+	for i := range names {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
 	sort.Slice(entries, func(left, right int) bool { return entries[left].Bytes > entries[right].Bytes })
 	return entries, nil
 }

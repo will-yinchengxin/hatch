@@ -263,11 +263,31 @@ func (a *App) previewWorkspaceProfile(p config.AIWorkspaceProfile) workspace.Pre
 		out.Errors = append(out.Errors, "工作区目录不存在或不是目录: "+p.RootPath)
 	}
 	claude, codex := agent.ReadClaudeCodeConfig(), agent.ReadCodexModelConfig()
-	if claude.Model != p.ClaudeModel || claude.EffortLevel != p.ClaudeEffort {
-		out.Changes = append(out.Changes, "Claude Code 模型或推理档位将更新")
+	orDefault := func(v string) string {
+		if v == "" {
+			return "默认"
+		}
+		return v
 	}
-	if codex.Model != p.CodexModel || codex.EffortLevel != p.CodexEffort || codex.GoalsEnabled != p.CodexGoals {
-		out.Changes = append(out.Changes, "Codex 模型、推理档位或 Goals 将更新")
+	change := func(label, from, to string) {
+		if from != to {
+			out.Changes = append(out.Changes, label+"："+orDefault(from)+" → "+orDefault(to))
+		}
+	}
+	change("Claude Code 模型", claude.Model, p.ClaudeModel)
+	change("Claude Code 推理档位", claude.EffortLevel, p.ClaudeEffort)
+	change("Codex 模型", codex.Model, p.CodexModel)
+	change("Codex 推理档位", codex.EffortLevel, p.CodexEffort)
+	if codex.GoalsEnabled != p.CodexGoals {
+		out.Changes = append(out.Changes, map[bool]string{true: "Codex Goals：关闭 → 开启", false: "Codex Goals：开启 → 关闭"}[p.CodexGoals])
+	}
+	// onOff describes a sync toggle the same way apply will perform it.
+	onOff := func(kind, name, target string, want bool) {
+		verb := "停止同步到"
+		if want {
+			verb = "同步到"
+		}
+		out.Changes = append(out.Changes, kind+"「"+name+"」将"+verb+" "+target)
 	}
 	a.mu.RLock()
 	hookList := hooks.Clone(a.cfg.Hooks)
@@ -288,13 +308,25 @@ func (a *App) previewWorkspaceProfile(p config.AIWorkspaceProfile) workspace.Pre
 			}
 		}
 		if list, err := st.List(); err == nil {
+			// Mirror applyWorkspaceProfile: every skill is brought in line with the
+			// profile, including ones the profile doesn't list (= turned off).
 			for _, skill := range list {
 				desired := workspace.SelectionFor(p.Skills, skill.Name)
-				if skill.InClaude && !desired.Claude && !st.TargetMatchesMaster(skill.Name, skills.TargetClaude) {
-					out.Warnings = append(out.Warnings, "Skill「"+skill.Name+"」在 Claude 中不是 Hatch 当前版本，将保留不变")
-				}
-				if skill.InCodex && !desired.Codex && !st.TargetMatchesMaster(skill.Name, skills.TargetCodex) {
-					out.Warnings = append(out.Warnings, "Skill「"+skill.Name+"」在 Codex 中不是 Hatch 当前版本，将保留不变")
+				for _, t := range []struct {
+					target, label string
+					current, want bool
+				}{
+					{skills.TargetClaude, "Claude", skill.InClaude, desired.Claude},
+					{skills.TargetCodex, "Codex", skill.InCodex, desired.Codex},
+				} {
+					if t.current == t.want {
+						continue
+					}
+					if !t.want && !st.TargetMatchesMaster(skill.Name, t.target) {
+						out.Warnings = append(out.Warnings, "Skill「"+skill.Name+"」在 "+t.label+" 中不是 Hatch 当前版本，将保留不变")
+						continue
+					}
+					onOff("Skill", skill.Name, t.label, t.want)
 				}
 			}
 		}
@@ -328,8 +360,17 @@ func (a *App) previewWorkspaceProfile(p config.AIWorkspaceProfile) workspace.Pre
 			out.Errors = append(out.Errors, "Hook 不存在: "+s.ID)
 		} else if s.Codex && !hooks.SupportedBy(h.Event, hooks.TargetCodex) {
 			out.Errors = append(out.Errors, "Hook 不支持 Codex: "+h.Name)
-		} else if s.Claude != h.EnabledInClaude || s.Codex != h.EnabledInCodex {
-			out.Changes = append(out.Changes, "Hook「"+h.Name+"」同步状态将更新")
+		}
+	}
+	// Apply walks every registered hook, so hooks missing from the profile are
+	// switched off too — list them here or the preview hides those changes.
+	for _, h := range hookList {
+		desired := workspace.SelectionFor(p.Hooks, h.ID)
+		if desired.Claude != h.EnabledInClaude {
+			onOff("Hook", h.Name, "Claude", desired.Claude)
+		}
+		if desired.Codex != h.EnabledInCodex {
+			onOff("Hook", h.Name, "Codex", desired.Codex)
 		}
 	}
 	out.CanApply = len(out.Errors) == 0

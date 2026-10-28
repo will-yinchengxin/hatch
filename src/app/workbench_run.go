@@ -53,12 +53,23 @@ func (a *App) RunWithPreScripts(id, path string, args []string, preScripts []str
 
 // ServiceAction executes start / stop / restart on a service script.
 func (a *App) ServiceAction(path, action string, args []string) error {
-	_, _, scanned, _ := a.scriptMetas(path)
+	override, hasOv, scanned, _ := a.scriptMetas(path)
+	meta := scanned
+	if hasOv && len(override.Commands) > 0 {
+		meta.Commands = override.Commands
+	}
+	if hasOv && override.PidFile != "" {
+		meta.PidFile = override.PidFile
+	}
+	meta.Path = path
 	a.mu.Lock()
 	sm, ok := a.services[path]
 	if !ok {
-		sm = executor.NewServiceManager(path, scanned.PidFile, executor.NewEmitter(a.ctx))
+		sm = a.newServiceManager(meta)
 		a.services[path] = sm
+	} else {
+		_, scriptPid := executor.SplitPidFile(meta.PidFile)
+		sm.Configure(meta.Commands, scriptPid)
 	}
 	a.mu.Unlock()
 
@@ -70,6 +81,8 @@ func (a *App) ServiceAction(path, action string, args []string) error {
 		return sm.Stop()
 	case "restart":
 		return sm.RestartWithEnv(args, env)
+	case "status", "reload":
+		return sm.RunAction(action, env)
 	default:
 		return fmt.Errorf("unknown action: %s", action)
 	}

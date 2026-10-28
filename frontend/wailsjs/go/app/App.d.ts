@@ -16,6 +16,7 @@ import {hooks} from '../models';
 import {skills} from '../models';
 import {zshrc} from '../models';
 import {executor} from '../models';
+import {fsutil} from '../models';
 
 export function AddDirectory(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
@@ -245,7 +246,7 @@ export function PreviewVPNEnhanceEdit(arg1:string,arg2:string):Promise<vpn.Enhan
 
 export function ProbeMCP(arg1:string,arg2:string):Promise<config.MCPProbe>;
 
-export function ReadScriptFile(arg1:string):Promise<string>;
+export function ReadScriptFile(arg1:string):Promise<fsutil.TextFile>;
 
 export function RefreshClaudeUsage():Promise<agent.ClaudeCodeStatus>;
 

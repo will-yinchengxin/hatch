@@ -134,6 +134,7 @@ window.hatchApp = function () {
     hostHardware: null,
     hostPrevious: null,
     hostRates: [],
+    hostShowIdleNet: false,   // idle (0 B/s) interfaces are folded behind a toggle
     hostDiskResult: null,
     hostNetworkResult: null,
     hostDiskBusy: false,
@@ -155,10 +156,12 @@ window.hatchApp = function () {
     wbSelected: null,      // script path
     wbPane: 'run',         // run | code | config | history
     wbArgValues: {},       // path → { argIndex: value } for declared @hatch.arg fields
-    wbCode: { path: '', content: '', original: '', loading: false, saving: false },
+    wbCode: { path: '', content: '', original: '', loading: false, saving: false, blocked: '', size: 0 },
+    wbHealth: { path: '', result: null, loading: false },   // @hatch.requires / health URL check for the selected script   // blocked: '' | 'binary' | 'large'
     wbAI: { instruction: '', busy: false, result: null, diff: [], stats: { add: 0, del: 0 } },
     wbFormSnapshot: '',
     wbRecentRuns: [],
+    wbRunsFailedOnly: false,
     // Global env editor (rows mirror cfg.exports plus UI-only fields)
     envRows: [],
     envDirty: false,
@@ -214,6 +217,9 @@ window.hatchApp = function () {
 
     // v1.3+: data dir inventory & retention
     dataInventory: [],
+    backupBusy: false,
+    backupResult: null,      // ExportBackup result { path, size, numFiles }
+    backupImportPath: '',
     retention: { traceRetainDays: 3, runsRetainDays: 14, runsKeepPerName: 50 },
     retentionSaving: false,
 
@@ -583,7 +589,7 @@ window.hatchApp = function () {
           .slice(0, 50);
       }
       return items
-        .map(it => ({ it, score: this.fuzzyScore(q, it.text) + (it.boost > 0 ? 1 : 0) }))
+        .map(it => { const m = this.fuzzyScore(q, it.text); return { it, score: m && m + (it.boost > 0 ? 1 : 0) }; })  // boost ranks matches, never adds non-matches
         .filter(x => x.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, 50)
@@ -832,14 +838,21 @@ esac
       await this.loadConfig();
       await this.loadRecentRuns();
       await this.scanAll();
+      // Selection can change via list clicks, ⌘K, ↑/↓ or a restored state.
+      this.$watch('wbSelected', () => this.wbCheckHealth(this.wbCurrent));
+      // VPN code reports through vpnMsg; show it as a toast like every other
+      // module instead of a banner that pushes the page down.
+      this.$watch('vpnMsg', (v) => {
+        if (!v) return;
+        if (/失败|未保存|请输入|错误/.test(v)) this.showError(v); else this.showSuccess(v);
+        this.vpnMsg = '';
+      });
+      this.wbCheckHealth(this.wbCurrent);
       if (this.tab === 'scripts' && this.wbSubTab === 'env') this.envLoad();
       this.loadDataPaths();
       this.loadDocLinks();
       this.loadAIProviders();
-      if (this.tab === 'ai' && this.aiSubTab === 'mcp') this.loadMCP();
-      if (this.tab === 'ai' && this.aiSubTab === 'skills') this.loadSkills();
-      if (this.tab === 'ai' && this.aiSubTab === 'workspace') this.loadWorkspace();
-      if (this.tab === 'ai' && this.aiSubTab === 'overview') this.loadOverview();
+      if (this.tab === 'ai') { this.loadAIHeroStats(); this.aiGo(this.aiSubTab); }
       if (this.tab === 'memo') this.loadMemoModule();
       if (this.tab === 'vpn') { this.loadVPNOverview(); if (this.vpnSubTab !== 'overview') this.vpnGo(this.vpnSubTab); }
       if (this.tab === 'host') this.openHost();
@@ -860,14 +873,40 @@ esac
       return this.modules[key] !== false;
     },
 
-    openTab(tab) {
+    openTab(tab, sub) {
       if (!this.moduleOn(tab)) return;
       if (this.hostTimer) { clearTimeout(this.hostTimer); this.hostTimer = null; }
       this.tab = tab;
-      if (tab === 'ai') { this.loadAIUsageStatuses(); this.loadAITraces(); }
+      if (tab === 'ai') { this.loadAITraces(); this.loadAIHeroStats(); this.aiGo(sub || this.aiSubTab); }
       else if (tab === 'vpn') this.loadVPNOverview();
       else if (tab === 'memo') this.loadMemoModule();
       else if (tab === 'host') this.openHost();
+    },
+
+    // Switches the AI sub-page and (re)loads its data, so every entry point —
+    // sidebar, overview cards, top tab, header refresh — shows fresh numbers.
+    aiGo(sub) {
+      this.aiSubTab = sub;
+      const loaders = {
+        overview: () => this.loadOverview(),
+        connect: () => this.loadAIProviders(),
+        tools: () => this.loadAIUsageStatuses(),
+        workspace: () => this.loadWorkspace(),
+        skills: () => this.loadSkills(),
+        mcp: () => this.loadMCP(),
+        hooks: () => this.loadHooks(),
+        docs: () => this.loadDocLinks(),
+        prompts: () => this.loadPromptTemplates(),
+        data: () => this.loadDataInventory(),
+      };
+      loaders[sub]?.();
+    },
+
+    // Hero stat cards (Skills / MCP / Hooks) are visible on every AI sub-page.
+    async loadAIHeroStats() {
+      try { this.skillsStats = await GetSkillsStats(); } catch (_) {}
+      try { this.hooksStats = await GetHooksStats(); } catch (_) {}
+      try { if (!this.mcpInventory) await this.loadMCP(); } catch (_) {}
     },
 
     // Re-reads module visibility from config.json; if the current tab was
@@ -1006,6 +1045,19 @@ esac
         this.$nextTick(() => document.querySelector('.wb-item.active')?.scrollIntoView({ block: 'nearest' }));
       }
       this.wbOpenPane(pane || this.wbPane);
+    },
+
+    // Only scripts that declare dependencies or a health URL are checked.
+    async wbCheckHealth(s, force = false) {
+      if (!s || !((s.requires || []).length || s.healthUrl)) { this.wbHealth = { path: s?.path || '', result: null, loading: false }; return; }
+      if (!force && this.wbHealth.path === s.path && this.wbHealth.result) return;
+      this.wbHealth = { path: s.path, result: null, loading: true };
+      try {
+        const result = await window['go']['app']['App']['CheckScriptHealth'](s.path);
+        if (this.wbHealth.path === s.path) this.wbHealth = { path: s.path, result, loading: false };
+      } catch (_) {
+        if (this.wbHealth.path === s.path) this.wbHealth.loading = false;
+      }
     },
 
     wbMoveSelection(delta) {
@@ -1198,10 +1250,12 @@ esac
 
     // ── Workbench: code editor + AI diff ──────────────────────────────
     async wbLoadCode(s) {
-      this.wbCode = { path: s.path, content: '', original: '', loading: true, saving: false };
+      this.wbCode = { path: s.path, content: '', original: '', loading: true, saving: false, blocked: '', size: 0 };
       try {
-        const text = await ReadScriptFile(s.path);
-        if (this.wbCode.path === s.path) this.wbCode = { ...this.wbCode, content: text, original: text, loading: false };
+        const f = await ReadScriptFile(s.path);
+        const blocked = f.binary ? 'binary' : f.truncated ? 'large' : '';
+        const text = f.content || '';
+        if (this.wbCode.path === s.path) this.wbCode = { ...this.wbCode, content: text, original: text, loading: false, blocked, size: f.size };
       } catch (e) {
         this.wbCode.loading = false;
         this.showError(`读取文件失败: ${e}`);
@@ -1241,6 +1295,7 @@ esac
       if (!s || !this.wbAI.instruction.trim()) return;
       if (!this.aiReady) { this.showError('请先在 ✦ AI → 连接 中配置并启用 AI'); return; }
       if (this.wbCode.path !== s.path) await this.wbLoadCode(s);
+      if (this.wbCode.blocked) { this.showError(this.wbCode.blocked === 'binary' ? '二进制文件无法用 AI 修改' : '文件过大，无法用 AI 修改'); return; }
       this.wbAI.busy = true;
       try {
         const result = await SuggestScriptContent(s.path, this.wbCode.content, this.wbAI.instruction);
@@ -1360,7 +1415,7 @@ esac
         });
         await this.scanAll();
         const fresh = this.allScripts.find(x => x.path === s.path);
-        if (fresh) this.wbLoadForm(fresh);
+        if (fresh) { this.wbLoadForm(fresh); this.wbCheckHealth(fresh, true); }
         this.showSuccess('配置已保存');
       } catch (e) {
         this.showError(`保存失败: ${e}`);
@@ -1490,8 +1545,10 @@ esac
       for (const r of rows) {
         const existing = this.envRows.find(e => e.name === r.name && !e._dir);
         const secret = /KEY|TOKEN|SECRET|PASSWORD|PASS/i.test(r.name);
+        // Only executable dirs join $PATH; a FOO_DIR=/some/dir is an ordinary variable.
+        const binDir = /^(\/|~\/|\$)/.test(r.value) && (/\/s?bin\/?$/.test(r.value) || /BIN$/i.test(r.name));
         if (existing) existing.value = r.value;
-        else this.envAdd({ name: r.name, value: r.value, secret, kind: /^(\/|~\/)/.test(r.value) ? 'path' : 'var' });
+        else this.envAdd({ name: r.name, value: r.value, secret, kind: binDir ? 'path' : 'var' });
       }
       this.envDirty = true;
       this.envImportOpen = false;
@@ -1662,10 +1719,7 @@ esac
         if (this.scriptLogs[id].length > 500) {
           this.scriptLogs[id] = this.scriptLogs[id].slice(-500);
         }
-        this.$nextTick(() => {
-          const el = document.getElementById('log-' + this.safeId(id));
-          if (el) el.scrollTop = el.scrollHeight;
-        });
+        this.scrollLog(id);
       });
 
       EventsOn('executor:done', (ev) => {
@@ -1689,6 +1743,13 @@ esac
       try { this.statuses = await GetAllServiceStatuses() || {}; } catch (_) {}
     },
 
+    scrollLog(id) {
+      this.$nextTick(() => {
+        const el = document.getElementById('log-' + this.safeId(id));
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    },
+
     async serviceAction(script, action, args = []) {
       const id = script.path;
       if (!this.scriptLogs[id]) this.scriptLogs[id] = [];
@@ -1699,8 +1760,9 @@ esac
         await this.refreshStatuses();
       } catch (e) {
         this.scriptLogs[id].push({ line: `[hatch] ${action} error: ${e}`, stream: 'stderr' });
-        this.showError(`${action} 失败: ${e}`);  
+        this.showError(`${action} 失败: ${e}`);
       }
+      this.scrollLog(id);
     },
 
     logLines(path) { return this.scriptLogs[path] || []; },
@@ -2245,6 +2307,7 @@ esac
     // GetMCPInventory rows (one per server name, one entry per location) and
     // every write goes through preview → apply.
     async loadMCP(includeCLI = false) {
+      if (!includeCLI && this.mcpLoading) return;   // hero stats + page loader may race
       if (includeCLI) this.mcpCLILoading = true; else this.mcpLoading = true;
       try {
         const [inv, catalog] = await Promise.all([
@@ -3065,6 +3128,9 @@ esac
           this.skills.length ? Promise.resolve(this.skills) : GetSkills(),
           this.mcpInventory ? Promise.resolve(null) : this.loadMCP(),
           this.hooks.length ? Promise.resolve(this.hooks) : ListHooks(),
+          // New profiles start from the current agent settings; without these
+          // the form would default to empty and applying would reset them.
+          this.loadClaudeCodeConfig(), this.loadCodexModelConfig(),
         ]);
         this.workspaceProfiles = profiles || [];
         this.workspaceSnapshots = snapshots || [];
@@ -3087,6 +3153,7 @@ esac
         skills: this.workspaceSelections(this.skills, 'name'), mcpServers: this.workspaceSelections(this.mcpServers, 'id'), hooks: this.workspaceSelections(this.hooks, 'id'),
       };
       this.workspaceFormOpen = true;
+      this.$nextTick(() => document.querySelector('.workspace-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     },
 
     workspaceSelection(list, id) {
@@ -3118,6 +3185,7 @@ esac
       try { this.workspacePreview = await PreviewAIWorkspaceProfileApply(profile.id); }
       catch (e) { this.showError(`预检失败: ${e}`); }
       finally { this.workspacePreviewing = false; }
+      this.$nextTick(() => document.querySelector('.workspace-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
     },
 
     async applyWorkspaceProfile() {
@@ -3127,7 +3195,7 @@ esac
       try {
         await ApplyAIWorkspaceProfile(profile.id);
         this.workspacePreview = null;
-        await this.loadWorkspace();
+        await this.reloadAfterWorkspaceChange();
         this.showSuccess(`已应用工作区画像「${profile.name}」`);
       } catch (e) { this.showError(`应用失败: ${e}`); }
       finally { this.workspaceApplying = false; }
@@ -3139,9 +3207,19 @@ esac
       catch (e) { this.showError(`删除失败: ${e}`); }
     },
 
+    // Apply / rollback rewrite skills, hooks, MCP and agent settings, so drop
+    // the caches loadWorkspace would otherwise reuse and refresh the hero.
+    async reloadAfterWorkspaceChange() {
+      this.skills = [];
+      this.hooks = [];
+      this.mcpInventory = null;
+      await this.loadWorkspace();
+      this.loadAIHeroStats();
+    },
+
     async rollbackWorkspaceSnapshot(snapshot) {
       if (!(await this.askConfirm(`回滚到「${snapshot.profileName}」应用前的状态？当前 Hatch 管理的 AI 配置会被恢复。`, { title: '回滚 AI 工作区', confirmText: '回滚' }))) return;
-      try { await RollbackAIWorkspaceSnapshot(snapshot.id); await this.loadWorkspace(); this.showSuccess('已回滚 AI 工作区快照'); }
+      try { await RollbackAIWorkspaceSnapshot(snapshot.id); await this.reloadAfterWorkspaceChange(); this.showSuccess('已回滚 AI 工作区快照'); }
       catch (e) { this.showError(`回滚失败: ${e}`); }
     },
 
@@ -3473,6 +3551,30 @@ esac
       }
     },
 
+    async exportHatchBackup() {
+      this.backupBusy = true;
+      try {
+        this.backupResult = await window['go']['app']['App']['ExportBackup']('');
+        this.showSuccess('备份已导出');
+      } catch (e) { this.showError(`导出失败: ${e}`); }
+      finally { this.backupBusy = false; }
+    },
+
+    async importHatchBackup() {
+      const path = this.backupImportPath.trim();
+      if (!path) return;
+      if (!(await this.askConfirm(`用「${path}」覆盖当前配置和 Skills？当前 config.json 会先自动备份。`, { title: '从备份恢复', confirmText: '恢复' }))) return;
+      this.backupBusy = true;
+      try {
+        const msg = await window['go']['app']['App']['ImportBackup'](path);
+        this.showSuccess(msg || '已恢复');
+        this.backupImportPath = '';
+        await this.loadConfig();
+        this.loadDataInventory();
+      } catch (e) { this.showError(`恢复失败: ${e}`); }
+      finally { this.backupBusy = false; }
+    },
+
     async loadOverview() {
       try { await this.loadAIUsageStatuses(); } catch (_) {}
       try { if (!this.aiProviders.length) await this.loadAIProviders(); } catch (_) {}
@@ -3485,7 +3587,8 @@ esac
 
     duplicateProvider(p) {
       this.openProviderEditor(null);
-      this.providerForm = { id: '', name: `${p.name || p.model || '提供商'} 副本`, baseUrl: p.baseUrl || '', model: p.model || '', apiKey: '', _isNew: true };
+      // Cloning is for "same endpoint + key, different model", so the key comes along.
+      this.providerForm = { id: '', name: `${p.name || p.model || '提供商'} 副本`, baseUrl: p.baseUrl || '', model: p.model || '', apiKey: p.apiKey || '', _isNew: true };
       this.providerTestResult = '';
     },
 
@@ -3527,6 +3630,16 @@ esac
         reload:  '↺ reload',
         status:  '? status',
       }[cmd] || cmd;
+    },
+
+    // List subtitle: description, else the file name when it differs from the
+    // display name, else the kind of file — never the name repeated.
+    wbItemSub(s) {
+      if (s.desc) return s.desc;
+      const file = this.baseName(s.path);
+      if (file !== s.name) return file;
+      const lang = { shell: 'Shell 脚本', python: 'Python 脚本', ruby: 'Ruby 脚本', node: 'Node 脚本', binary: '可执行文件' }[s.language];
+      return lang || '脚本';
     },
 
     baseName(path) {
@@ -3765,6 +3878,9 @@ esac
       take(/\s#([^\s#!]+)/g, (_, t) => out.tags.push(t));
       take(/\s(?:!{2,}|!(?:高|high|急|1))(?=\s)/gi, () => { out.priority = 'high'; });
       take(/\s!(?:低|low|3)(?=\s)/gi, () => { out.priority = 'low'; });
+      // 今晚 / 明早 carry both a day and a part of day ("今晚8点" → today 20:00).
+      let impliedPart = '', hadPart = false;
+      take(/(今晚|今早|明晚|明早)/, (_, w) => { setDays(w[0] === '明' ? 1 : 0); impliedPart = w[1] === '晚' ? '晚上' : '早上'; });
       take(/(大后天|后天|明天|明日|今天|今日)/, (_, w) => setDays({ 今天: 0, 今日: 0, 明天: 1, 明日: 1, 后天: 2, 大后天: 3 }[w]));
       take(/(下)?(?:周|星期|礼拜)([一二三四五六日天])/, (_, next, w) => {
         const target = '一二三四五六日'.indexOf(w === '天' ? '日' : w); // Monday = 0
@@ -3785,10 +3901,16 @@ esac
         if (new Date(y, +m - 1, +d) < base) y += 1;
         out.date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       });
-      take(/(上午|早上|中午|下午|傍晚|晚上)?\s*(\d{1,2})(?::|：)(\d{2})/, (_, part, h, m) => { out.time = this.quickTime(part, +h, +m); });
-      if (!out.time) take(/(上午|早上|中午|下午|傍晚|晚上)?\s*(\d{1,2})\s*点\s*(半|(\d{1,2})\s*分?)?/, (_, part, h, half, m) => {
-        out.time = this.quickTime(part, +h, half === '半' ? 30 : (+m || 0));
+      take(/(凌晨|上午|早上|中午|下午|傍晚|晚上)?\s*(\d{1,2})(?::|：)(\d{2})/, (_, part, h, m) => { hadPart = !!(part || impliedPart); out.time = this.quickTime(part || impliedPart, +h, +m); });
+      if (!out.time) take(/(凌晨|上午|早上|中午|下午|傍晚|晚上)?\s*(\d{1,2})\s*点\s*(半|(\d{1,2})\s*分?)?/, (_, part, h, half, m) => {
+        hadPart = !!(part || impliedPart);
+        out.time = this.quickTime(part || impliedPart, +h, half === '半' ? 30 : (+m || 0));
       });
+      // A bare "8点" typed for today after 8:00 means the evening, not a time already past.
+      if (out.time && !hadPart && out.date === this.ymd(now)) {
+        const [h, m] = out.time.split(':').map(Number);
+        if (h < 12 && h * 60 + m < now.getHours() * 60 + now.getMinutes()) out.time = this.quickTime('晚上', h, m);
+      }
       out.title = rest.replace(/\s+/g, ' ').trim();
       return out;
     },
@@ -4331,12 +4453,22 @@ esac
       return rows;
     },
 
+    hostNetActive(n) { return n.receive == null || (n.receive + n.send) > 0; },
+    get hostVisibleRates() {
+      return this.hostShowIdleNet ? this.hostRates : this.hostRates.filter(n => this.hostNetActive(n));
+    },
+    get hostIdleNetCount() {
+      return this.hostRates.filter(n => !this.hostNetActive(n)).length;
+    },
+
     async openHost() {
       this.hostPrevious = null;
       this.hostRates = [];
       this.refreshHost();
-      this.hostDiskTest();
-      this.hostNetworkTest();
+      // Benchmarks are heavy (64 MiB disk write, networkQuality download):
+      // run them on the first visit only and keep the result until re-tested.
+      if (!this.hostDiskResult) this.hostDiskTest();
+      if (!this.hostNetworkResult) this.hostNetworkTest();
       try { this.hostHardware = await window['go']['app']['App']['GetHostHardware'](); }
       catch (error) { this.hostError = '硬件信息获取失败：' + error; }
     },
@@ -4413,14 +4545,9 @@ esac
       } else if (this.tab === 'host') {
         this.refreshHost();
       } else if (this.tab === 'ai') {
-        this.loadAIUsageStatuses();
         this.loadAITraces();
-        if (this.aiSubTab === 'overview') this.loadOverview();
-        else if (this.aiSubTab === 'mcp') this.loadMCP();
-        else if (this.aiSubTab === 'hooks') this.loadHooks();
-        else if (this.aiSubTab === 'skills') this.loadSkills();
-        else if (this.aiSubTab === 'workspace') this.loadWorkspace();
-        else if (this.aiSubTab === 'docs') this.loadDocLinks();
+        this.loadAIHeroStats();
+        this.aiGo(this.aiSubTab);
       }
     },
 
@@ -4578,7 +4705,7 @@ esac
       try {
         const r = await ExportVPNBackup();
         this.vpnMsg = `备份成功: ${r.path} (${r.numFiles} 个文件)`;
-        this.vpnBackups = await ListVPNBackups();
+        this.vpnBackups = (await ListVPNBackups()) || [];   // Go nil slice → null
         this.vpnHealthReport = await GetVPNHealthReport();
       } catch (e) {
         this.vpnMsg = '备份失败: ' + e;
@@ -4617,7 +4744,7 @@ esac
       try {
         const msg = await ImportVPNBackup(zipPath);
         this.vpnMsg = '恢复成功: ' + msg;
-        this.vpnBackups = await ListVPNBackups();
+        this.vpnBackups = (await ListVPNBackups()) || [];   // Go nil slice → null
         await this.loadVPNOverview();
       } catch (e) {
         this.vpnMsg = '恢复失败: ' + e;
@@ -4634,7 +4761,7 @@ esac
       if (!(await this.askConfirm(`确认删除备份？\n${this.vpnBackupBasename(zipPath)}\n\n此操作不可撤销。`))) return;
       try {
         await DeleteVPNBackup(zipPath);
-        this.vpnBackups = await ListVPNBackups();
+        this.vpnBackups = (await ListVPNBackups()) || [];   // Go nil slice → null
         this.vpnMsg = '已删除备份';
         setTimeout(() => { this.vpnMsg = ''; }, 3000);
       } catch (e) {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -267,4 +268,54 @@ func runOneshotWithTestEmitter(id, scriptPath string, args []string, em *testEmi
 			em.onDone(DoneEvent{ID: id, ExitCode: code})
 		}
 	})
+}
+
+// A start branch that backgrounds the real server and exits (the common
+// `nohup … &` shape) must stay "running", and stop must reach the script.
+func TestServiceManager_DaemonizingStartAndScriptStop(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "svc.sh")
+	marker := filepath.Join(dir, "stopped")
+	body := "#!/bin/zsh\ncase \"$1\" in\n  start) nohup sleep 30 >/dev/null 2>&1 &; echo started ;;\n  stop) touch " + marker + " ;;\nesac\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewServiceManager(script, filepath.Join(dir, "svc.pid"), nil)
+	svc.Configure([]string{"start", "stop"}, "")
+	if err := svc.Start(nil); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(700 * time.Millisecond) // the start branch itself has exited by now
+	if st, _ := svc.Status(); st != StatusRunning {
+		t.Fatalf("backgrounded child should keep the service running, got %s", st)
+	}
+	if err := svc.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Error("stop should run the script's stop branch")
+	}
+	time.Sleep(200 * time.Millisecond)
+	if st, _ := svc.Status(); st != StatusStopped {
+		t.Errorf("expected stopped after Stop, got %s", st)
+	}
+}
+
+func TestServiceManager_ScriptOwnedPidFile(t *testing.T) {
+	if h, s := SplitPidFile("/tmp/hatch/x.pid"); h != "/tmp/hatch/x.pid" || s != "" {
+		t.Errorf("hatch dir pid file: %q %q", h, s)
+	}
+	if h, s := SplitPidFile("/tmp/app-dev.pid"); h != "" || s != "/tmp/app-dev.pid" {
+		t.Errorf("script pid file: %q %q", h, s)
+	}
+	dir := t.TempDir()
+	own := filepath.Join(dir, "own.pid")
+	if err := os.WriteFile(own, []byte(strconv.Itoa(os.Getpid())), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewServiceManager(filepath.Join(dir, "none.sh"), filepath.Join(dir, "hatch.pid"), nil)
+	svc.Configure(nil, own)
+	if st, _ := svc.Status(); st != StatusRunning {
+		t.Errorf("live pid in the script's own pid file should count as running, got %s", st)
+	}
 }

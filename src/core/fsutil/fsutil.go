@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // AppDataDir returns ~/Library/Application Support/Hatch joined with elem.
@@ -168,4 +169,54 @@ func IsPathInside(path, root string) bool {
 	root = ExpandHome(root)
 	rel, err := filepath.Rel(root, path)
 	return err == nil && rel != "." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) && rel != ".."
+}
+
+// textSniffLen is how many leading bytes ReadTextFile scans for NUL bytes.
+const textSniffLen = 8000
+
+// TextFile is the result of ReadTextFile. Content is empty when Binary is set.
+type TextFile struct {
+	Content   string `json:"content"`
+	Size      int64  `json:"size"`
+	Binary    bool   `json:"binary"`
+	Truncated bool   `json:"truncated"`
+}
+
+// ReadTextFile reads at most max bytes of path as UTF-8 text without loading
+// larger files whole. A NUL byte in the first 8 KB or invalid UTF-8 marks the
+// file Binary; a file larger than max returns its first max bytes, Truncated.
+func ReadTextFile(path string, max int64) (TextFile, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return TextFile{}, err
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return TextFile{}, err
+	}
+	out := TextFile{Size: st.Size(), Truncated: st.Size() > max}
+	b, err := io.ReadAll(io.LimitReader(f, max))
+	if err != nil {
+		return TextFile{}, err
+	}
+	if out.Truncated {
+		b = trimPartialRune(b)
+	}
+	if bytes.IndexByte(b[:min(len(b), textSniffLen)], 0) >= 0 || !utf8.Valid(b) {
+		out.Binary = true
+		return out, nil
+	}
+	out.Content = string(b)
+	return out, nil
+}
+
+// trimPartialRune drops a multi-byte rune cut off at the end of b.
+func trimPartialRune(b []byte) []byte {
+	for k := 0; k < utf8.UTFMax && k < len(b); k++ {
+		if utf8.Valid(b[:len(b)-k]) {
+			return b[:len(b)-k]
+		}
+	}
+	return b
 }

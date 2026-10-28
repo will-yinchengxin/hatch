@@ -105,7 +105,7 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) restoreServices() {
 	for _, s := range a.store.All() {
 		if s.Type == config.TypeService {
-			sm := executor.NewServiceManager(s.Path, s.PidFile, executor.NewEmitter(a.ctx))
+			sm := a.newServiceManager(s)
 			a.mu.Lock()
 			a.services[s.Path] = sm
 			a.mu.Unlock()
