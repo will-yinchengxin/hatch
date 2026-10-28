@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"hatch/ai/leaderboard"
 	"hatch/ai/llm"
 	"hatch/core/config"
 	"hatch/memo"
@@ -34,6 +35,8 @@ type App struct {
 	services map[string]*executor.ServiceManager
 	mu       sync.RWMutex
 	mcpOpMu  sync.Mutex // serializes MCP config writes (CLI remove+add is not atomic)
+
+	leaderboards *leaderboard.Service // lazily created by modelLeaderboards()
 
 	tracesMu sync.Mutex
 	traces   []llm.Trace

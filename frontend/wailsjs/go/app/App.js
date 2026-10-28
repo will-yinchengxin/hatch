@@ -258,6 +258,10 @@ export function GetMemoSettings() {
   return window['go']['app']['App']['GetMemoSettings']();
 }
 
+export function GetModelLeaderboards() {
+  return window['go']['app']['App']['GetModelLeaderboards']();
+}
+
 export function GetModuleSettings() {
   return window['go']['app']['App']['GetModuleSettings']();
 }
@@ -464,6 +468,10 @@ export function ReadScriptFile(arg1) {
 
 export function RefreshClaudeUsage() {
   return window['go']['app']['App']['RefreshClaudeUsage']();
+}
+
+export function RefreshModelLeaderboards(arg1) {
+  return window['go']['app']['App']['RefreshModelLeaderboards'](arg1);
 }
 
 export function RemoveDirectory(arg1) {

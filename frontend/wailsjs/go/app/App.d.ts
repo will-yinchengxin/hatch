@@ -13,6 +13,7 @@ import {llm} from '../models';
 import {datadir} from '../models';
 import {agent} from '../models';
 import {hooks} from '../models';
+import {leaderboard} from '../models';
 import {skills} from '../models';
 import {zshrc} from '../models';
 import {executor} from '../models';
@@ -146,6 +147,8 @@ export function GetMemoDashboard():Promise<memo.Dashboard>;
 
 export function GetMemoSettings():Promise<memo.Settings>;
 
+export function GetModelLeaderboards():Promise<leaderboard.Snapshot>;
+
 export function GetModuleSettings():Promise<config.Modules>;
 
 export function GetPromptTemplates():Promise<Record<string, string>>;
@@ -249,6 +252,8 @@ export function ProbeMCP(arg1:string,arg2:string):Promise<config.MCPProbe>;
 export function ReadScriptFile(arg1:string):Promise<fsutil.TextFile>;
 
 export function RefreshClaudeUsage():Promise<agent.ClaudeCodeStatus>;
+
+export function RefreshModelLeaderboards(arg1:boolean):Promise<leaderboard.Snapshot>;
 
 export function RemoveDirectory(arg1:string):Promise<void>;
 

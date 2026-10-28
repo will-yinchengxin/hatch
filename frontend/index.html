@@ -976,6 +976,9 @@
           <span>文档</span>
           <span class="ai-sidenav-count" x-show="docLinks.length > 0" x-text="docLinks.length"></span>
         </button>
+        <button class="ai-sidenav-item" :class="aiSubTab==='leaderboards' ? 'active' : ''" @click="aiGo('leaderboards')">
+          <span class="ai-sidenav-icon">🏆</span><span>模型榜单</span>
+        </button>
         <button class="ai-sidenav-item" :class="aiSubTab==='prompts' ? 'active' : ''"
           @click="aiGo('prompts')">
           <span class="ai-sidenav-icon">📝</span>
@@ -990,6 +993,166 @@
 
       <!-- Right content -->
       <div class="ai-content">
+
+        <!-- ══ 模型榜单 ══════════════════════════════════════════════ -->
+        <div x-show="aiSubTab==='leaderboards'" class="lb">
+          <section class="settings-section">
+            <div class="lb-head">
+              <div>
+                <h3>模型榜单</h3>
+                <p class="lb-sub">Arena 真人盲测与 Epoch AI 基准的公开数据 · 每个榜单独立排名，分数不跨榜比较</p>
+              </div>
+              <div class="lb-sync">
+                <span class="lb-sync-label" :class="{'lb-sync-busy': lbRefreshing}" x-text="lbSyncLabel()"></span>
+                <button class="btn-sm" @click="refreshLeaderboards(true)" :disabled="lbRefreshing" title="重新获取全部榜单">↻ 刷新</button>
+              </div>
+            </div>
+
+            <div class="lb-domains" role="tablist" aria-label="评测领域">
+              <template x-for="d in lbDomains" :key="d.id">
+                <button type="button" role="tab" class="lb-domain" :class="{active: lbDomain===d.id}" :aria-selected="lbDomain===d.id" @click="lbSelectDomain(d.id)" x-text="d.name"></button>
+              </template>
+            </div>
+
+            <div class="lb-recs" x-show="lbRecommend().length">
+              <div class="lb-recs-head">
+                <span class="lb-recs-title"><span x-text="lbDomainName()"></span> · 推荐 Top 4</span>
+                <span class="lb-recs-note" x-text="lbRecNote()"></span>
+              </div>
+              <div class="lb-recs-grid">
+                <template x-for="(r, i) in lbRecommend()" :key="r.key">
+                  <button type="button" class="lb-rec" :class="{'lb-rec-first': i === 0}" @click="lbFocusRec(r)" :title="'在「' + r.best.title + '」中查看 ' + r.name">
+                    <span class="lb-rec-top">
+                      <span class="lb-rec-place" x-text="i + 1"></span>
+                      <span class="lb-logo" :style="{'--c': lbBrand(r).color}">
+                        <template x-if="lbBrand(r).icon"><img :src="lbBrand(r).icon" alt="" width="18" height="18"></template>
+                        <template x-if="!lbBrand(r).icon"><span x-text="lbBrand(r).initial"></span></template>
+                      </span>
+                      <span class="lb-rec-points"><b x-text="r.points"></b> 分</span>
+                    </span>
+                    <strong class="lb-rec-name" x-text="r.name"></strong>
+                    <small class="lb-rec-org" x-text="(r.org || '—') + ' · 上榜 ' + r.hits.length + '/' + lbDomainBoards(lbDomain).filter(b => b.entries.length).length"></small>
+                    <span class="lb-rec-hits">
+                      <template x-for="h in r.hits" :key="h.board">
+                        <span class="lb-rec-hit"><span x-text="h.tag"></span> <b x-text="'#' + h.rank"></b></span>
+                      </template>
+                    </span>
+                  </button>
+                </template>
+              </div>
+            </div>
+
+            <div class="lb-picks" role="tablist" aria-label="榜单">
+              <template x-for="b in lbDomainBoards(lbDomain)" :key="b.id">
+                <button type="button" role="tab" class="lb-pick" :class="{active: lbBoard()?.id===b.id}" :aria-selected="lbBoard()?.id===b.id" @click="lbSelectBoard(b.id)">
+                  <span class="lb-pick-title" x-text="b.title"></span>
+                  <span class="lb-pick-tag"><span x-text="b.source"></span> · <span x-text="b.tag"></span></span>
+                </button>
+              </template>
+            </div>
+
+            <p class="lb-error" x-show="lbError" x-text="lbError"></p>
+
+            <template x-if="lbBoard()">
+              <article class="lb-board">
+                <header class="lb-board-head">
+                  <div class="lb-board-title">
+                    <h4 x-text="lbBoard().title"></h4>
+                    <p x-text="lbBoard().summary"></p>
+                  </div>
+                  <a class="lb-source-link" :href="lbBoard().url" @click.prevent="lbOpen(lbBoard().url)">在 <span x-text="lbBoard().source"></span> 查看 ↗</a>
+                </header>
+                <div class="lb-facts">
+                  <span x-show="lbBoard().published">数据日期 <b x-text="lbBoard().published"></b></span>
+                  <span x-show="lbBoard().total">共 <b x-text="lbBoard().total"></b> 个模型</span>
+                  <span>单位 <b x-text="lbBoard().unit"></b></span>
+                  <span class="lb-facts-warn" x-show="lbBoard().error && lbBoard().entries.length" x-text="lbBoardState(lbBoard())"></span>
+                </div>
+
+                <!-- Empty: first sync in progress, or failed without cache -->
+                <div class="lb-skeleton" x-show="!lbBoard().entries.length && (lbRefreshing || lbLoading)" aria-busy="true">
+                  <template x-for="i in 6" :key="i"><span></span></template>
+                </div>
+                <div class="lb-empty" x-show="!lbBoard().entries.length && !lbRefreshing && !lbLoading">
+                  <p x-text="lbBoard().error || '还没有数据'"></p>
+                  <button class="btn-sm" @click="refreshLeaderboards(true)">重新获取</button>
+                </div>
+
+                <template x-if="lbBoard().entries.length">
+                  <div>
+                    <figure class="lb-chart">
+                      <div class="lb-plot">
+                        <template x-for="t in lbChart().ticks" :key="t.label">
+                          <div class="lb-tick" :style="{'--y': t.y + '%'}"><span x-text="t.label"></span></div>
+                        </template>
+                        <div class="lb-cols">
+                          <template x-for="c in lbChart().cols" :key="c.key">
+                            <div class="lb-col" :title="c.title" :style="{'--b': c.b + '%', '--h': c.h + '%', '--top': c.top + '%', '--lo': c.lo + '%', '--hi': c.hi + '%', '--c': c.brand.color}">
+                              <span class="lb-col-ci" x-show="c.ci"></span>
+                              <span class="lb-col-bar"></span>
+                              <span class="lb-col-score" :class="{'lb-col-score-ci': c.ci}" x-text="c.score"></span>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                      <div class="lb-col-labels">
+                        <template x-for="c in lbChart().cols" :key="c.key">
+                          <div class="lb-col-label" :title="c.title">
+                            <span class="lb-logo" :style="{'--c': c.brand.color}">
+                              <template x-if="c.brand.icon"><img :src="c.brand.icon" alt="" width="18" height="18"></template>
+                              <template x-if="!c.brand.icon"><span x-text="c.brand.initial"></span></template>
+                            </span>
+                            <span class="lb-col-name" x-text="c.entry.model"></span>
+                            <span class="lb-col-variant" x-text="c.entry.variant || ' '"></span>
+                          </div>
+                        </template>
+                      </div>
+                      <figcaption x-text="lbChart().note"></figcaption>
+                    </figure>
+
+                    <div class="lb-list-head">
+                      <span>完整排名</span>
+                      <input type="search" class="lb-search" placeholder="筛选模型或厂商" x-model="lbQuery" aria-label="筛选模型或厂商">
+                    </div>
+                    <ol class="lb-list">
+                      <li class="lb-row lb-row-head" aria-hidden="true">
+                        <span>#</span><span></span><span>模型</span><span x-text="lbMetaLabel(lbBoard())"></span><span>置信区间</span><span>分数</span>
+                      </li>
+                      <template x-for="e in lbRows()" :key="e.rank + '|' + e.model + '|' + (e.variant || '')">
+                        <li class="lb-row">
+                          <span class="lb-rank" :class="{'lb-rank-top': e.rank <= 3}" x-text="e.rank"></span>
+                          <span class="lb-logo" :style="{'--c': lbBrand(e).color}">
+                            <template x-if="lbBrand(e).icon"><img :src="lbBrand(e).icon" alt="" width="18" height="18"></template>
+                            <template x-if="!lbBrand(e).icon"><span x-text="lbBrand(e).initial"></span></template>
+                          </span>
+                          <span class="lb-name">
+                            <span class="lb-name-line">
+                              <strong x-text="e.model"></strong>
+                              <span class="lb-variant" x-show="e.variant" x-text="e.variant"></span>
+                              <span class="lb-new" x-show="lbIsNew(e)">新</span>
+                            </span>
+                            <small x-text="e.org || '—'"></small>
+                          </span>
+                          <span class="lb-meta" x-text="lbMeta(lbBoard(), e)"></span>
+                          <span class="lb-ci" x-text="lbInterval(lbBoard(), e)"></span>
+                          <span class="lb-score" x-text="lbNumber(lbBoard(), e.score)"></span>
+                        </li>
+                      </template>
+                      <li class="lb-row-empty" x-show="!lbRows().length">没有匹配的模型</li>
+                    </ol>
+                    <button class="lb-more" x-show="lbCanExpand()" @click="lbExpanded = !lbExpanded" x-text="lbExpanded ? '收起' : '显示前 ' + lbBoard().entries.length + ' 名'"></button>
+                  </div>
+                </template>
+              </article>
+            </template>
+
+            <p class="lb-footnote">
+              数据：<a href="https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset" @click.prevent="lbOpen('https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset')">Arena 公开数据集</a>
+              与 <a href="https://epoch.ai/benchmarks" @click.prevent="lbOpen('https://epoch.ai/benchmarks')">Epoch AI Benchmarking Hub</a>，均为 CC BY 4.0。
+              Arena 采用官网默认的风格控制榜。本地缓存 12 小时，进入页面时自动更新。
+            </p>
+          </section>
+        </div>
 
         <!-- ══ 概览 ══════════════════════════════════════════════════ -->
         <div x-show="aiSubTab==='overview'">

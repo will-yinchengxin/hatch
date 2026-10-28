@@ -1,6 +1,7 @@
 import '@picocss/pico/css/pico.min.css';
 import './style.css';
 import Alpine from 'alpinejs';
+import { leaderboardState } from './leaderboards';
 
 import {
   GetConfig,
@@ -126,6 +127,7 @@ const GetModuleSettings    = ()                            => window['go']['app'
 
 window.hatchApp = function () {
   return {
+    ...leaderboardState(),
     // ── State ──────────────────────────────────────────────────────────
     tab: 'ai',
     // Top-level module visibility, from config.json "modules" (GetModuleSettings).
@@ -888,6 +890,7 @@ esac
     aiGo(sub) {
       this.aiSubTab = sub;
       const loaders = {
+        leaderboards: () => this.loadLeaderboards(),
         overview: () => this.loadOverview(),
         connect: () => this.loadAIProviders(),
         tools: () => this.loadAIUsageStatuses(),
@@ -947,7 +950,7 @@ esac
       const ai = params.get('aiSubTab') || params.get('ai');
       const memo = params.get('memoSubTab') || params.get('memo');
       const vpn = params.get('vpnSubTab') || params.get('vpn');
-      const allowedAI = ['overview', 'connect', 'tools', 'workspace', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
+      const allowedAI = ['leaderboards', 'overview', 'connect', 'tools', 'workspace', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
       const allowedMemo = ['today', 'upcoming', 'done', 'words', 'review', 'storage'];
       if (allowedAI.includes(ai)) {
         this.tab = 'ai';

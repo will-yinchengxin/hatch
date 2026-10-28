@@ -1378,6 +1378,136 @@ export namespace hostmonitor {
 
 }
 
+export namespace leaderboard {
+	
+	export class Entry {
+	    rank: number;
+	    model: string;
+	    variant?: string;
+	    org: string;
+	    brand: string;
+	    score: number;
+	    lower?: number;
+	    upper?: number;
+	    votes?: number;
+	    released?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rank = source["rank"];
+	        this.model = source["model"];
+	        this.variant = source["variant"];
+	        this.org = source["org"];
+	        this.brand = source["brand"];
+	        this.score = source["score"];
+	        this.lower = source["lower"];
+	        this.upper = source["upper"];
+	        this.votes = source["votes"];
+	        this.released = source["released"];
+	    }
+	}
+	export class Board {
+	    id: string;
+	    domain: string;
+	    title: string;
+	    tag: string;
+	    summary: string;
+	    source: string;
+	    url: string;
+	    license: string;
+	    format: string;
+	    unit: string;
+	    entries: Entry[];
+	    total: number;
+	    published: string;
+	    syncedAt: number;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Board(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.domain = source["domain"];
+	        this.title = source["title"];
+	        this.tag = source["tag"];
+	        this.summary = source["summary"];
+	        this.source = source["source"];
+	        this.url = source["url"];
+	        this.license = source["license"];
+	        this.format = source["format"];
+	        this.unit = source["unit"];
+	        this.entries = this.convertValues(source["entries"], Entry);
+	        this.total = source["total"];
+	        this.published = source["published"];
+	        this.syncedAt = source["syncedAt"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class Snapshot {
+	    boards: Board[];
+	    refreshing: boolean;
+	    stale: boolean;
+	    syncedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Snapshot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.boards = this.convertValues(source["boards"], Board);
+	        this.refreshing = source["refreshing"];
+	        this.stale = source["stale"];
+	        this.syncedAt = source["syncedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace llm {
 	
 	export class Trace {
