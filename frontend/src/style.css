@@ -1,5 +1,7 @@
 /* ── Design tokens ─────────────────────────────────────────────────────── */
-:root {
+/* Same specificity as Pico's theme block, so the --pico-* overrides below win.
+   <html data-theme="light"> keeps Pico off its dark theme in macOS Dark Mode. */
+:root:not([data-theme=dark]) {
   --primary:        #c15f3c;
   --primary-hover:  #a94f32;
   --primary-dim:    rgba(193,95,60,0.1);
