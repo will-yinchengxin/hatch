@@ -4,33 +4,56 @@
 
 # Hatch
 
-**macOS 脚本管理与开发环境仪表盘 — Go + Wails + Alpine.js**
+**macOS 脚本管理与开发环境仪表盘**
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20arm64-000000?logo=apple&logoColor=white)
-![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)
-![Wails](https://img.shields.io/badge/Wails-v2.12-DF0000?logo=wails&logoColor=white)
-![Alpine.js](https://img.shields.io/badge/Alpine.js-v3-8BC0D0?logo=alpinedotjs&logoColor=white)
-![Pico CSS](https://img.shields.io/badge/Pico%20CSS-v2-13795B)
-![Vite](https://img.shields.io/badge/Vite-v3-646CFF?logo=vite&logoColor=white)
 
 </div>
 
-Hatch 是一个面向 Apple Silicon macOS 的本地桌面工具，基于 **Wails v2**（Go 后端 + WKWebView 外壳 + Alpine.js 前端）。
-它把脚本管理、AI 编码助手配置、VPN（Clash Verge Rev）维护和日常备忘集中在一个窗口里。
+Hatch 是一个面向 Apple Silicon macOS 的本地桌面工具，把脚本管理、AI 编码助手配置、VPN（Clash Verge Rev）维护、日常备忘和主机监控集中在一个窗口里。
 在 App Store 之外分发，**不需要 Apple 开发者账号**，所有数据都保存在本机。
+
+<p align="center">
+  <img src="docs/screenshots/ai-overview.png" alt="AI 概览" width="100%" />
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/ai-leaderboards.png" alt="模型榜单与 Top 4 推荐" /></td>
+    <td width="50%"><img src="docs/screenshots/ai-agents.png" alt="Claude Code / Codex 用量与模型配置" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>模型榜单</b> · 各领域 Top 4 推荐</sub></td>
+    <td align="center"><sub><b>助手</b> · Claude Code / Codex 用量与重置时间</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/vpn.png" alt="VPN 配置中心" /></td>
+    <td width="50%"><img src="docs/screenshots/host.png" alt="主机状况" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>VPN</b> · 连接状态 / 出口 / 节点 / 订阅流量</sub></td>
+    <td align="center"><sub><b>主机</b> · 实时采样与磁盘 / 网络测速</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/memo.png" alt="备忘录与单词本" width="70%" />
+  <br /><sub><b>备忘录</b> · 待办提醒、单词本与间隔复习</sub>
+</p>
 
 ---
 
 ## 功能模块
 
-顶部四个模块均可在配置文件中单独开关（见 [模块开关](#模块开关)）。
+顶部五个模块均可在配置文件中单独开关（见 [模块开关](#模块开关)）。
 
 | 模块 | 主要能力 |
 |---|---|
-| 🗂 **工作台** | 按目录管理脚本：自动扫描与 `@hatch.*` 注解识别、一次性脚本 / 常驻服务（start/stop/restart）、实时日志与运行历史、定时任务、前置脚本链、单脚本环境变量、完成通知；`~/.zshrc` export 托管块、zshrc 解析 / 备注 / AI 整理；PATH 与依赖体检；内置脚本编辑器与 AI 生成 |
-| ✦ **AI** | OpenAI 兼容 provider 管理与调用日志；Claude Code / Codex 模型与推理档位配置、预设、用量状态；Skills 主仓库与双端同步；MCP 注册、安装（本地 / git / npm）、同步、连接测试与 AI 选型推荐；命令型 Hooks 双端同步；项目级工作区画像（预览 → 快照 → 应用 / 回滚）；提示词覆盖；本地数据目录与保留策略 |
-| 🔒 **VPN** | Clash Verge Rev 系统代理 / TUN 状态、当前节点与出口 IP、一键体检；配置文件与 Profile 原文编辑（保存前 YAML 校验并自动备份）；配置备份 / 预览 / 恢复；自定义规则汇总 |
-| ✓ **备忘录** | 待办与提醒（横幅 / 声音）、图片与文件附件托管；单词本：词典查询、发音、AI 补全、间隔复盘 |
+| 🗂 **工作台** | 按目录管理脚本：自动扫描与 `@hatch.*` 注解识别、一次性脚本 / 常驻服务（start/stop/restart）、实时日志与运行历史（可只看失败）、定时任务、前置脚本链、单脚本环境变量与 `.env` 粘贴导入、完成通知；`⌘K` 快速搜索并运行脚本 / 预设；`~/.zshrc` export 托管块、zshrc 解析 / 备注 / AI 整理；PATH 与依赖体检；内置脚本编辑器，AI 起草 / 修改以 diff 呈现，确认后才写入 |
+| ✦ **AI** | 概览仪表盘；OpenAI 兼容 provider 管理与调用日志；Claude Code / Codex 模型与推理档位配置、推荐组合、预设，用量状态含 5H / 7D 额度与重置时间（北京时间）；**模型榜单**：Arena / Epoch AI 公开数据，按编程 / 图像 / 前端 / 综合给出 Top 4 推荐；Skills 主仓库与双端同步，导入时可确认同名冲突，支持批量同步；**MCP**：直接读写 Claude Code / Codex 的配置，写入前预览，支持连接测试与 AI 选型推荐；命令型 Hooks 双端同步与模板库；本地文档快捷入口；提示词覆盖；数据目录、保留策略与备份恢复 |
+| 🔒 **VPN** | Clash Verge Rev 连接状态 / TUN、出口 IP、当前节点与延迟、订阅流量；一键体检；订阅与增强文件查看，AI 修改在写入前先验证效果；**自定义规则**可视化编辑（分流 / Hosts / Fake-IP / DNS / TUN 绕过），保存即热加载；配置备份 / 预览 / 恢复；原始配置文件编辑（保存前 YAML 校验并自动备份） |
+| ✓ **备忘录** | 一句话添加待办（自动识别「明天 9:30」「下周三」`#标签` `!高` 等），今天 / 计划 / 已完成视图；提醒（横幅 / 声音）、图片与文件附件托管；单词本：词典查询、发音、AI 补全、间隔复习 |
+| ◉ **主机** | 处理器、内存、磁盘、温度与风扇的实时监控；磁盘读写测速与目录占用分析；按网卡的实时流量、网络测速与监听端口；设备详情 |
 
 所有 AI 能力只生成草稿供确认，不会自动写入配置、脚本或 zshrc。
 
@@ -75,7 +98,8 @@ make install    # 复制到 /Applications 并清除隔离属性
     "workbench": true,
     "ai": true,
     "vpn": false,
-    "memo": true
+    "memo": true,
+    "host": true
   }
 }
 ```
@@ -86,10 +110,11 @@ make install    # 复制到 /Applications 并清除隔离属性
 | `ai` | ✦ AI（同时隐藏右上角「✦ AI」快捷面板） |
 | `vpn` | 🔒 VPN（同时隐藏右上角 VPN 状态按钮） |
 | `memo` | ✓ 备忘录 |
+| `host` | ◉ 主机 |
 
-- 未写 `modules` 或缺少某个键时，该模块默认**显示**；新版 Hatch 第一次保存设置时会自动写入四个 `true`。
+- 未写 `modules` 或缺少某个键时，该模块默认**显示**；新版 Hatch 第一次保存设置时会自动写入五个 `true`。
 - 修改后**无需重启**：点击顶部「↻ 刷新」或切回 Hatch 窗口即生效；当前模块被隐藏时自动切到其他可见模块。
-- 四个全部关闭时会保留工作台，窗口不会为空。
+- 全部关闭时会保留工作台，窗口不会为空。
 - Hatch 自身保存配置时不会覆盖你手动改的 `modules`。
 - 隐藏只影响界面：定时任务、备忘提醒、数据清理等后台功能照常运行。
 
@@ -145,44 +170,6 @@ make test-short   # 只显示 PASS / FAIL
 
 ---
 
-## 仓库结构
-
-```text
-hatch/
-├── frontend/                  # 前端工程（Vite + Alpine.js + Pico CSS）
-│   ├── index.html             # 页面模板
-│   ├── src/                   # main.js（状态与交互）、style.css、assets
-│   ├── wailsjs/               # Wails 自动生成的 Go 调用绑定
-│   └── vite.config.js         # 构建产物输出到 ../src/web/dist
-├── src/                       # 后端工程（Go module + Wails 项目）
-│   ├── main.go                # 入口：嵌入 web/dist 并调用 app.Run
-│   ├── go.mod / go.sum
-│   ├── wails.json             # 前端目录 ../frontend，打包目录 ../build
-│   ├── app/                   # Wails 绑定层：system_* / workbench_* / ai_* / vpn / memo*
-│   ├── core/                  # 基础设施：config、fsutil、macos、strutil、backup、datadir、autostart
-│   ├── workbench/             # 工作台：scanner、executor、scheduler、store、zshrc、diagnostics
-│   ├── ai/                    # AI：llm、prompts、agent、skills、hooks、mcp、workspace
-│   ├── vpn/                   # VPN：Clash Verge Rev 管理
-│   └── memo/                  # 备忘录：待办、附件、单词、复盘
-├── build/                     # 打包资源（图标、Info.plist）；产物在 build/bin（不入库）
-├── scripts/release.sh         # 构建 → 签名 → DMG
-└── Makefile                   # 构建 / 测试 / 发布命令入口
-```
-
----
-
-## 技术栈
-
-| 层 | 技术 |
-|---|---|
-| 桌面框架 | Wails v2.12：Go 二进制 + macOS 原生 WKWebView，Go 方法绑定到前端并支持双向事件 |
-| 后端 | Go 1.23+；直接依赖 `wailsapp/wails/v2`、`gopkg.in/yaml.v3`、`pelletier/go-toml` |
-| 前端 | Alpine.js v3、Pico CSS v2（暖色浅色主题，自定义 CSS 变量覆盖）、Vite v3 |
-| AI | OpenAI 兼容协议 provider（`/chat/completions`） |
-| 存储 | 无数据库，全部为本地 JSON / 文件 |
-
----
-
 ## 本地数据
 
 | 用途 | 路径 |
@@ -194,7 +181,6 @@ hatch/
 | AI 调用日志 | `~/Library/Application Support/Hatch/traces/<date>.jsonl`（可配置） |
 | 运行历史 | `~/Library/Application Support/Hatch/runs/<script>/<id>.{log,json}` |
 | Skills 主仓库 | `~/Library/Application Support/Hatch/skills/`（可配置） |
-| AI 工作区快照 | `~/Library/Application Support/Hatch/ai-workspace-snapshots/`（保留最近 20 个） |
 | VPN 备份 | `~/Library/Application Support/Hatch/vpn-backups/`（可配置） |
 | PID 文件 | `/tmp/hatch/<script-name>.pid` |
 | zshrc 托管块 / 备份 | `~/.zshrc`（仅 Hatch block）/ `~/.zshrc.hatch-backup-<时间戳>` |
