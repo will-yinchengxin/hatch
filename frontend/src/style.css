@@ -2325,6 +2325,7 @@ code {
 .codex-usage-pill {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -2412,11 +2413,30 @@ code {
 .usage-mid  .cup-fill { background: var(--yellow); }
 .usage-high .cup-fill { background: var(--red); }
 
-.cup-reset {
+/* Second line of a usage pill: countdown left, absolute Beijing time right */
+.cup-reset-line {
+  flex-basis: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
   font-size: 11px;
-  font-family: var(--font-mono);
   color: var(--text-muted);
+}
+
+.cup-reset-in,
+.cup-reset-at {
   white-space: nowrap;
+}
+
+.cup-reset-at {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── AI Trace Log ──────────────────────────────────────────────────── */
@@ -6844,8 +6864,10 @@ input.vocab-word-input.vocab-word-input { font-size: 18px; }
 
 .claude-usage-age {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 4px;
+  white-space: nowrap;
   font-size: 12px;
   color: var(--text-muted);
 }

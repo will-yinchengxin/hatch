@@ -20,8 +20,10 @@ type ClaudeCodeStatus struct {
 	HasUsageData    bool     `json:"hasUsageData"`
 	FiveHourPct     float64  `json:"fiveHourPct"`
 	FiveHourReset   string   `json:"fiveHourReset"`
+	FiveHourResetAt string   `json:"fiveHourResetAt"`
 	SevenDayPct     float64  `json:"sevenDayPct"`
 	SevenDayReset   string   `json:"sevenDayReset"`
+	SevenDayResetAt string   `json:"sevenDayResetAt"`
 	PlanType        string   `json:"planType"`
 	UsageUpdatedAt  string   `json:"usageUpdatedAt"`
 	UsageAge        string   `json:"usageAge"`
@@ -50,6 +52,7 @@ type CodexUsageWindow struct {
 	WindowMinutes int     `json:"windowMinutes"`
 	ResetsAt      int64   `json:"resetsAt"`
 	ResetIn       string  `json:"resetIn"`
+	ResetAt       string  `json:"resetAt"`
 	Available     bool    `json:"available"`
 }
 
@@ -95,13 +98,15 @@ func ClaudeStatus() ClaudeCodeStatus {
 	st.PlanType = cache.PlanType
 	st.FiveHourPct = cache.RateLimits.FiveHour.UsedPercentage
 	st.FiveHourReset = formatResetCountdown(cache.RateLimits.FiveHour.ResetsAt)
+	st.FiveHourResetAt = formatBeijingTime(cache.RateLimits.FiveHour.ResetsAt)
 	st.SevenDayPct = cache.RateLimits.SevenDay.UsedPercentage
 	st.SevenDayReset = formatResetCountdown(cache.RateLimits.SevenDay.ResetsAt)
+	st.SevenDayResetAt = formatBeijingTime(cache.RateLimits.SevenDay.ResetsAt)
 	// The cache is written only by the Claude Code statusline hook, so it
 	// goes stale whenever the user works in the desktop app instead of the
 	// CLI. Surface its age so the UI can say how old the numbers are.
 	if info, statErr := os.Stat(cachePath); statErr == nil {
-		st.UsageUpdatedAt = info.ModTime().Format("2006-01-02 15:04")
+		st.UsageUpdatedAt = info.ModTime().In(beijingTZ).Format("2006-01-02 15:04")
 		st.UsageAge = formatElapsed(info.ModTime())
 		st.UsageStale = time.Since(info.ModTime()) > claudeUsageCacheMaxAge
 	}
@@ -284,6 +289,7 @@ func codexWindowFromSnapshot(label string, window CodexRateLimitWindow) CodexUsa
 		WindowMinutes: window.WindowMinutes,
 		ResetsAt:      window.ResetsAt,
 		ResetIn:       formatResetCountdown(window.ResetsAt),
+		ResetAt:       formatBeijingTime(window.ResetsAt),
 		Available:     true,
 	}
 }
@@ -306,6 +312,19 @@ func formatElapsed(t time.Time) string {
 	default:
 		return fmt.Sprintf("%d分钟前", mins)
 	}
+}
+
+// beijingTZ is China Standard Time (UTC+8, no DST); usage timestamps are
+// always shown in it regardless of the Mac's own time zone.
+var beijingTZ = time.FixedZone("CST", 8*3600)
+
+// formatBeijingTime renders a unix timestamp as "2006-01-02 15:04:05" in
+// Beijing time, or "" when ts is unset.
+func formatBeijingTime(ts int64) string {
+	if ts == 0 {
+		return ""
+	}
+	return time.Unix(ts, 0).In(beijingTZ).Format("2006-01-02 15:04:05")
 }
 
 func formatResetCountdown(ts int64) string {

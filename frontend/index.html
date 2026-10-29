@@ -2326,14 +2326,14 @@
                         <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(claudeStatus.fiveHourPct)+'%'"></strong></span>
                         <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.max(0,100-Math.round(claudeStatus.fiveHourPct))+'%'"></strong></span>
                         <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(claudeStatus.fiveHourPct,100)+'%'"></span></span>
-                        <span class="cup-reset" x-show="claudeStatus.fiveHourReset">↻ <span x-text="claudeStatus.fiveHourReset"></span></span>
+                        <div class="cup-reset-line" x-show="claudeStatus.fiveHourReset"><span class="cup-reset-in">↻ <span x-text="claudeStatus.fiveHourReset === '已重置' ? '已重置' : claudeStatus.fiveHourReset + ' 后重置'"></span></span><span class="cup-reset-at" x-show="claudeStatus.fiveHourResetAt" title="重置时间（北京时间）" x-text="claudeStatus.fiveHourResetAt"></span></div>
                       </div>
                       <div class="claude-usage-pill" :class="usagePill(claudeStatus.sevenDayPct)">
                         <span class="cup-window">7d</span>
                         <span class="cup-metric"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(claudeStatus.sevenDayPct)+'%'"></strong></span>
                         <span class="cup-metric cup-left"><span class="cup-label">剩余</span><strong x-text="Math.max(0,100-Math.round(claudeStatus.sevenDayPct))+'%'"></strong></span>
                         <span class="cup-bar"><span class="cup-fill" :style="'width:'+Math.min(claudeStatus.sevenDayPct,100)+'%'"></span></span>
-                        <span class="cup-reset" x-show="claudeStatus.sevenDayReset">↻ <span x-text="claudeStatus.sevenDayReset"></span></span>
+                        <div class="cup-reset-line" x-show="claudeStatus.sevenDayReset"><span class="cup-reset-in">↻ <span x-text="claudeStatus.sevenDayReset === '已重置' ? '已重置' : claudeStatus.sevenDayReset + ' 后重置'"></span></span><span class="cup-reset-at" x-show="claudeStatus.sevenDayResetAt" title="重置时间（北京时间）" x-text="claudeStatus.sevenDayResetAt"></span></div>
                       </div>
                     </div>
                   </template>
@@ -2557,7 +2557,7 @@
                           <span class="cup-metric" x-show="codexStatus.primary.available"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.primary.usedPercent)+'%'"></strong></span>
                           <span class="cup-metric cup-left" x-show="codexStatus.primary.available"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.primary.leftPercent)+'%'"></strong></span>
                           <span class="cup-bar" x-show="codexStatus.primary.available"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.primary.usedPercent,100)+'%'"></span></span>
-                          <span class="cup-reset" x-show="codexStatus.primary.resetIn">↻ <span x-text="codexStatus.primary.resetIn"></span></span>
+                          <div class="cup-reset-line" x-show="codexStatus.primary.resetIn"><span class="cup-reset-in">↻ <span x-text="codexStatus.primary.resetIn === '已重置' ? '已重置' : codexStatus.primary.resetIn + ' 后重置'"></span></span><span class="cup-reset-at" x-show="codexStatus.primary.resetAt" title="重置时间（北京时间）" x-text="codexStatus.primary.resetAt"></span></div>
                           <span class="cup-unavailable" x-show="!codexStatus.primary.available">暂无数据</span>
                         </div>
                         <div class="codex-usage-pill" :class="codexStatus.secondary.available ? usagePill(codexStatus.secondary.usedPercent) : 'usage-unavailable'">
@@ -2565,7 +2565,7 @@
                           <span class="cup-metric" x-show="codexStatus.secondary.available"><span class="cup-label">已用</span><strong class="cup-pct" x-text="Math.round(codexStatus.secondary.usedPercent)+'%'"></strong></span>
                           <span class="cup-metric cup-left" x-show="codexStatus.secondary.available"><span class="cup-label">剩余</span><strong x-text="Math.round(codexStatus.secondary.leftPercent)+'%'"></strong></span>
                           <span class="cup-bar" x-show="codexStatus.secondary.available"><span class="cup-fill" :style="'width:'+Math.min(codexStatus.secondary.usedPercent,100)+'%'"></span></span>
-                          <span class="cup-reset" x-show="codexStatus.secondary.resetIn">↻ <span x-text="codexStatus.secondary.resetIn"></span></span>
+                          <div class="cup-reset-line" x-show="codexStatus.secondary.resetIn"><span class="cup-reset-in">↻ <span x-text="codexStatus.secondary.resetIn === '已重置' ? '已重置' : codexStatus.secondary.resetIn + ' 后重置'"></span></span><span class="cup-reset-at" x-show="codexStatus.secondary.resetAt" title="重置时间（北京时间）" x-text="codexStatus.secondary.resetAt"></span></div>
                           <span class="cup-unavailable" x-show="!codexStatus.secondary.available">暂无数据</span>
                         </div>
                       </div>

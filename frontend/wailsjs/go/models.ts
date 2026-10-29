@@ -24,8 +24,10 @@ export namespace agent {
 	    hasUsageData: boolean;
 	    fiveHourPct: number;
 	    fiveHourReset: string;
+	    fiveHourResetAt: string;
 	    sevenDayPct: number;
 	    sevenDayReset: string;
+	    sevenDayResetAt: string;
 	    planType: string;
 	    usageUpdatedAt: string;
 	    usageAge: string;
@@ -44,8 +46,10 @@ export namespace agent {
 	        this.hasUsageData = source["hasUsageData"];
 	        this.fiveHourPct = source["fiveHourPct"];
 	        this.fiveHourReset = source["fiveHourReset"];
+	        this.fiveHourResetAt = source["fiveHourResetAt"];
 	        this.sevenDayPct = source["sevenDayPct"];
 	        this.sevenDayReset = source["sevenDayReset"];
+	        this.sevenDayResetAt = source["sevenDayResetAt"];
 	        this.planType = source["planType"];
 	        this.usageUpdatedAt = source["usageUpdatedAt"];
 	        this.usageAge = source["usageAge"];
@@ -75,6 +79,7 @@ export namespace agent {
 	    windowMinutes: number;
 	    resetsAt: number;
 	    resetIn: string;
+	    resetAt: string;
 	    available: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -89,6 +94,7 @@ export namespace agent {
 	        this.windowMinutes = source["windowMinutes"];
 	        this.resetsAt = source["resetsAt"];
 	        this.resetIn = source["resetIn"];
+	        this.resetAt = source["resetAt"];
 	        this.available = source["available"];
 	    }
 	}
