@@ -395,75 +395,6 @@ export namespace config {
 	        this.model = source["model"];
 	    }
 	}
-	export class AgentResourceSelection {
-	    id: string;
-	    claude: boolean;
-	    codex: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new AgentResourceSelection(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.claude = source["claude"];
-	        this.codex = source["codex"];
-	    }
-	}
-	export class AIWorkspaceProfile {
-	    id: string;
-	    name: string;
-	    rootPath: string;
-	    claudeModel?: string;
-	    claudeEffort?: string;
-	    codexModel?: string;
-	    codexEffort?: string;
-	    codexGoals: boolean;
-	    skills?: AgentResourceSelection[];
-	    mcpServers?: AgentResourceSelection[];
-	    hooks?: AgentResourceSelection[];
-	    updatedAt: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new AIWorkspaceProfile(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.rootPath = source["rootPath"];
-	        this.claudeModel = source["claudeModel"];
-	        this.claudeEffort = source["claudeEffort"];
-	        this.codexModel = source["codexModel"];
-	        this.codexEffort = source["codexEffort"];
-	        this.codexGoals = source["codexGoals"];
-	        this.skills = this.convertValues(source["skills"], AgentResourceSelection);
-	        this.mcpServers = this.convertValues(source["mcpServers"], AgentResourceSelection);
-	        this.hooks = this.convertValues(source["hooks"], AgentResourceSelection);
-	        this.updatedAt = source["updatedAt"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
 	export class ArgDef {
 	    name: string;
 	    flag: string;
@@ -897,8 +828,6 @@ export namespace config {
 	    mcpMeta?: MCPMeta[];
 	    hooks?: HookDef[];
 	    hooksSeeded?: boolean;
-	    aiWorkspaceProfiles?: AIWorkspaceProfile[];
-	    lastAppliedWorkspaceId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -932,8 +861,6 @@ export namespace config {
 	        this.mcpMeta = this.convertValues(source["mcpMeta"], MCPMeta);
 	        this.hooks = this.convertValues(source["hooks"], HookDef);
 	        this.hooksSeeded = source["hooksSeeded"];
-	        this.aiWorkspaceProfiles = this.convertValues(source["aiWorkspaceProfiles"], AIWorkspaceProfile);
-	        this.lastAppliedWorkspaceId = source["lastAppliedWorkspaceId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3398,124 +3325,6 @@ export namespace vpn {
 		    }
 		    return a;
 		}
-	}
-
-}
-
-export namespace workspace {
-	
-	export class HealthCheck {
-	    id: string;
-	    label: string;
-	    status: string;
-	    detail: string;
-	    suggestion?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new HealthCheck(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.label = source["label"];
-	        this.status = source["status"];
-	        this.detail = source["detail"];
-	        this.suggestion = source["suggestion"];
-	    }
-	}
-	export class Health {
-	    overall: string;
-	    currentProfile: string;
-	    profileState: string;
-	    checks: HealthCheck[];
-	
-	    static createFrom(source: any = {}) {
-	        return new Health(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.overall = source["overall"];
-	        this.currentProfile = source["currentProfile"];
-	        this.profileState = source["profileState"];
-	        this.checks = this.convertValues(source["checks"], HealthCheck);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class Preview {
-	    profile: config.AIWorkspaceProfile;
-	    changes: string[];
-	    errors: string[];
-	    warnings: string[];
-	    canApply: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new Preview(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.profile = this.convertValues(source["profile"], config.AIWorkspaceProfile);
-	        this.changes = source["changes"];
-	        this.errors = source["errors"];
-	        this.warnings = source["warnings"];
-	        this.canApply = source["canApply"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SnapshotInfo {
-	    id: string;
-	    profileId: string;
-	    profileName: string;
-	    createdAt: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new SnapshotInfo(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.profileId = source["profileId"];
-	        this.profileName = source["profileName"];
-	        this.createdAt = source["createdAt"];
-	    }
 	}
 
 }

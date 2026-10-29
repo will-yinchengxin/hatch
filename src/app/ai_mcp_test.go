@@ -57,9 +57,19 @@ func TestMCPCodexToggleThroughApp(t *testing.T) {
 	if err := a.SetMCPEnabled("docs", key, false); err != nil {
 		t.Fatal(err)
 	}
-	states := a.globalMCPStates()
-	if len(states) != 1 || !states[0].HasCodex || states[0].Codex {
-		t.Fatalf("states = %+v", states)
+	found := false
+	for _, r := range a.GetMCPInventory(false).Rows {
+		for _, e := range r.Entries {
+			if r.Name == "docs" && e.LocationKey == key {
+				found = true
+				if e.Enabled {
+					t.Fatalf("docs still enabled: %+v", e)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatal("docs entry missing from inventory")
 	}
 	if len(a.cfg.MCPMeta) != 0 {
 		t.Fatalf("codex toggle must not park: %+v", a.cfg.MCPMeta)

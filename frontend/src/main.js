@@ -96,14 +96,6 @@ const GetHooksStats         = ()                            => window['go']['app
 const GetHookEventSupport   = ()                            => window['go']['app']['App']['GetHookEventSupport']();
 const SuggestHookFromDescription = (desc)                   => window['go']['app']['App']['SuggestHookFromDescription'](desc);
 const SuggestHookEdit       = (hook, instruction)          => window['go']['app']['App']['SuggestHookEdit'](hook, instruction);
-const ListAIWorkspaceProfiles = ()                         => window['go']['app']['App']['ListAIWorkspaceProfiles']();
-const SaveAIWorkspaceProfile = (profile)                   => window['go']['app']['App']['SaveAIWorkspaceProfile'](profile);
-const DeleteAIWorkspaceProfile = (id)                      => window['go']['app']['App']['DeleteAIWorkspaceProfile'](id);
-const PreviewAIWorkspaceProfileApply = (id)                => window['go']['app']['App']['PreviewAIWorkspaceProfileApply'](id);
-const ApplyAIWorkspaceProfile = (id)                       => window['go']['app']['App']['ApplyAIWorkspaceProfile'](id);
-const ListAIWorkspaceSnapshots = ()                        => window['go']['app']['App']['ListAIWorkspaceSnapshots']();
-const RollbackAIWorkspaceSnapshot = (id)                   => window['go']['app']['App']['RollbackAIWorkspaceSnapshot'](id);
-const GetAIEnvironmentHealth = ()                          => window['go']['app']['App']['GetAIEnvironmentHealth']();
 const GetMemoDashboard     = ()                            => window['go']['app']['App']['GetMemoDashboard']();
 const ListMemos            = ()                            => window['go']['app']['App']['ListMemos']();
 const SaveMemo             = (item)                        => window['go']['app']['App']['SaveMemo'](item);
@@ -376,19 +368,8 @@ window.hatchApp = function () {
     hookAIInstruction: '',       // AI optimize bar inside the editor
     hookAIBusy: false,
 
-    // AI workspace profiles
-    workspaceProfiles: [],
-    workspaceSnapshots: [],
-    workspaceHealth: null,
-    workspaceLoading: false,
-    workspacePreview: null,
-    workspacePreviewing: false,
-    workspaceApplying: false,
-    workspaceFormOpen: false,
-    workspaceForm: null,
-
     // AI sub-navigation
-    aiSubTab: 'overview',    // 'overview' | 'connect' | 'tools' | 'workspace' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
+    aiSubTab: 'overview',    // 'overview' | 'connect' | 'tools' | 'skills' | 'mcp' | 'hooks' | 'docs' | 'prompts' | 'data'
 
     // VPN module
     vpnSubTab: 'overview',   // 'overview' | 'subs' | 'rules' | 'backup' | 'config'
@@ -894,7 +875,6 @@ esac
         overview: () => this.loadOverview(),
         connect: () => this.loadAIProviders(),
         tools: () => this.loadAIUsageStatuses(),
-        workspace: () => this.loadWorkspace(),
         skills: () => this.loadSkills(),
         mcp: () => this.loadMCP(),
         hooks: () => this.loadHooks(),
@@ -950,7 +930,7 @@ esac
       const ai = params.get('aiSubTab') || params.get('ai');
       const memo = params.get('memoSubTab') || params.get('memo');
       const vpn = params.get('vpnSubTab') || params.get('vpn');
-      const allowedAI = ['leaderboards', 'overview', 'connect', 'tools', 'workspace', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
+      const allowedAI = ['leaderboards', 'overview', 'connect', 'tools', 'skills', 'mcp', 'hooks', 'docs', 'prompts', 'data'];
       const allowedMemo = ['today', 'upcoming', 'done', 'words', 'review', 'storage'];
       if (allowedAI.includes(ai)) {
         this.tab = 'ai';
@@ -3126,110 +3106,6 @@ esac
     },
 
     // ── Claude Code / Codex usage status ──────────────────────────────
-    // ── AI workspace profiles ─────────────────────────────────────────
-    async loadWorkspace() {
-      this.workspaceLoading = true;
-      try {
-        const [profiles, snapshots, health, skills, mcps, hooks] = await Promise.all([
-          ListAIWorkspaceProfiles(), ListAIWorkspaceSnapshots(), GetAIEnvironmentHealth(),
-          this.skills.length ? Promise.resolve(this.skills) : GetSkills(),
-          this.mcpInventory ? Promise.resolve(null) : this.loadMCP(),
-          this.hooks.length ? Promise.resolve(this.hooks) : ListHooks(),
-          // New profiles start from the current agent settings; without these
-          // the form would default to empty and applying would reset them.
-          this.loadClaudeCodeConfig(), this.loadCodexModelConfig(),
-        ]);
-        this.workspaceProfiles = profiles || [];
-        this.workspaceSnapshots = snapshots || [];
-        this.workspaceHealth = health;
-        this.skills = skills || [];
-        this.hooks = hooks || [];
-      } catch (e) { this.showError(`加载工作区失败: ${e}`); }
-      finally { this.workspaceLoading = false; }
-    },
-
-    workspaceSelections(items, key) {
-      return (items || []).map(item => ({ id: item[key], claude: !!item.inClaude || !!item.enabledInClaude, codex: !!item.inCodex || !!item.enabledInCodex }));
-    },
-
-    openWorkspaceForm(profile = null) {
-      this.workspacePreview = null;
-      this.workspaceForm = profile ? JSON.parse(JSON.stringify(profile)) : {
-        id: '', name: '', rootPath: '', claudeModel: this.claudeCodeConfig.model || '', claudeEffort: this.claudeCodeConfig.effortLevel || '',
-        codexModel: this.codexModelConfig.model || '', codexEffort: this.codexModelConfig.effortLevel || '', codexGoals: !!this.codexModelConfig.goalsEnabled,
-        skills: this.workspaceSelections(this.skills, 'name'), mcpServers: this.workspaceSelections(this.mcpServers, 'id'), hooks: this.workspaceSelections(this.hooks, 'id'),
-      };
-      this.workspaceFormOpen = true;
-      this.$nextTick(() => document.querySelector('.workspace-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-    },
-
-    workspaceSelection(list, id) {
-      return (list || []).find(x => x.id === id) || { id, claude: false, codex: false };
-    },
-
-    toggleWorkspaceSelection(kind, id, target, enabled) {
-      const list = [...(this.workspaceForm[kind] || [])];
-      let item = list.find(x => x.id === id);
-      if (!item) { item = { id, claude: false, codex: false }; list.push(item); }
-      item[target] = enabled;
-      this.workspaceForm = { ...this.workspaceForm, [kind]: list.filter(x => x.claude || x.codex) };
-    },
-
-    async saveWorkspaceProfile() {
-      if (!this.workspaceForm?.name?.trim() || !this.workspaceForm?.rootPath?.trim()) { this.showError('请填写工作区名称和目录'); return; }
-      try {
-        const saved = await SaveAIWorkspaceProfile(this.workspaceForm);
-        this.workspaceForm = saved;
-        this.workspaceFormOpen = false;
-        await this.loadWorkspace();
-        this.showSuccess('工作区画像已保存');
-      } catch (e) { this.showError(`保存工作区失败: ${e}`); }
-    },
-
-    async previewWorkspaceProfile(profile) {
-      this.workspacePreviewing = true;
-      this.workspacePreview = null;
-      try { this.workspacePreview = await PreviewAIWorkspaceProfileApply(profile.id); }
-      catch (e) { this.showError(`预检失败: ${e}`); }
-      finally { this.workspacePreviewing = false; }
-      this.$nextTick(() => document.querySelector('.workspace-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
-    },
-
-    async applyWorkspaceProfile() {
-      const profile = this.workspacePreview?.profile;
-      if (!profile?.id || !this.workspacePreview?.canApply) return;
-      this.workspaceApplying = true;
-      try {
-        await ApplyAIWorkspaceProfile(profile.id);
-        this.workspacePreview = null;
-        await this.reloadAfterWorkspaceChange();
-        this.showSuccess(`已应用工作区画像「${profile.name}」`);
-      } catch (e) { this.showError(`应用失败: ${e}`); }
-      finally { this.workspaceApplying = false; }
-    },
-
-    async deleteWorkspaceProfile(profile) {
-      if (!(await this.askConfirm(`删除工作区画像「${profile.name}」？不会改动当前 Claude/Codex 配置。`))) return;
-      try { await DeleteAIWorkspaceProfile(profile.id); await this.loadWorkspace(); this.showSuccess('工作区画像已删除'); }
-      catch (e) { this.showError(`删除失败: ${e}`); }
-    },
-
-    // Apply / rollback rewrite skills, hooks, MCP and agent settings, so drop
-    // the caches loadWorkspace would otherwise reuse and refresh the hero.
-    async reloadAfterWorkspaceChange() {
-      this.skills = [];
-      this.hooks = [];
-      this.mcpInventory = null;
-      await this.loadWorkspace();
-      this.loadAIHeroStats();
-    },
-
-    async rollbackWorkspaceSnapshot(snapshot) {
-      if (!(await this.askConfirm(`回滚到「${snapshot.profileName}」应用前的状态？当前 Hatch 管理的 AI 配置会被恢复。`, { title: '回滚 AI 工作区', confirmText: '回滚' }))) return;
-      try { await RollbackAIWorkspaceSnapshot(snapshot.id); await this.reloadAfterWorkspaceChange(); this.showSuccess('已回滚 AI 工作区快照'); }
-      catch (e) { this.showError(`回滚失败: ${e}`); }
-    },
-
     // ── AI tool status ─────────────────────────────────────────────────
     async loadAIUsageStatuses() {
       if (!this.claudeStatus) this.loadClaudeStatus();
@@ -4432,15 +4308,6 @@ esac
           (h.command || '').toLowerCase().includes(q));
       }
       return list;
-    },
-
-    // Rows Claude-global / Codex can switch (overview counts + workspace profiles).
-    get mcpServers() {
-      return (this.mcpInventory?.rows || []).map(r => {
-        const at = key => r.entries.find(e => e.locationKey === key);
-        const c = at('claude:user'), x = at('codex:user');
-        return { id: r.name, name: r.name, enabledInClaude: !!c?.enabled, enabledInCodex: !!x?.enabled, global: !!(c || x) };
-      }).filter(s => s.global);
     },
 
     get mcpEnabledCount() {

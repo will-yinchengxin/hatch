@@ -10,10 +10,6 @@ export function AnalyzeHostStorage() {
   return window['go']['app']['App']['AnalyzeHostStorage']();
 }
 
-export function ApplyAIWorkspaceProfile(arg1) {
-  return window['go']['app']['App']['ApplyAIWorkspaceProfile'](arg1);
-}
-
 export function ApplyAllSchedules() {
   return window['go']['app']['App']['ApplyAllSchedules']();
 }
@@ -32,10 +28,6 @@ export function ApplyVPNEnhanceEdit(arg1, arg2) {
 
 export function ApplyZshrcOrganization(arg1) {
   return window['go']['app']['App']['ApplyZshrcOrganization'](arg1);
-}
-
-export function CaptureCurrentAIWorkspaceProfile(arg1, arg2) {
-  return window['go']['app']['App']['CaptureCurrentAIWorkspaceProfile'](arg1, arg2);
 }
 
 export function CheckCommandAvailable(arg1) {
@@ -76,10 +68,6 @@ export function CreateScriptFile(arg1, arg2, arg3) {
 
 export function CreateSkillTemplate(arg1) {
   return window['go']['app']['App']['CreateSkillTemplate'](arg1);
-}
-
-export function DeleteAIWorkspaceProfile(arg1) {
-  return window['go']['app']['App']['DeleteAIWorkspaceProfile'](arg1);
 }
 
 export function DeleteClaudeCodePreset(arg1) {
@@ -136,10 +124,6 @@ export function ExportBackup(arg1) {
 
 export function ExportVPNBackup() {
   return window['go']['app']['App']['ExportVPNBackup']();
-}
-
-export function GetAIEnvironmentHealth() {
-  return window['go']['app']['App']['GetAIEnvironmentHealth']();
 }
 
 export function GetAIProviders() {
@@ -358,14 +342,6 @@ export function ImportVPNBackup(arg1) {
   return window['go']['app']['App']['ImportVPNBackup'](arg1);
 }
 
-export function ListAIWorkspaceProfiles() {
-  return window['go']['app']['App']['ListAIWorkspaceProfiles']();
-}
-
-export function ListAIWorkspaceSnapshots() {
-  return window['go']['app']['App']['ListAIWorkspaceSnapshots']();
-}
-
 export function ListAliasInventory() {
   return window['go']['app']['App']['ListAliasInventory']();
 }
@@ -442,10 +418,6 @@ export function ParseZshrc() {
   return window['go']['app']['App']['ParseZshrc']();
 }
 
-export function PreviewAIWorkspaceProfileApply(arg1) {
-  return window['go']['app']['App']['PreviewAIWorkspaceProfileApply'](arg1);
-}
-
 export function PreviewMCPApply(arg1) {
   return window['go']['app']['App']['PreviewMCPApply'](arg1);
 }
@@ -498,10 +470,6 @@ export function ReviewVocabEntry(arg1, arg2) {
   return window['go']['app']['App']['ReviewVocabEntry'](arg1, arg2);
 }
 
-export function RollbackAIWorkspaceSnapshot(arg1) {
-  return window['go']['app']['App']['RollbackAIWorkspaceSnapshot'](arg1);
-}
-
 export function RunHostDiskBenchmark() {
   return window['go']['app']['App']['RunHostDiskBenchmark']();
 }
@@ -524,10 +492,6 @@ export function SaveAIConfig(arg1) {
 
 export function SaveAIProviders(arg1, arg2) {
   return window['go']['app']['App']['SaveAIProviders'](arg1, arg2);
-}
-
-export function SaveAIWorkspaceProfile(arg1) {
-  return window['go']['app']['App']['SaveAIWorkspaceProfile'](arg1);
 }
 
 export function SaveAppDataPaths(arg1, arg2) {

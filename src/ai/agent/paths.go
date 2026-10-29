@@ -46,17 +46,3 @@ func CodexSessionsDir() (string, error) { return homePath(".codex", "sessions") 
 func ClaudeUsageCachePath() (string, error) {
 	return homePath(".cache", "will-statusline", "last.json")
 }
-
-// ManagedConfigFiles lists every agent config file Hatch may rewrite; AI
-// workspace snapshots capture exactly these.
-func ManagedConfigFiles() ([]string, error) {
-	var out []string
-	for _, f := range []func() (string, error){ClaudeSettingsPath, ClaudeJSONPath, CodexConfigPath, CodexHooksPath} {
-		p, err := f()
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, p)
-	}
-	return out, nil
-}
