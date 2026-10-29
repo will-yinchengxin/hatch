@@ -22,29 +22,31 @@ Hatch 是一个面向 Apple Silicon macOS 的本地桌面工具，把脚本管�
   <img src="docs/screenshots/ai-overview.png" alt="AI 概览" width="100%" />
 </p>
 
+## 界面一览
+
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/ai-leaderboards.png" alt="模型榜单与 Top 4 推荐" /></td>
-    <td width="50%"><img src="docs/screenshots/ai-agents.png" alt="Claude Code / Codex 用量与模型配置" /></td>
+    <td width="50%" valign="top"><b>🗂 工作台</b> · 脚本、服务、⌘K 快速运行<br /><img src="docs/screenshots/workbench.png" alt="工作台" /></td>
+    <td width="50%" valign="top"><b>✦ 助手</b> · Claude Code / Codex 用量与模型配置<br /><img src="docs/screenshots/ai-agents.png" alt="助手" /></td>
   </tr>
   <tr>
-    <td align="center"><sub><b>模型榜单</b> · 各领域 Top 4 推荐</sub></td>
-    <td align="center"><sub><b>助手</b> · Claude Code / Codex 用量与重置时间</sub></td>
+    <td width="50%" valign="top"><b>✦ Skills</b> · 主仓库与双端同步<br /><img src="docs/screenshots/ai-skills.png" alt="Skills" /></td>
+    <td width="50%" valign="top"><b>✦ MCP</b> · 直接读写 Claude Code / Codex 配置<br /><img src="docs/screenshots/ai-mcp.png" alt="MCP" /></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/vpn.png" alt="VPN 配置中心" /></td>
-    <td width="50%"><img src="docs/screenshots/host.png" alt="主机状况" /></td>
+    <td width="50%" valign="top"><b>✦ 模型榜单</b> · 各领域 Top 4 推荐<br /><img src="docs/screenshots/ai-leaderboards.png" alt="模型榜单" /></td>
+    <td width="50%" valign="top"><b>🔒 VPN · 订阅</b> · 订阅与增强一目了然<br /><img src="docs/screenshots/vpn-subs.png" alt="VPN 订阅" /></td>
   </tr>
   <tr>
-    <td align="center"><sub><b>VPN</b> · 连接状态 / 出口 / 节点 / 订阅流量</sub></td>
-    <td align="center"><sub><b>主机</b> · 实时采样与磁盘 / 网络测速</sub></td>
+    <td width="50%" valign="top"><b>🔒 VPN · 自定义规则</b> · 保存即热加载<br /><img src="docs/screenshots/vpn-rules.png" alt="VPN 自定义规则" /></td>
+    <td width="50%" valign="top"><b>◉ 主机</b> · 实时监控与磁盘 / 网络测速<br /><img src="docs/screenshots/host.png" alt="主机" /></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>✓ 备忘录</b> · 待办提醒、单词本与间隔复习<br /><img src="docs/screenshots/memo.png" alt="备忘录" width="50%" /></td>
   </tr>
 </table>
 
-<p align="center">
-  <img src="docs/screenshots/memo.png" alt="备忘录与单词本" width="70%" />
-  <br /><sub><b>备忘录</b> · 待办提醒、单词本与间隔复习</sub>
-</p>
+<sub>截图中的出口 IP、订阅名、本机路径等敏感信息已做马赛克处理。</sub>
 
 ---
 
