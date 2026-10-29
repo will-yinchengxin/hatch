@@ -120,12 +120,8 @@ func (s Store) List() ([]Entry, error) {
 	}
 	var out []Entry
 	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
 		skillPath := filepath.Join(s.Dir, e.Name())
-		// skip dirs that don't have SKILL.md — they're not valid skills
-		if _, err := os.Stat(filepath.Join(skillPath, "SKILL.md")); err != nil {
+		if !isSkillDir(skillPath, e) {
 			continue
 		}
 		modTime := int64(0)
@@ -254,10 +250,11 @@ func (s Store) ImportFrom(source string) (ImportResult, error) {
 
 	var result ImportResult
 	for _, e := range entries {
-		if !e.IsDir() {
+		src := filepath.Join(srcBase, e.Name())
+		// Client bookkeeping dirs (.trash, .system, synced/) are not skills.
+		if !isSkillDir(src, e) {
 			continue
 		}
-		src := filepath.Join(srcBase, e.Name())
 		dst := filepath.Join(s.Dir, e.Name())
 		if !fsutil.DirExists(dst) {
 			if err := fsutil.CopyDir(src, dst); err != nil {
@@ -397,6 +394,15 @@ func Fingerprint(dir string) (string, int64, error) {
 		}
 	}
 	return hex.EncodeToString(h.Sum(nil)), latest, nil
+}
+
+// isSkillDir reports whether e is a visible directory holding a SKILL.md.
+func isSkillDir(path string, e os.DirEntry) bool {
+	if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(path, "SKILL.md"))
+	return err == nil
 }
 
 func sourceDir(source string) (string, error) {
