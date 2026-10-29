@@ -2244,6 +2244,11 @@ esac
     },
 
     async importSkills(source) {
+      const label = source === 'claude' ? 'Claude' : 'Codex';
+      const dir = source === 'claude' ? '~/.claude/skills' : '~/.codex/skills';
+      if (!(await this.askConfirm(
+        `把 ${dir} 中 Hatch 还没有的 Skill 复制到 Hatch 主库。\n同名且内容一致的会跳过；内容不同的列为冲突，由你逐个选择，不会自动覆盖。`,
+        { title: `从 ${label} 导入 Skills`, confirmText: '导入', danger: false }))) return;
       this.skillImporting = source;
       this.skillImportResult = null;
       try {
@@ -2252,7 +2257,6 @@ esac
         await this.loadSkills();
         const n = (r?.imported || []).length;
         const c = (r?.conflicts || []).length;
-        const label = source === 'claude' ? 'Claude' : 'Codex';
         if (n > 0 || c > 0) {
           const parts = [];
           if (n > 0) parts.push(`导入 ${n} 个`);
@@ -3598,6 +3602,13 @@ esac
     async bulkSkillSync(target, enabled) {
       const list = this.filteredSkills || [];
       if (!list.length) { this.showError('没有可操作的 Skill'); return; }
+      const label = target === 'claude' ? 'Claude' : 'Codex';
+      const dir = target === 'claude' ? '~/.claude/skills' : '~/.codex/skills';
+      const pending = list.filter(s => (target === 'claude' ? s.inClaude : s.inCodex) !== enabled).length;
+      if (!pending) { this.showSuccess(`当前筛选下的 Skill 已全部同步到 ${label}`); return; }
+      if (!(await this.askConfirm(
+        `把当前筛选下 ${pending} 个尚未同步的 Skill 从 Hatch 主库复制到 ${dir}。\n目标目录中的同名文件夹会被 Hatch 版本整体替换。`,
+        { title: `全部同步到 ${label}`, confirmText: '同步', danger: false }))) return;
       let n = 0;
       for (const s of list) {
         const already = target === 'claude' ? s.inClaude : s.inCodex;
@@ -3605,13 +3616,18 @@ esac
         try { await SetSkillSync(s.name, target, enabled); n++; } catch (_) {}
       }
       await this.loadSkills();
-      const label = target === 'claude' ? 'Claude' : 'Codex';
       this.showSuccess(enabled ? `已同步 ${n} 个 Skill 到 ${label}` : `已从 ${label} 取消 ${n} 个 Skill`);
     },
 
     async bulkSkillUnsyncAll() {
       const list = this.filteredSkills || [];
       if (!list.length) { this.showError('没有可操作的 Skill'); return; }
+      const nClaude = list.filter(s => s.inClaude).length;
+      const nCodex = list.filter(s => s.inCodex).length;
+      if (!nClaude && !nCodex) { this.showSuccess('当前筛选下没有已同步的 Skill'); return; }
+      if (!(await this.askConfirm(
+        `从 ~/.claude/skills 删除 ${nClaude} 个、从 ~/.codex/skills 删除 ${nCodex} 个当前筛选下的 Skill 文件夹。\nHatch 主库中的 Skill 保留，之后可以重新同步。`,
+        { title: '全部取消同步', confirmText: '取消同步' }))) return;
       let n = 0;
       for (const s of list) {
         if (s.inClaude) { try { await SetSkillSync(s.name, 'claude', false); n++; } catch (_) {} }
