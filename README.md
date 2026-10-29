@@ -7,6 +7,11 @@
 **macOS 脚本管理与开发环境仪表盘**
 
 ![Platform](https://img.shields.io/badge/platform-macOS%20arm64-000000?logo=apple&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go&logoColor=white)
+![Wails](https://img.shields.io/badge/Wails-v2.12-DF0000?logo=wails&logoColor=white)
+![Alpine.js](https://img.shields.io/badge/Alpine.js-v3-8BC0D0?logo=alpinedotjs&logoColor=white)
+![Pico CSS](https://img.shields.io/badge/Pico%20CSS-v2-13795B)
+![Vite](https://img.shields.io/badge/Vite-v3-646CFF?logo=vite&logoColor=white)
 
 </div>
 
