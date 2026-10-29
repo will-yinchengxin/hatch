@@ -175,21 +175,15 @@ make test-short   # 只显示 PASS / FAIL
 
 ---
 
-## 本地数据
+## 🤝 参与贡献
 
-| 用途 | 路径 |
-|---|---|
-| 主配置（含模块开关） | `~/Library/Application Support/Hatch/config.json` |
-| 脚本缓存 | `~/Library/Application Support/Hatch/scripts.json` |
-| 备忘录 / 单词 | `~/Library/Application Support/Hatch/memos.json` |
-| 备忘录附件 | `~/Library/Application Support/Hatch/memo-files/`（可配置） |
-| AI 调用日志 | `~/Library/Application Support/Hatch/traces/<date>.jsonl`（可配置） |
-| 运行历史 | `~/Library/Application Support/Hatch/runs/<script>/<id>.{log,json}` |
-| Skills 主仓库 | `~/Library/Application Support/Hatch/skills/`（可配置） |
-| VPN 备份 | `~/Library/Application Support/Hatch/vpn-backups/`（可配置） |
-| PID 文件 | `/tmp/hatch/<script-name>.pid` |
-| zshrc 托管块 / 备份 | `~/.zshrc`（仅 Hatch block）/ `~/.zshrc.hatch-backup-<时间戳>` |
-| 开机自启 | `~/Library/LaunchAgents/com.hatch.app.plist` |
-| 配置备份导出 | `~/Desktop/hatch-backup-<时间戳>.zip`（默认） |
+欢迎提交 Issue 和 Pull Request。
 
-AI 调用日志、运行历史和备忘录附件按保留策略在启动时和每小时自动清理，可在 AI → 数据 页面调整。
+- 后端逻辑放在对应的模块包（`core` / `workbench` / `ai` / `vpn` / `memo` / `hostmonitor`），`src/app` 只做 Wails 绑定；模块包不依赖 Wails 和 `app`。
+- 前端使用 Alpine.js + Pico CSS，不引入 Tailwind，新样式写进 `frontend/src/style.css` 的具名 class，避免内联 `style`。
+- 提交前请运行 `make test`，涉及界面的改动请附一张截图。
+- AI 相关功能只生成草稿供用户确认，不要静默写入配置、脚本或 zshrc。
+
+## 📝 License
+
+MIT License，详见 [LICENSE](LICENSE)。
