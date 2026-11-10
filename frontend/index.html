@@ -2623,10 +2623,28 @@
               <span class="muted text-sm">链接本地文档，一键用系统默认程序打开</span>
             </div>
 
+            <div class="doc-links-toolbar">
+              <input type="search" class="field-input doc-links-search" x-model="docLinkSearch"
+                aria-label="搜索文档名称或路径" placeholder="搜索文档名称或路径…" @keydown.escape="docLinkSearch = ''" />
+              <button class="btn-sm" x-show="docLinkSearch" @click="docLinkSearch = ''">清除</button>
+              <span class="muted text-sm" role="status" x-text="filteredDocLinks.length + ' / ' + docLinks.length + ' 篇'"></span>
+            </div>
+            <p class="muted text-xs doc-links-hint">拖动左侧 ⠿ 调整顺序，松开后自动保存；也可聚焦手柄，按 ↑ / ↓ 移动。搜索时仍可排序。</p>
             <div class="doc-links-list" x-show="docLinks.length > 0">
-              <template x-for="(link, idx) in docLinks" :key="idx">
-                <div class="doc-link-row" :class="editingDocLinkIdx === idx ? 'is-editing' : ''">
+              <template x-for="{link, idx} in filteredDocLinks" :key="idx">
+                <div class="doc-link-row" :class="{ 'is-editing': editingDocLinkIdx === idx, 'is-dragging': docLinkDragIdx === idx,
+                  'drop-before': docLinkDragIdx !== idx && docLinkDropIdx === idx && !docLinkDropAfter,
+                  'drop-after': docLinkDragIdx !== idx && docLinkDropIdx === idx && docLinkDropAfter }"
+                  :data-doc-idx="idx">
 
+                  <button class="icon-btn doc-link-drag"
+                    :disabled="!!(docLinksSaving || editingDocLinkIdx !== -1)"
+                    :aria-label="'调整顺序：' + (link.label || link.path)" title="拖拽排序，或按 ↑ / ↓ 移动"
+                    @pointerdown="startDocLinkDrag($event, idx)" @pointermove="overDocLink($event)"
+                    @pointerup="dropDocLink($event)" @pointercancel="endDocLinkDrag()" @lostpointercapture="endDocLinkDrag()"
+                    @keydown.escape="endDocLinkDrag()"
+                    @keydown.up.prevent="moveDocLink(idx, filteredDocLinks[filteredDocLinks.findIndex(row => row.idx === idx) - 1]?.idx)"
+                    @keydown.down.prevent="moveDocLink(idx, filteredDocLinks[filteredDocLinks.findIndex(row => row.idx === idx) + 1]?.idx, true)">⠿</button>
                   <!-- ── 查看模式 ── -->
                   <span class="doc-link-icon" x-show="editingDocLinkIdx !== idx" x-text="docLinkIcon(link.path)"></span>
                   <div class="doc-link-info" x-show="editingDocLinkIdx !== idx">
@@ -2637,8 +2655,8 @@
                     <button class="btn-sm btn-primary doc-link-open" @click="openDocFile(link.path)" title="用默认程序打开">
                       ↗ 打开
                     </button>
-                    <button class="icon-btn" @click="startEditDocLink(idx)" title="编辑名称或路径">✎</button>
-                    <button class="icon-btn danger" @click="removeDocLink(idx)" title="移除">✕</button>
+                    <button class="icon-btn" @click="startEditDocLink(idx)" :disabled="!!(docLinksSaving || editingDocLinkIdx !== -1)" title="编辑名称或路径">✎</button>
+                    <button class="icon-btn danger" @click="removeDocLink(idx)" :disabled="!!(docLinksSaving || editingDocLinkIdx !== -1)" title="移除">✕</button>
                   </div>
 
                   <!-- ── 编辑模式（内联） ── -->
@@ -2658,8 +2676,8 @@
                       @keyup.escape="cancelEditDocLink()"
                     />
                     <div class="doc-link-edit-actions">
-                      <button class="btn-sm btn-primary" @click="saveEditDocLink()" :disabled="!editingDocLinkForm.path.trim()" :aria-busy="docLinksSaving">保存</button>
-                      <button class="btn-sm" @click="cancelEditDocLink()">取消</button>
+                      <button class="btn-sm btn-primary" @click="saveEditDocLink()" :disabled="!!(docLinksSaving || !editingDocLinkForm.path.trim())" :aria-busy="docLinksSaving">保存</button>
+                      <button class="btn-sm" @click="cancelEditDocLink()" :disabled="!!docLinksSaving">取消</button>
                     </div>
                   </div>
 
@@ -2667,6 +2685,9 @@
               </template>
             </div>
 
+            <div x-show="docLinks.length > 0 && filteredDocLinks.length === 0" class="muted text-sm doc-links-empty">
+              未找到匹配的文档，请更换关键词或清除搜索。
+            </div>
             <div x-show="docLinks.length === 0" class="muted text-sm doc-links-empty">
               暂无文档链接。添加后可在此快速打开 PDF、HTML、Markdown 等本地文件。
             </div>
@@ -2685,7 +2706,7 @@
                 class="field-input doc-link-label-input"
                 @keyup.enter="addDocLink()"
               />
-              <button class="btn-sm btn-primary" @click="addDocLink()" :disabled="!docLinkForm.path.trim()" :aria-busy="docLinksSaving">
+              <button class="btn-sm btn-primary" @click="addDocLink()" :disabled="!!(docLinksSaving || editingDocLinkIdx !== -1 || !docLinkForm.path.trim())" :aria-busy="docLinksSaving">
                 + 添加
               </button>
             </div>

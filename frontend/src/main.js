@@ -449,6 +449,11 @@ window.hatchApp = function () {
 
     // Doc links (AI > Docs quick-open documents)
     docLinks: [],
+    docLinkSearch: '',
+    docLinkPointer: null,
+    docLinkDragIdx: -1,
+    docLinkDropIdx: -1,
+    docLinkDropAfter: false,
     docLinkForm: { path: '', label: '' },
     docLinksSaving: false,
     editingDocLinkIdx: -1,
@@ -3582,61 +3587,124 @@ esac
     },
 
     // ── Doc links ──────────────────────────────────────────────────────────
-    async loadDocLinks() {
-      try {
-        this.docLinks = await GetDocLinks() || [];
-      } catch (_) {}
+    get filteredDocLinks() {
+      const query = this.docLinkSearch.trim().toLowerCase();
+      return this.docLinks.map((link, idx) => ({ link, idx }))
+        .filter(({ link, idx }) => idx === this.editingDocLinkIdx ||
+          !query || `${link.label || ''} ${link.path}`.toLowerCase().includes(query));
     },
 
-    async saveDocLinks() {
+    async loadDocLinks() {
+      if (this.docLinksSaving || this.editingDocLinkIdx !== -1 || this.docLinkPointer) return;
+      try {
+        const links = await GetDocLinks() || [];
+        if (!this.docLinksSaving && this.editingDocLinkIdx === -1 && !this.docLinkPointer) this.docLinks = links;
+      } catch (e) { this.showError(`加载文档链接失败: ${e}`); }
+    },
+
+    async saveDocLinks(links) {
+      if (this.docLinksSaving) return false;
       this.docLinksSaving = true;
       try {
-        await SaveDocLinks(this.docLinks);
+        await SaveDocLinks(links);
+        this.docLinks = links;
         this.showSuccess('文档链接已保存');
+        return true;
       } catch (e) {
         this.showError(`保存文档链接失败: ${e}`);
+        return false;
       } finally {
         this.docLinksSaving = false;
       }
     },
 
     async addDocLink() {
+      if (this.docLinksSaving || this.editingDocLinkIdx !== -1) return;
       const path = (this.docLinkForm.path || '').trim();
       if (!path) return;
       const label = (this.docLinkForm.label || '').trim() || path.split('/').pop();
-      this.docLinks = [...this.docLinks, { path, label }];
-      this.docLinkForm = { path: '', label: '' };
-      await this.saveDocLinks();
+      if (await this.saveDocLinks([...this.docLinks, { path, label }])) this.docLinkForm = { path: '', label: '' };
     },
 
     async removeDocLink(idx) {
+      if (this.docLinksSaving || this.editingDocLinkIdx !== -1) return;
       const link = this.docLinks[idx];
-      if (!(await this.askConfirm(`移除文档「${link?.label || link?.path || ''}」？只移除链接，不删除文件。`, { title: '确认移除', confirmText: '移除' }))) return;
-      this.docLinks = this.docLinks.filter((_, i) => i !== idx);
-      await this.saveDocLinks();
+      if (!link) return;
+      if (!(await this.askConfirm(`移除文档「${link.label || link.path}」？只移除链接，不删除文件。`, { title: '确认移除', confirmText: '移除' }))) return;
+      // The list may have refreshed while confirmation was open.
+      if (this.docLinks[idx] !== link) return;
+      await this.saveDocLinks(this.docLinks.filter((_, i) => i !== idx));
     },
 
     startEditDocLink(idx) {
+      if (this.docLinksSaving || this.editingDocLinkIdx !== -1) return;
       const link = this.docLinks[idx];
+      this.endDocLinkDrag();
       this.editingDocLinkIdx = idx;
       this.editingDocLinkForm = { path: link.path, label: link.label };
     },
 
     cancelEditDocLink() {
+      if (this.docLinksSaving) return;
       this.editingDocLinkIdx = -1;
       this.editingDocLinkForm = { path: '', label: '' };
     },
 
     async saveEditDocLink() {
+      if (this.docLinksSaving || this.editingDocLinkIdx === -1) return;
       const path = (this.editingDocLinkForm.path || '').trim();
       if (!path) return;
       const label = (this.editingDocLinkForm.label || '').trim() || path.split('/').pop();
       const newLinks = [...this.docLinks];
       newLinks[this.editingDocLinkIdx] = { path, label };
-      this.docLinks = newLinks;
-      this.editingDocLinkIdx = -1;
-      this.editingDocLinkForm = { path: '', label: '' };
-      await this.saveDocLinks();
+      if (await this.saveDocLinks(newLinks)) this.cancelEditDocLink();
+    },
+
+    startDocLinkDrag(event, idx) {
+      if (event.button !== 0 || this.docLinksSaving || this.editingDocLinkIdx !== -1) return;
+      this.docLinkPointer = { idx, x: event.clientX, y: event.clientY, id: event.pointerId };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+
+    overDocLink(event) {
+      const pointer = this.docLinkPointer;
+      if (!pointer || pointer.id !== event.pointerId) return;
+      if (this.docLinkDragIdx === -1 && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) < 5) return;
+      this.docLinkDragIdx = pointer.idx;
+      const row = document.elementFromPoint(event.clientX, event.clientY)?.closest('.doc-link-row');
+      this.docLinkDropIdx = row ? Number(row.dataset.docIdx) : -1;
+      if (row) {
+        const rect = row.getBoundingClientRect();
+        this.docLinkDropAfter = event.clientY > rect.top + rect.height / 2;
+      }
+    },
+
+    endDocLinkDrag() {
+      this.docLinkPointer = null;
+      this.docLinkDragIdx = -1;
+      this.docLinkDropIdx = -1;
+      this.docLinkDropAfter = false;
+    },
+
+    async dropDocLink(event) {
+      if (!this.docLinkPointer || this.docLinkPointer.id !== event.pointerId) return;
+      const from = this.docLinkDragIdx;
+      const target = this.docLinkDropIdx;
+      const after = this.docLinkDropAfter;
+      this.endDocLinkDrag();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      await this.moveDocLink(from, target, after);
+    },
+
+    async moveDocLink(from, target, after = false) {
+      if (this.docLinksSaving || this.editingDocLinkIdx !== -1 || from === target ||
+          !this.docLinks[from] || !this.docLinks[target]) return;
+      const links = [...this.docLinks];
+      const [link] = links.splice(from, 1);
+      const to = target + (after ? 1 : 0) - (from < target ? 1 : 0);
+      if (to === from) return;
+      links.splice(to, 0, link);
+      await this.saveDocLinks(links);
     },
 
     async openDocFile(path) {
