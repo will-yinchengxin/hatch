@@ -1,0 +1,33 @@
+{
+  "goal": "将04网络配置海报红框Hosts截图换成用户提供分流规则截图；只遮域名IP值，保留其他UI",
+  "done": [
+    "确认替换位置与提供的截图，标题应同步改为分流规则",
+    "提供的分流规则截图已替换Hosts区域，标签改为分流规则",
+    "只遮盖3个域名与1个IP值，保留其他规则UI",
+    "已调整下方备份和恢复区域间距，移除红框标记，鼠标未出现",
+    "已输出outputs/hatch-cursor-clean/04-网络配置-分流规则替换版.png"
+  ],
+  "remaining": [],
+  "next_action": "交付新PNG",
+  "decisions": [
+    "使用现有可编辑HTML排版，保留其他部分",
+    "保留截图所有UI标签，具体域名和IP遮盖；不保留红框"
+  ],
+  "tests": [
+    {
+      "command": "node /private/tmp/hatch-rules-replace.cjs",
+      "result": "passed",
+      "evidence": "所有素材加载成功，无页面溢出，1080x1440；已人工查看成品"
+    },
+    {
+      "command": "tesseract redacted rules image -l eng --psm 11",
+      "result": "passed",
+      "evidence": "无域名与IP残留；保留用户原截图VPN等UI词"
+    }
+  ],
+  "risks": [
+    "用户提供截图含VPN等文字；本次按用户要求保留UI，不额外篡改"
+  ],
+  "authorization": "本地图片替换与脱敏；未授权发布",
+  "complete": true
+}

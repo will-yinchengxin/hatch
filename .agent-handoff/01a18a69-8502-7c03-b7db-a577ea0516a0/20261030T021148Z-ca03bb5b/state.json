@@ -1,0 +1,28 @@
+{
+  "goal": "清理用户指定04-网络配置.png中的鼠标箭头与灰色光晕，保留文字按钮版式",
+  "done": [
+    "已查看用户原图，识别Hosts第4行右侧及底部恢复说明右侧两处鼠标痕迹",
+    "已读取imagegen和quota-handoff技能；额度原生读取5小时26%/7天58%",
+    "内置imagegen生成局部去鼠标参考，发现整图有重绘和尺寸变化，未将整图作为最终交付",
+    "改用本地可编辑源素材中同型干净输入框修复，再仅合成两个小区域到用户原图",
+    "最终 outputs/hatch-cursor-clean/04-网络配置-无鼠标.png，1080x1440；目标区外差异像素为0"
+  ],
+  "remaining": [],
+  "next_action": "交付无鼠标PNG",
+  "decisions": [
+    "仅处理指定图片，输出工作区新文件，保留Downloads原图"
+  ],
+  "tests": [
+    {
+      "command": "node /private/tmp/hatch-clean-cursor.cjs",
+      "result": "passed",
+      "evidence": "inside changed=10097, outside changed=0; 原图尺寸保持1080x1440"
+    }
+  ],
+  "risks": [
+    "Downloads原图未覆盖；本地新文件可下载替换",
+    "无后台渲染进程"
+  ],
+  "authorization": "用户授权图片清理与本地输出，未授权发布",
+  "complete": true
+}

@@ -1,0 +1,20 @@
+{
+  "width": 1080,
+  "height": 1440,
+  "changed_pixels_in_regions": 10097,
+  "changed_pixels_elsewhere": 0,
+  "regions": [
+    {
+      "left": 870,
+      "top": 690,
+      "width": 125,
+      "height": 110
+    },
+    {
+      "left": 885,
+      "top": 1235,
+      "width": 110,
+      "height": 75
+    }
+  ]
+}

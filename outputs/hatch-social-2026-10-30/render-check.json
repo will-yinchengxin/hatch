@@ -1,0 +1,44 @@
+[
+  {
+    "file": "01-抖音-总览封面",
+    "width": 1080,
+    "height": 1440,
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "file": "02-抖音-脚本工作台",
+    "width": 1080,
+    "height": 1440,
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "file": "03-抖音-待办与单词本",
+    "width": 1080,
+    "height": 1440,
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "file": "04-抖音-Mac状态",
+    "width": 1080,
+    "height": 1440,
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "file": "05-X-横版封面",
+    "width": 1600,
+    "height": 900,
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "file": "06-X-功能拼贴",
+    "width": 1600,
+    "height": 900,
+    "images": true,
+    "pageOverflow": false
+  }
+]

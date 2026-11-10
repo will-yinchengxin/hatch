@@ -1,0 +1,32 @@
+{
+  "goal": "只隐藏04网络配置图中域名IP具体值，保留输入框及其他UI；此前鼠标已移除",
+  "done": [
+    "确认使用原始截图重新制作紧贴值的遮盖，保留原图与无鼠标版",
+    "已完成8处具体值遮盖，保留输入框、边框、行号、箭头、备注、添加按钮",
+    "人工查看脱敏局部及英文OCR：未发现域名/IP残留；鼠标痕迹保持清除",
+    "输出outputs/hatch-cursor-clean/04-网络配置-仅隐藏具体值.png；Hosts区域之外像素差异0"
+  ],
+  "remaining": [],
+  "next_action": "交付修订PNG",
+  "decisions": [
+    "不遮盖整行/整输入框；保留边框行号箭头按钮",
+    "使用现有本地可编辑素材精确修改，不重绘文字"
+  ],
+  "tests": [
+    {
+      "command": "node /private/tmp/hatch-value-only.cjs",
+      "result": "passed",
+      "evidence": "changed=36637; outside=0; 1080x1440"
+    },
+    {
+      "command": "tesseract value-only asset stdout -l eng --psm 11",
+      "result": "passed",
+      "evidence": "仅备注类误识别字符，无域名IP；同时人工核验遮盖区域"
+    }
+  ],
+  "risks": [
+    "需要检查遮盖范围没有残留域名IP字符"
+  ],
+  "authorization": "用户授权本地图片值级遮盖修订，不发布",
+  "complete": true
+}

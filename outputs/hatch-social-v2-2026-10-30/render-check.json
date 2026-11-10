@@ -1,0 +1,86 @@
+[
+  {
+    "platform": "抖音",
+    "id": "01-五模块总览",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "抖音",
+    "id": "02-AI配置与用量",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "抖音",
+    "id": "03-Skills与MCP",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "抖音",
+    "id": "04-网络配置",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "抖音",
+    "id": "05-主机监控",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "抖音",
+    "id": "06-脚本工作台",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "抖音",
+    "id": "07-备忘录与单词本",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "X",
+    "id": "01-五模块总览",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "X",
+    "id": "02-AI配置与用量",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "X",
+    "id": "03-Skills与MCP",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "X",
+    "id": "04-网络配置",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "X",
+    "id": "05-主机监控",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "X",
+    "id": "06-脚本工作台",
+    "images": true,
+    "pageOverflow": false
+  },
+  {
+    "platform": "X",
+    "id": "07-备忘录与单词本",
+    "images": true,
+    "pageOverflow": false
+  }
+]
