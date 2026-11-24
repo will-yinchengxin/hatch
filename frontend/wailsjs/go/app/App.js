@@ -14,6 +14,10 @@ export function ApplyAllSchedules() {
   return window['go']['app']['App']['ApplyAllSchedules']();
 }
 
+export function ApplyHostStorageCleanup(arg1) {
+  return window['go']['app']['App']['ApplyHostStorageCleanup'](arg1);
+}
+
 export function ApplyMCP(arg1) {
   return window['go']['app']['App']['ApplyMCP'](arg1);
 }
@@ -418,6 +422,10 @@ export function ParseZshrc() {
   return window['go']['app']['App']['ParseZshrc']();
 }
 
+export function PreviewHostStorageCleanup(arg1, arg2) {
+  return window['go']['app']['App']['PreviewHostStorageCleanup'](arg1, arg2);
+}
+
 export function PreviewMCPApply(arg1) {
   return window['go']['app']['App']['PreviewMCPApply'](arg1);
 }
@@ -580,6 +588,10 @@ export function SaveZshrcAnnotation(arg1, arg2) {
 
 export function ScanAll() {
   return window['go']['app']['App']['ScanAll']();
+}
+
+export function ScanHostStorage() {
+  return window['go']['app']['App']['ScanHostStorage']();
 }
 
 export function ScheduleMemoReminders() {

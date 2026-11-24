@@ -7432,6 +7432,83 @@ p.mcp-plan-error {
 }
 .host-storage { display: flex; align-items: baseline; gap: 10px; color: var(--text-muted); font-size: 12px; }
 .host-storage strong { color: var(--text); font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+.host-storage-report {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.host-storage-inventory, .host-cleanup {
+  padding: 10px 12px;
+  border: 1px solid var(--surface-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.host-storage-inventory, .host-storage-group { margin: 0; }
+.host-storage-inventory summary, .host-storage-group summary {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.host-storage-inventory > summary > span {
+  margin-inline-start: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.host-storage-group {
+  padding: 8px 0 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--surface-3);
+}
+.host-storage-group summary small {
+  margin-inline-start: 6px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.host-cleanup .section-header-row { margin: 0; }
+.host-cleanup h4 { margin: 0; color: var(--text); font-size: 13px; }
+.host-cleanup small, .host-storage-row small { color: var(--text-muted); }
+.host-cleanup-selectors, .host-cleanup-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 10px;
+}
+.host-cleanup-footer { justify-content: space-between; }
+.host-cleanup-list, .host-cleanup-results {
+  margin-top: 8px;
+  border-top: 1px solid var(--surface-3);
+}
+.host-cleanup-results { margin-bottom: 0; padding-top: 8px; }
+.host-cleanup-results summary { margin: 0; font-size: 12px; font-weight: 600; }
+.host-cleanup-results summary small { margin-inline-start: 6px; font-weight: 400; }
+.host-storage-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px 8px;
+  padding: 7px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--surface-3);
+  color: var(--text);
+  font-size: 12px;
+}
+.host-cleanup-list .host-cleanup-option {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+  cursor: pointer;
+}
+.host-storage-entry { align-items: baseline; }
+.host-storage-trash { grid-column: 2; justify-self: end; }
+.host-cleanup-option input[type="checkbox"] { margin: 2px 0 0; }
+.host-storage-path {
+  display: block;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
 .host-panel progress { width: 100%; height: 6px; margin: 10px 0 6px; }
 .host-panel progress::-webkit-progress-bar { background: var(--surface-3); border-radius: 6px; }
 .host-panel progress::-webkit-progress-value { background: var(--primary); border-radius: 6px; }

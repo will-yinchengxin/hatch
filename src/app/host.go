@@ -10,6 +10,7 @@ import (
 var hostDiskBenchmarkLock sync.Mutex
 var hostNetworkBenchmarkLock sync.Mutex
 var hostStorageAnalysisLock sync.Mutex
+var hostStorageAnalyzer hostmonitor.StorageAnalyzer
 
 func (a *App) GetHostSnapshot() hostmonitor.Snapshot {
 	return hostmonitor.ReadSnapshot()
@@ -29,6 +30,18 @@ func (a *App) AnalyzeHostStorage() ([]hostmonitor.StorageEntry, error) {
 	}
 	defer hostStorageAnalysisLock.Unlock()
 	return hostmonitor.AnalyzeHostStorage()
+}
+
+func (a *App) ScanHostStorage() (hostmonitor.StorageReport, error) {
+	return hostStorageAnalyzer.Scan()
+}
+
+func (a *App) PreviewHostStorageCleanup(scanID string, ids []string) (hostmonitor.StorageCleanupPreview, error) {
+	return hostStorageAnalyzer.Preview(scanID, ids)
+}
+
+func (a *App) ApplyHostStorageCleanup(token string) ([]hostmonitor.StorageCleanupResult, error) {
+	return hostStorageAnalyzer.Apply(token)
 }
 
 func (a *App) RunHostDiskBenchmark() (hostmonitor.DiskBenchmark, error) {

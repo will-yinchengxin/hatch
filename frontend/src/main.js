@@ -135,6 +135,10 @@ window.hatchApp = function () {
     hostNetworkBusy: false,
     hostStorageBusy: false,
     hostStorage: null,
+    hostCleanupBusy: false,
+    hostCleanupApplying: false,
+    hostStorageSelection: [],
+    hostCleanupResults: [],
     hostPorts: null,
     hostPortsBusy: false,
     hostLoading: false,
@@ -4463,11 +4467,69 @@ esac
       finally { this.hostDiskBusy = false; }
     },
     async hostAnalyzeStorage() {
-      if (this.hostStorageBusy) return;
+      if (this.hostStorageBusy || this.hostCleanupBusy) return;
       this.hostStorageBusy = true;
-      try { this.hostStorage = await window['go']['app']['App']['AnalyzeHostStorage'](); }
+      this.hostStorage = null;
+      this.hostStorageSelection = [];
+      this.hostCleanupResults = [];
+      try { this.hostStorage = await window['go']['app']['App']['ScanHostStorage'](); }
       catch (error) { this.showError('磁盘分析失败：' + error); }
       finally { this.hostStorageBusy = false; }
+    },
+    get hostSelectedStorageBytes() {
+      return (this.hostStorage?.candidates || []).reduce(
+        (total, item) => total + (this.hostStorageSelection.includes(item.id) ? item.bytes : 0), 0);
+    },
+    hostSelectStorage(id, selected) {
+      if (this.hostCleanupBusy) return;
+      this.hostStorageSelection = this.hostStorage.candidates
+        .filter(item => item.id === id ? selected : this.hostStorageSelection.includes(item.id))
+        .map(item => item.id);
+    },
+    hostSelectAllStorage(mode) {
+      if (this.hostCleanupBusy) return;
+      const ids = this.hostStorage.candidates.map(item => item.id);
+      this.hostStorageSelection = mode === 'all' ? ids
+        : mode === 'invert' ? ids.filter(id => !this.hostStorageSelection.includes(id)) : [];
+    },
+    async hostCleanStorage(ids = this.hostStorageSelection) {
+      if (this.hostStorageBusy || this.hostCleanupBusy || !ids.length) return;
+      this.hostCleanupBusy = true;
+      try {
+        const app = window['go']['app']['App'];
+        const preview = await app.PreviewHostStorageCleanup(this.hostStorage.id, [...ids]);
+        const bytes = preview.items.reduce((total, item) => total + item.bytes, 0);
+        const paths = preview.items.map(item => item.path + ' · ' + this.hostBytes(item.bytes)).join('\n');
+        const note = preview.items.some(item => item.userFile)
+          ? '请确认这些下载文件已不再需要。' : '请先结束相关安装和构建。';
+        const message = '将以下 ' + preview.items.length + ' 项移到废纸篓，占用约 ' + this.hostBytes(bytes) +
+          '。' + note + '\n\n' + paths +
+          '\n\n如需恢复，可按原路径手动移回。空间通常在清空废纸篓后释放。';
+        if (!(await this.askConfirm(message, { title: '清理所选项目？', confirmText: '移到废纸篓' }))) return;
+
+        this.hostCleanupApplying = true;
+        const results = await app.ApplyHostStorageCleanup(preview.token);
+        this.hostCleanupResults = results;
+        this.hostStorageSelection = this.hostStorageSelection.filter(id => !ids.includes(id));
+        const resolved = new Set(results.filter(item => item.status !== 'skipped').map(item => item.id));
+        const moved = new Set(results.filter(item => item.status === 'moved').map(item => item.path));
+        const changedPaths = results.filter(item => resolved.has(item.id)).map(item => item.path);
+        this.hostStorage.candidates = this.hostStorage.candidates.filter(item => !resolved.has(item.id));
+        for (const group of this.hostStorage.groups) {
+          group.entries = group.entries.filter(entry => !moved.has(entry.path));
+          for (const entry of group.entries) {
+            if (changedPaths.some(path => path === entry.path || path.startsWith(entry.path + '/'))) {
+              entry.stale = true;
+              entry.cleanupId = '';
+            }
+          }
+        }
+      } catch (error) {
+        this.showError('清理失败：' + error);
+      } finally {
+        this.hostCleanupApplying = false;
+        this.hostCleanupBusy = false;
+      }
     },
     async hostLoadPorts() {
       if (this.hostPortsBusy) return;

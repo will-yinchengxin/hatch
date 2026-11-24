@@ -24,6 +24,8 @@ export function AnalyzeHostStorage():Promise<Array<hostmonitor.StorageEntry>>;
 
 export function ApplyAllSchedules():Promise<void>;
 
+export function ApplyHostStorageCleanup(arg1:string):Promise<Array<hostmonitor.StorageCleanupResult>>;
+
 export function ApplyMCP(arg1:mcp.ApplyRequest):Promise<void>;
 
 export function ApplyRetention():Promise<void>;
@@ -226,6 +228,8 @@ export function ParseVPNRuleLines(arg1:string,arg2:string):Promise<Array<vpn.Rul
 
 export function ParseZshrc():Promise<Array<zshrc.Entry>>;
 
+export function PreviewHostStorageCleanup(arg1:string,arg2:Array<string>):Promise<hostmonitor.StorageCleanupPreview>;
+
 export function PreviewMCPApply(arg1:mcp.ApplyRequest):Promise<mcp.ApplyPlan>;
 
 export function PreviewVPNBackup(arg1:string):Promise<vpn.BackupPreview>;
@@ -307,6 +311,8 @@ export function SaveVocabEntry(arg1:memo.VocabEntry):Promise<memo.VocabEntry>;
 export function SaveZshrcAnnotation(arg1:string,arg2:string):Promise<void>;
 
 export function ScanAll():Promise<Array<config.ScriptMeta>>;
+
+export function ScanHostStorage():Promise<hostmonitor.StorageReport>;
 
 export function ScheduleMemoReminders():Promise<void>;
 

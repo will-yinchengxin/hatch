@@ -225,14 +225,86 @@
           <div><small>顺序读取</small><strong x-text="hostBytes(hostDiskResult?.readBytesPerSecond) + '/s'"></strong></div>
         </div>
         <div class="host-actions">
-          <button class="btn-sm" @click="hostAnalyzeStorage()" :disabled="hostStorageBusy" x-text="hostStorageBusy ? '正在分析…（约 30 秒）' : '分析 Mac 目录'"></button>
-          <span>统计根目录各项（含隐藏目录）；不跨挂载点，权限不足或超时会标记为不完整。完整磁盘访问权限可提高覆盖率。</span>
+          <button class="btn-sm" @click="hostAnalyzeStorage()" :disabled="hostStorageBusy || hostCleanupBusy"
+                  :aria-busy="hostStorageBusy" x-text="hostStorageBusy ? '正在分析…' : (hostStorage ? '重新分析' : '分析 Mac 目录')"></button>
+          <span>只读统计本机目录，查找占用空间较大的位置和可重建缓存。</span>
         </div>
-        <div class="host-network-list" x-show="hostStorage">
-          <template x-for="entry in (hostStorage || [])" :key="entry.name">
-            <div class="host-network-row"><b x-text="entry.name"></b><span x-text="entry.partial ? '不完整' : '已统计'"></span><span x-text="entry.partial && !entry.bytes ? '—' : hostBytes(entry.bytes)"></span></div>
-          </template>
-        </div>
+        <template x-if="hostStorage">
+          <div class="host-storage-report">
+            <details class="host-storage-inventory">
+              <summary>目录占用概览 <span x-show="hostStorage.groups.some(group => group.partial)">部分统计不完整</span></summary>
+              <p class="host-muted">每组按大小展示，重叠目录的数值不可相加。通过检查的下载文件和缓存可移到废纸篓。</p>
+              <template x-for="group in hostStorage.groups" :key="group.name">
+                <details class="host-storage-group">
+                  <summary>
+                    <span x-text="group.name"></span>
+                    <small x-text="group.partial ? '统计不完整' : (group.entries.length ? group.entries.length + ' 项' : '无较大占用')"></small>
+                  </summary>
+                  <template x-for="entry in group.entries" :key="entry.path">
+                    <div class="host-storage-row host-storage-entry">
+                      <bdi class="host-storage-path" dir="ltr" x-text="entry.path"></bdi>
+                      <small x-text="entry.stale ? '待刷新' : (entry.partial ? '至少 ' : '') + hostBytes(entry.bytes)"></small>
+                      <button class="btn-sm host-storage-trash" x-show="entry.cleanupId" :disabled="hostCleanupBusy"
+                              :aria-label="'移到废纸篓：' + entry.path" @click="hostCleanStorage([entry.cleanupId])">移到废纸篓</button>
+                    </div>
+                  </template>
+                  <p class="host-muted" x-show="group.more" x-text="'另外 ' + group.more + ' 项较小的结果'"></p>
+                </details>
+              </template>
+            </details>
+            <div class="host-cleanup">
+              <div class="section-header-row">
+                <h4>可清理缓存</h4>
+                <small x-show="hostStorage.candidates.length" x-text="hostStorage.candidates.length + ' 项 · 约 ' + hostBytes(hostStorage.candidates.reduce((total, item) => total + item.bytes, 0))"></small>
+              </div>
+              <p class="host-muted" x-show="hostStorage.cleanupNote" x-text="hostStorage.cleanupNote"></p>
+              <p class="host-muted" x-show="!hostStorage.candidates.length && !hostCleanupApplying"
+                 x-text="hostCleanupResults.length ? '当前没有待清理缓存。' : '没有通过检查且占用至少 50 MiB 的已知缓存。'"></p>
+              <template x-if="hostStorage.candidates.length">
+                <div class="host-cleanup-selection">
+                  <div class="host-cleanup-selectors" role="group" aria-label="选择缓存">
+                    <button class="btn-sm" :disabled="hostCleanupBusy" @click="hostSelectAllStorage('all')">全选</button>
+                    <button class="btn-sm" :disabled="hostCleanupBusy" @click="hostSelectAllStorage('invert')">反选</button>
+                    <button class="btn-sm" :disabled="hostCleanupBusy || !hostStorageSelection.length" @click="hostSelectAllStorage('none')">取消全选</button>
+                  </div>
+                  <div class="host-cleanup-list">
+                    <template x-for="item in hostStorage.candidates" :key="item.id">
+                      <label class="host-storage-row host-cleanup-option">
+                        <input type="checkbox" :checked="hostStorageSelection.includes(item.id)" :disabled="hostCleanupBusy"
+                               @change="hostSelectStorage(item.id, $event.target.checked)">
+                        <span><strong x-text="item.name"></strong><bdi class="host-storage-path" dir="ltr" x-text="item.path"></bdi></span>
+                        <small x-text="hostBytes(item.bytes)"></small>
+                      </label>
+                    </template>
+                  </div>
+                  <div class="host-cleanup-footer">
+                    <small aria-live="polite" x-text="'已选 ' + hostStorageSelection.length + ' 项 · 约 ' + hostBytes(hostSelectedStorageBytes)"></small>
+                    <button class="btn-sm active" :disabled="hostCleanupBusy || !hostStorageSelection.length"
+                            @click="hostCleanStorage()">清理所选</button>
+                  </div>
+                </div>
+              </template>
+              <p class="host-muted" role="status" x-show="hostCleanupApplying">正在复核并移动所选项目…</p>
+              <template x-if="hostCleanupResults.length">
+                <details class="host-cleanup-results">
+                  <summary>上次清理结果 <small role="status"
+                    x-text="'已移动 ' + hostCleanupResults.filter(item => item.status === 'moved').length + ' 项 · 已跳过 ' + hostCleanupResults.filter(item => item.status === 'skipped').length + ' 项 · 待检查 ' + hostCleanupResults.filter(item => item.status === 'review').length + ' 项'"></small></summary>
+                  <template x-for="item in hostCleanupResults" :key="item.id">
+                    <div class="host-storage-row">
+                      <span>
+                        <strong x-text="item.name"></strong>
+                        <bdi class="host-storage-path" dir="ltr" x-text="item.path"></bdi>
+                        <bdi class="host-storage-path" dir="ltr" x-show="item.trashPath" x-text="item.trashPath || ''"></bdi>
+                        <small x-show="item.message" x-text="item.message || ''"></small>
+                      </span>
+                      <small x-text="item.status === 'moved' ? '已移到废纸篓' : (item.status === 'review' ? '需要检查' : '已跳过')"></small>
+                    </div>
+                  </template>
+                </details>
+              </template>
+            </div>
+          </div>
+        </template>
       </section>
 
       <section class="settings-section host-panel">
