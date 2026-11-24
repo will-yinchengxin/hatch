@@ -160,6 +160,8 @@ export function GetSkillsStats():Promise<skills.Stats>;
 
 export function GetVPNAppDir():Promise<string>;
 
+export function GetVPNBroadbandAddress():Promise<vpn.BroadbandAddress>;
+
 export function GetVPNConfigFile(arg1:string):Promise<vpn.ConfigFile>;
 
 export function GetVPNCurrentIP():Promise<vpn.CurrentIP>;
@@ -167,6 +169,8 @@ export function GetVPNCurrentIP():Promise<vpn.CurrentIP>;
 export function GetVPNEnhanceInfo(arg1:string):Promise<vpn.EnhanceInfo>;
 
 export function GetVPNHealthReport():Promise<vpn.HealthReport>;
+
+export function GetVPNLocalNetwork():Promise<vpn.LocalNetwork>;
 
 export function GetVPNProfileContent(arg1:string):Promise<string>;
 

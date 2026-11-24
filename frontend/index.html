@@ -3425,12 +3425,11 @@
 
     <!-- Hero -->
     <section class="page-hero ai-hero vpn-hero">
-      <!-- 刷新按钮 — 右上角，刷新四项状态 -->
       <button class="btn-refresh vpn-hero-refresh-btn"
               @click="refreshVPNStatus()"
               :aria-busy="vpnStatusRefreshing"
               :disabled="vpnStatusRefreshing"
-              title="刷新连接状态、出口 IP、节点与流量">↻</button>
+              aria-label="刷新 VPN 状态和网络地址" title="刷新 VPN 状态和网络地址">↻</button>
 
       <div class="vpn-hero-left">
         <p class="eyebrow">代理配置管理</p>
@@ -3460,31 +3459,38 @@
           </div>
         </div>
 
-        <!-- 出口 IP -->
-        <div class="vpn-dash-card">
+        <div class="vpn-dash-card vpn-egress-card">
           <div class="vpn-dash-label">
-            <span>出口 IP</span>
-            <button class="vpn-dash-icon-btn" @click.stop="refreshVPNCurrentIP()" :aria-busy="vpnIPLoading" :disabled="vpnIPLoading" title="重新检测">↻</button>
+            <span>公网出口</span>
+            <button class="vpn-dash-icon-btn" @click.stop="refreshVPNAddresses()"
+              :aria-busy="vpnIPLoading || vpnBroadbandLoading" :disabled="vpnIPLoading || vpnBroadbandLoading"
+              aria-label="重新检测公网出口" title="重新检测公网出口">↻</button>
           </div>
-          <template x-if="vpnIPLoading">
-            <div class="vpn-dash-main"><span class="vpn-dash-big vpn-dash-muted">检测中…</span></div>
-          </template>
-          <template x-if="!vpnIPLoading && vpnCurrentIP && !vpnCurrentIP.error">
-            <div class="vpn-dash-body">
-              <div class="vpn-dash-main">
-                <span class="vpn-dash-flag" x-text="vpnFlag(vpnCurrentIP.country)"></span>
-                <span class="vpn-dash-big" x-text="vpnIPPlace(vpnCurrentIP)"></span>
-              </div>
-              <div class="vpn-dash-mono" x-text="vpnCurrentIP.ip"></div>
-              <div class="vpn-dash-meta" x-show="vpnCurrentIP.org"><span x-text="vpnIPOrg(vpnCurrentIP.org)"></span></div>
+          <div class="vpn-egress-grid">
+            <div class="vpn-egress-item">
+              <div class="vpn-egress-label" x-text="vpnCurrentIP?.source === 'system' ? '系统出口' : 'Clash 出口'"></div>
+              <template x-if="vpnCurrentIP?.ip && !vpnCurrentIP.error">
+                <div class="vpn-egress-value">
+                  <bdi class="vpn-egress-address" dir="ltr" x-text="vpnCurrentIP.ip"></bdi>
+                  <div class="vpn-egress-place"><span aria-hidden="true" x-text="vpnFlag(vpnCurrentIP.country)"></span><span x-text="vpnIPPlace(vpnCurrentIP)"></span></div>
+                  <span class="vpn-egress-detail" x-show="vpnCurrentIP.org" x-text="vpnIPOrg(vpnCurrentIP.org)"></span>
+                </div>
+              </template>
+              <span class="vpn-egress-detail" x-show="!vpnCurrentIP?.ip" x-text="vpnIPLoading ? '检测中…' : '暂未取得出口地址'"></span>
             </div>
-          </template>
-          <template x-if="!vpnIPLoading && (!vpnCurrentIP || vpnCurrentIP.error)">
-            <div class="vpn-dash-body">
-              <div class="vpn-dash-main"><span class="vpn-dash-big vpn-dash-muted">检测失败</span></div>
-              <div class="vpn-dash-meta"><span>网络不通或检测服务不可用，可点 ↻ 重试</span></div>
+            <div class="vpn-egress-item">
+              <div class="vpn-egress-label">宽带真实地址</div>
+              <template x-if="vpnBroadbandAddress?.ip && !vpnBroadbandAddress.error">
+                <div class="vpn-egress-value">
+                  <bdi class="vpn-egress-address" dir="ltr" x-text="vpnBroadbandAddress.ip"></bdi>
+                  <span class="vpn-egress-place" x-show="vpnBroadbandAddress.location" x-text="vpnBroadbandAddress.location"></span>
+                  <span class="vpn-egress-detail" x-text="'物理网卡 ' + vpnBroadbandAddress.interface + ' · 直连'"></span>
+                </div>
+              </template>
+              <span class="vpn-egress-detail" x-show="!vpnBroadbandAddress?.ip"
+                x-text="vpnBroadbandLoading ? '检测中…' : (vpnBroadbandAddress?.error || '暂未取得宽带地址')"></span>
             </div>
-          </template>
+          </div>
         </div>
 
         <!-- 当前节点 -->
@@ -3537,6 +3543,29 @@
           <div class="vpn-dash-foot" x-show="vpnStatus && vpnStatus.coreOnline">
             <span x-text="'本次运行 ↑ ' + vpnFormatBytes(vpnStatus && vpnStatus.sessionUpload) + ' · ↓ ' + vpnFormatBytes(vpnStatus && vpnStatus.sessionDownload)"></span>
           </div>
+        </div>
+
+        <div class="vpn-dash-card vpn-local-card">
+          <div class="vpn-dash-label">
+            <span>本机网络</span>
+            <button class="vpn-dash-icon-btn" @click.stop="refreshVPNLocalNetwork()"
+              :aria-busy="vpnLocalNetworkLoading" :disabled="vpnLocalNetworkLoading"
+              aria-label="刷新本机网络" title="刷新本机网络">↻</button>
+          </div>
+          <dl class="vpn-local-grid" x-show="vpnNetworkRows.length">
+            <template x-for="row in vpnNetworkRows" :key="row.key">
+              <div class="vpn-local-item">
+                <dt x-text="row.label"></dt>
+                <dd><bdi class="vpn-egress-address" dir="ltr" x-text="row.ip"></bdi></dd>
+                <dd class="vpn-egress-detail">
+                  <span x-text="row.detail"></span>
+                  <span class="vpn-local-default" x-show="row.primary">默认出口</span>
+                </dd>
+              </div>
+            </template>
+          </dl>
+          <span class="vpn-egress-detail" x-show="!vpnNetworkRows.length"
+            x-text="vpnLocalNetworkLoading ? '读取中…' : (vpnLocalNetwork?.error || '未检测到活动的 IPv4 地址')"></span>
         </div>
       </div>
     </section>

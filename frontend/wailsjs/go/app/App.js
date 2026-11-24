@@ -286,6 +286,10 @@ export function GetVPNAppDir() {
   return window['go']['app']['App']['GetVPNAppDir']();
 }
 
+export function GetVPNBroadbandAddress() {
+  return window['go']['app']['App']['GetVPNBroadbandAddress']();
+}
+
 export function GetVPNConfigFile(arg1) {
   return window['go']['app']['App']['GetVPNConfigFile'](arg1);
 }
@@ -300,6 +304,10 @@ export function GetVPNEnhanceInfo(arg1) {
 
 export function GetVPNHealthReport() {
   return window['go']['app']['App']['GetVPNHealthReport']();
+}
+
+export function GetVPNLocalNetwork() {
+  return window['go']['app']['App']['GetVPNLocalNetwork']();
 }
 
 export function GetVPNProfileContent(arg1) {

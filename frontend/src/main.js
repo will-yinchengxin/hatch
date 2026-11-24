@@ -67,6 +67,8 @@ const GetVPNSettings        = ()                            => window['go']['app
 const SaveVPNSettings       = (appDir, backupDir)           => window['go']['app']['App']['SaveVPNSettings'](appDir, backupDir);
 const GetVPNStatus          = ()                            => window['go']['app']['App']['GetVPNStatus']();
 const GetVPNCurrentIP       = ()                            => window['go']['app']['App']['GetVPNCurrentIP']();
+const GetVPNBroadbandAddress = ()                           => window['go']['app']['App']['GetVPNBroadbandAddress']();
+const GetVPNLocalNetwork     = ()                           => window['go']['app']['App']['GetVPNLocalNetwork']();
 const GetVPNHealthReport    = ()                            => window['go']['app']['App']['GetVPNHealthReport']();
 const ValidateVPNSettings   = (appDir, backupDir)           => window['go']['app']['App']['ValidateVPNSettings'](appDir, backupDir);
 const PreviewVPNBackup      = (zipPath)                     => window['go']['app']['App']['PreviewVPNBackup'](zipPath);
@@ -382,6 +384,10 @@ window.hatchApp = function () {
     vpnAppDir: '',
     vpnStatus: null,
     vpnCurrentIP: null,
+    vpnBroadbandAddress: null,
+    vpnBroadbandLoading: false,
+    vpnLocalNetwork: null,
+    vpnLocalNetworkLoading: false,
     vpnIPLoading: false,
     vpnHealthReport: null,
     vpnHealthLoading: false,
@@ -4584,6 +4590,8 @@ esac
     // ── VPN ───────────────────────────────────────────────────────────────
 
     async refreshVPNStatus() {
+      this.refreshVPNAddresses();
+      this.refreshVPNLocalNetwork();
       this.vpnStatusRefreshing = true;
       try {
         const [status, report] = await Promise.all([
@@ -4597,10 +4605,11 @@ esac
       } finally {
         this.vpnStatusRefreshing = false;
       }
-      this.refreshVPNCurrentIP();
     },
 
     async loadVPNOverview() {
+      this.refreshVPNAddresses();
+      this.refreshVPNLocalNetwork();
       try {
         this.vpnHealthLoading = true;
         const [profilesRes, dirRes, backupsRes, statusRes, settingsRes, reportRes] = await Promise.allSettled([
@@ -4623,8 +4632,6 @@ esac
         this.vpnStatus = statusRes.status === 'fulfilled' ? (statusRes.value || null) : null;
         this.vpnSettings = settings || null;
         this.vpnHealthReport = reportRes.status === 'fulfilled' ? (reportRes.value || null) : null;
-        // Fetch real exit IP in background (network call, takes a moment)
-        this.refreshVPNCurrentIP();
         if (settings) {
           this.vpnSettingsForm = { appDir: settings.appDir, backupDir: settings.backupDir };
           this.vpnBackupDir = settings.backupDir;
@@ -4671,9 +4678,14 @@ esac
       return gb >= 1 ? gb.toFixed(2) + ' GB' : (bytes / 1024 / 1024).toFixed(0) + ' MB';
     },
 
+    refreshVPNAddresses() {
+      this.refreshVPNCurrentIP();
+      this.refreshVPNBroadbandAddress();
+    },
+
     async refreshVPNCurrentIP() {
+      if (this.vpnIPLoading) return;
       this.vpnIPLoading = true;
-      this.vpnCurrentIP = null;
       try {
         this.vpnCurrentIP = await GetVPNCurrentIP();
       } catch (e) {
@@ -4681,6 +4693,53 @@ esac
       } finally {
         this.vpnIPLoading = false;
       }
+    },
+
+    async refreshVPNBroadbandAddress() {
+      if (this.vpnBroadbandLoading) return;
+      this.vpnBroadbandLoading = true;
+      try {
+        this.vpnBroadbandAddress = await GetVPNBroadbandAddress();
+      } catch (_) {
+        this.vpnBroadbandAddress = { error: '宽带检测暂不可用' };
+      } finally {
+        this.vpnBroadbandLoading = false;
+      }
+    },
+
+    async refreshVPNLocalNetwork() {
+      if (this.vpnLocalNetworkLoading) return;
+      this.vpnLocalNetworkLoading = true;
+      try {
+        this.vpnLocalNetwork = await GetVPNLocalNetwork();
+      } catch (_) {
+        this.vpnLocalNetwork = { error: '无法读取本机网络' };
+      } finally {
+        this.vpnLocalNetworkLoading = false;
+      }
+    },
+
+    get vpnNetworkRows() {
+      const network = this.vpnLocalNetwork;
+      if (!network || network.error) return [];
+      const labels = { lan: '局域网地址', vm: '虚拟机网络', clash: 'Clash 虚拟网卡', vpn: 'VPN 虚拟地址', other: '其他接口' };
+      const order = ['lan', 'vm', 'clash', 'vpn', 'other'];
+      const rows = (network.addresses || []).map(item => ({
+        ...item,
+        key: item.interface + '/' + item.ip,
+        label: labels[item.kind] || labels.other,
+        primary: item.interface === network.defaultInterface,
+        detail: item.interface + (item.kind === 'clash' ? ' · TUN 模式' : ''),
+      })).sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || Number(b.primary) - Number(a.primary));
+      if (network.gateway || rows.length) {
+        rows.splice(rows[0]?.kind === 'lan' ? 1 : 0, 0, {
+          key: 'gateway',
+          label: '默认网关',
+          ip: network.gateway || '—',
+          detail: network.gateway ? network.defaultInterface : '未读取到 IPv4 网关',
+        });
+      }
+      return rows;
     },
 
     async loadVPNConfig() {

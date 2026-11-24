@@ -45,6 +45,10 @@ func (a *App) TestVPNNodeDelay(name string) (int, error) { return a.vpn().TestNo
 // GetVPNCurrentIP fetches the exit IP via Clash's HTTP proxy (direct fallback).
 func (a *App) GetVPNCurrentIP() vpn.CurrentIP { return a.vpn().CurrentIP() }
 
+func (a *App) GetVPNBroadbandAddress() vpn.BroadbandAddress { return vpn.ReadBroadbandAddress() }
+
+func (a *App) GetVPNLocalNetwork() vpn.LocalNetwork { return vpn.ReadLocalNetwork() }
+
 func (a *App) GetVPNAppDir() string { return a.vpn().EffectiveAppDir() }
 
 func (a *App) GetVPNProfiles() ([]vpn.Profile, error) { return a.vpn().Profiles() }

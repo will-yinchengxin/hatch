@@ -109,6 +109,7 @@ type CurrentIP struct {
 	Region  string `json:"region"`
 	City    string `json:"city"`
 	Org     string `json:"org"`
+	Source  string `json:"source,omitempty"`
 	Error   string `json:"error,omitempty"`
 }
 
@@ -838,6 +839,7 @@ func (m Manager) CurrentIP() CurrentIP {
 	}
 	result, err := fetchIPInfo(proxyClient)
 	if err == nil {
+		result.Source = "clash"
 		return result
 	}
 
@@ -847,6 +849,7 @@ func (m Manager) CurrentIP() CurrentIP {
 	if err != nil {
 		return CurrentIP{Error: err.Error()}
 	}
+	result.Source = "system"
 	return result
 }
 
@@ -858,10 +861,16 @@ func fetchIPInfo(client *http.Client) (CurrentIP, error) {
 		return CurrentIP{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return CurrentIP{}, fmt.Errorf("IP 查询服务返回 HTTP %d", resp.StatusCode)
+	}
 
 	var result CurrentIP
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 16<<10)).Decode(&result); err != nil {
 		return CurrentIP{}, err
+	}
+	if net.ParseIP(result.IP) == nil {
+		return CurrentIP{}, fmt.Errorf("IP 查询服务未返回有效地址")
 	}
 	return result, nil
 }

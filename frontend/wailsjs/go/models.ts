@@ -2618,6 +2618,24 @@ export namespace vpn {
 	        this.numFiles = source["numFiles"];
 	    }
 	}
+	export class BroadbandAddress {
+	    ip: string;
+	    location: string;
+	    interface: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BroadbandAddress(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ip = source["ip"];
+	        this.location = source["location"];
+	        this.interface = source["interface"];
+	        this.error = source["error"];
+	    }
+	}
 	export class ConfigFile {
 	    name: string;
 	    path: string;
@@ -2640,6 +2658,7 @@ export namespace vpn {
 	    region: string;
 	    city: string;
 	    org: string;
+	    source?: string;
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2653,6 +2672,7 @@ export namespace vpn {
 	        this.region = source["region"];
 	        this.city = source["city"];
 	        this.org = source["org"];
+	        this.source = source["source"];
 	        this.error = source["error"];
 	    }
 	}
@@ -2894,6 +2914,59 @@ export namespace vpn {
 	        this.note = source["note"];
 	    }
 	}
+	export class NetworkAddress {
+	    interface: string;
+	    ip: string;
+	    kind: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NetworkAddress(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.interface = source["interface"];
+	        this.ip = source["ip"];
+	        this.kind = source["kind"];
+	    }
+	}
+	export class LocalNetwork {
+	    addresses: NetworkAddress[];
+	    defaultInterface: string;
+	    gateway: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalNetwork(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.addresses = this.convertValues(source["addresses"], NetworkAddress);
+	        this.defaultInterface = source["defaultInterface"];
+	        this.gateway = source["gateway"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class PathValidation {
 	    appDirOk: boolean;
 	    backupDirOk: boolean;
